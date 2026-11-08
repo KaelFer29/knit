@@ -19,4 +19,6 @@ export interface CliDeps {
   cwd?: string;
   /** Pause between polls of `logs --follow` (override in tests). */
   sleep?: (ms: number) => Promise<void>;
+  /** Ends a long-running command such as `ui` (default: SIGINT or SIGTERM). Tests abort it instead of signalling. */
+  stopSignal?: AbortSignal;
 }

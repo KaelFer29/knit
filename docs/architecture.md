@@ -21,6 +21,7 @@ src/
     storage/sqlite/  RunStore (read-write) and RunReader (read-only)
     storage/files/   TranscriptStore (raw JSONL)
     system/          process spawning with timeouts and group kill
+  server/          driving adapter: HTTP API, live stream (SSE), static files and the security guard of `knit ui`; receives a `RunReader`, knows nothing about SQLite
   cli/             command line: wires adapters into the core
     commands/        one module per command
     support/         argument parsing, paths, formatting
@@ -29,7 +30,7 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 
 ## Dependency rule
 
-`core` imports nothing outside `core`. `adapters` import `core/ports` (and a few core types). `cli` imports both and is the only place where adapters are chosen. This is what keeps the core testable with fakes and the adapters replaceable.
+`core` imports nothing outside `core`. `adapters` import `core/ports` (and a few core types). `server` imports `core` (ports and the board view model) and no adapter. `cli` imports all of them and is the only place where adapters are chosen. This is what keeps the core testable with fakes and the adapters replaceable.
 
 ## Ports
 
@@ -49,11 +50,16 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 
 `core/board` is data in, view model out: it takes the records a `RunReader` returns and builds what the page draws (see [web-interface.md](web-interface.md#read-side-and-board-view-model)). It imports only port types, so `web/` can `import type` it.
 
+### Server
+
+`src/server` is a driving adapter, like the CLI: it turns HTTP requests into calls on the `RunReader` port. It is built from small parts: `security.ts` (the guard every request passes), `router.ts` (method and path matching), `routes/<name>.ts` (one module per group of routes, each a function from the server's dependencies to a list of routes), `static.ts` (built app and SPA fallback) and `server.ts` (wires them on `127.0.0.1`). `lazy-reader.ts` wraps any `RunReader` for a database that does not exist yet. Details in [web-interface.md](web-interface.md#http-api).
+
 ## Extending
 
 - **Another agent** (for example Claude Code headless): implement `AgentRunner` under `adapters/agents/<name>/`, then choose it in `cli/commands/execute.ts`.
 - **Another code host**: implement `PullRequests` under `adapters/vcs/<host>/`.
 - **Another command**: add `cli/commands/<name>.ts`, route it in `cli/main.ts` and describe it in `cli/usage.ts`.
+- **Another HTTP route**: add `server/routes/<name>.ts` and register it with one line in `server/routes/index.ts`; it sits behind the security guard automatically.
 - **A new acceptance rule**: add a pure function under `core/verification/` and call it from `core/run/run-plan.ts`.
 
 ## Tests

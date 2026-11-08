@@ -4,6 +4,7 @@ import { resumeCommand } from "./commands/resume.js";
 import { runCommand } from "./commands/run.js";
 import { runsCommand } from "./commands/runs.js";
 import { showCommand } from "./commands/show.js";
+import { uiCommand } from "./commands/ui.js";
 import { validateCommand } from "./commands/validate.js";
 import { UsageError } from "./errors.js";
 import type { CliDeps, CliIo } from "./types.js";
@@ -35,6 +36,8 @@ export async function main(argv: string[], io: CliIo, deps: CliDeps = {}): Promi
         return await logsCommand(rest, io, deps, env);
       case "clean":
         return cleanCommand(rest, io, deps, env);
+      case "ui":
+        return await uiCommand(rest, io, deps, env);
       case undefined:
       case "help":
       case "--help":
