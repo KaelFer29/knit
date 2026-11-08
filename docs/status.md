@@ -6,7 +6,9 @@ Where Knit stands, what is not obvious from the code, and what comes next. Read 
 
 Knit turns a plan into verified, stacked pull requests. A one-shot CLI (not a server) runs each task in its own git worktree on the plan's branch, with the Cursor CLI as implementer. The agent edits and commits its own work; Knit verifies it (process, scope, git hygiene, checks), retries with feedback, and can push and open stacked PRs. It also records everything: a run history in SQLite, the agent's full timeline, and raw transcripts. Commands: `run`, `resume`, `validate`, `runs`, `show`, `logs`, `clean`.
 
-It was verified end to end against the real Cursor CLI. 200 tests pass, and every commit in the history typechecks and passes its own tests.
+`knit ui` serves a web app on `127.0.0.1` with four pages: runs (live canvas, start, abort, resume, retry, task diffs), workspace (chat sessions with Claude and Cursor, plan drafts launched as runs), configuration (Claude and Cursor files, diff before saving) and a read-only file explorer. Chat turns run through `knit chat` (Claude by default, `claude -p` with the subscription), and `knit followup` sends more work to a task's Cursor chat.
+
+The run loop was verified end to end against the real Cursor CLI. On the branch `docs/web-interface-close`, `pnpm typecheck`, `pnpm test` (936 tests in 84 files) and `pnpm build` pass. Every commit typechecks and passes its own tests.
 
 ## Findings that shaped the design
 
@@ -22,10 +24,19 @@ Project-wide rules (language, commits, where to look) live in `CLAUDE.md`, which
 
 ## Next steps
 
-1. **Web interface** (in progress): Knit becomes one workspace for planning with Claude, orchestrating and implementing with Cursor. Design in [web-interface.md](web-interface.md); specs, phases and tasks in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md). `knit logs --follow` (`src/cli/commands/logs.ts`) is the terminal reference for the live timeline.
-2. **A `knit-plan` skill** so Claude writes a valid plan and runs `knit validate`; now part of the interface's plan handoff (task T13).
-3. **A first real run on a real project** with a minimal docs-only task, since the agent has no sandbox.
-4. Smaller items: a `LICENSE`, continue independent tasks after a failure, a `claude -p` adapter for planner or verifier roles, and measuring token cost on real tasks.
+### Done
+
+- The web interface, tasks T1 to T17: the read side, `knit ui`, the canvas with live data, detail panels, runs and run control, the workspace and plan handoff, the configuration editor, the file explorer, and live file activity for task attempts. Known limits are in [web-interface.md](web-interface.md#known-limits-and-follow-ups).
+- The `knit-plan` skill (T13): Claude writes a valid plan and runs `knit validate`.
+
+### Pending
+
+1. **Verification of the web interface**: an independent verifier for each task that names a high-risk item, then the native review, each with the user's consent per candidate.
+2. **The user's visual review** of the interface, once everything is implemented.
+3. **Interactive `claude --resume` of a `-p` session** is not verified: it cannot be tested headless. Session resume from the terminal rests on it (D10).
+4. **Known limits** of the web interface (see the link above), for example session-level file activity and polling for sessions.
+5. **A first real run on a real project** with a minimal docs-only task, since the agent has no sandbox.
+6. Smaller items: a `LICENSE`, continue independent tasks after a failure, a verifier role for Claude, and measuring token cost on real tasks.
 
 ## Picking it up
 
