@@ -2,6 +2,7 @@ import type { AgentRunner } from "../core/ports/agent-runner.js";
 import type { ProcessControl } from "../core/ports/process-control.js";
 import type { PullRequests } from "../core/ports/pull-requests.js";
 import type { TaskDiff } from "../core/ports/task-diff.js";
+import type { FileActivity } from "../core/ports/file-activity.js";
 import type { Spawner } from "../server/index.js";
 
 export interface CliIo {
@@ -30,6 +31,8 @@ export interface CliDeps {
   spawnKnit?: Spawner;
   /** Reads what a task changed for the web interface (override in tests). Default: the diff of the task's worktree. */
   taskDiff?: TaskDiff;
+  /** Reads the files a task worktree has changed for the web interface (override in tests). Default: git status of the worktree. */
+  fileActivity?: FileActivity;
   /** Pull request adapter (override in tests). Default: GitHub CLI. */
   pullRequests?: PullRequests;
   /** Extra git args for every git call (tests disable hooks with this). */

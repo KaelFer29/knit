@@ -64,7 +64,7 @@ The port declares these as `AgentCapabilities` on each runner (`src/core/ports/a
 ## Files
 
 - **Phase A:** each task's diff, from its start commit to its last commit.
-- **Phases B and C:** the files an agent touches while a turn runs, from tool-call paths and the worktree's `git status`.
+- **Built (T14), task attempts:** the files each attempt touched, from the paths of its timeline's file tool calls (`Read`, `Edit`, `Write`, `NotebookEdit` and Cursor's `args.path`; search and listing tools are skipped), plus the task worktree's `git status`. The derivation is the pure `touchedPaths` in `src/core/timeline/file-activity.ts`, confined to the worktree (`confinePath`: relative, no `..`, no backslash or NUL, absolute paths only inside the worktree). The worktree list comes from the `FileActivity` port (`GitFileActivity`, which reuses the scope check's `listChangedPaths`). The task detail panel shows both. The workspace (sessions, phases B and C) does not show them yet.
 - **Phase E (built):** a read-only file explorer for the repository and the task worktrees (`FileTree` port, `FsFileTree` adapter, routes above). The root directory always comes from the run record, never from the request. Every path is confined to its root: `..`, absolute paths, NUL, backslashes, `.git` and symlinks that resolve outside the root are `403`; the `.git` directory is not listed. The page (`web/src/containers/FilesView.tsx`, `organisms/FileExplorer.tsx`) opens at `/?view=files&run=<run-id>` (add `&demo=1`, or omit `run`, for built-in sample files): a root switcher, a lazily loaded tree and a text viewer that renders contents as plain text, with a note for binary and oversized files.
 
 ## Process model
@@ -274,7 +274,7 @@ Built in task T6 on top of the flow canvas: the `renderDetail` slot of every dis
 | --- | --- |
 | Claude | the plan text (plain text; a run recorded before schema 4 says it stored none) and the specs of every task |
 | Knit | per task and attempt: the setup command, the verdicts on checks, scope and the commit history, the feedback sent to the agent for the next attempt (derived from the failed attempt before it) and the last lines of the recorded output |
-| a task (queue, active task, or a delivered task opened from the delivery lane) | its goal, every attempt with its verdicts and the agent timeline (loaded when the attempt opens), and "Changes": the diff from `GET /api/runs/:id/tasks/:task/diff`, one expandable section per file |
+| a task (queue, active task, or a delivered task opened from the delivery lane) | its goal, every attempt with its verdicts, the agent timeline and the files it touched (loaded when the attempt opens), "Changes": the diff from `GET /api/runs/:id/tasks/:task/diff`, one expandable section per file, and "Worktree changes": what the worktree's git status lists now (from `GET /api/runs/:id/tasks/:task/activity`) |
 | Cursor | none of its own: its work is opened task by task |
 
 Gaps: Knit stores only the failed check's command, not its output, so the "check output" is shown for the setup command only; the retry feedback is rebuilt from the verdicts, not read from a stored prompt. The agent output, the plan and the patch always render as text (never as markup).
@@ -314,6 +314,7 @@ Built in tasks T3 (read routes) and T8 (run control, `src/server/routes/control.
 | `GET /api/runs/:id/roots` | `{ roots }`: what the explorer may show, `repo` (the run's repository) and one entry per task that has a worktree (id is the task id) |
 | `GET /api/runs/:id/files?root=<id>&path=<dir>` | `{ root, path, entries }`: one directory level, directories first; `path` is relative and empty for the root |
 | `GET /api/runs/:id/file?root=<id>&path=<file>` | `{ root, kind, path, size, ... }`: `kind` is `text` (with `text`), `binary` or `too-large` (with `limit`, 512 KiB); bytes of binary or oversized files are never sent |
+| `GET /api/runs/:id/tasks/:task/activity?attempt=<n>` | `{ runId, taskId, attempt, touched }`: the relative paths the attempt's file tool calls touched, each once. Without `attempt`: `{ runId, taskId, touched, worktree }` for the whole task, where `worktree` is `{ paths, moreFiles }` (at most 200 paths) from the worktree's git status, or `null` when the worktree is gone or not a git worktree. 400 on a malformed `attempt`, 404 for an unknown task |
 | `GET /api/runs/:id/tasks/:task/diff` | `{ runId, taskId, startSha, commitSha?, files, moreFiles }`: what the task changed, read from its worktree between `startSha` and `commitSha` (to the worktree content while the task has no commit). Each file has `path`, `status` (`added`, `modified`, `deleted`), `binary`, `additions`, `deletions` and the `patch` hunks; a patch over 100,000 characters is left out with `truncated: true`, and at most 200 files are listed (`moreFiles`). 404 when the task has not started or its worktree is gone, 503 on a server without the diff port |
 | `GET /api/runs/:id/stream` | Server-Sent Events, see below |
 | `GET /*` | the built app from `dist/web` (or the directory the server was started with) |

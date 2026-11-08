@@ -3,6 +3,7 @@ import type { FileTree } from "../core/ports/file-tree.js";
 import type { PlanDrafts } from "../core/ports/plan-drafts.js";
 import type { RunReader } from "../core/ports/run-reader.js";
 import type { TaskDiff } from "../core/ports/task-diff.js";
+import type { FileActivity } from "../core/ports/file-activity.js";
 import type { AgentCapabilities } from "../core/ports/agent-runner.js";
 import type { SessionReader } from "../core/ports/session-reader.js";
 
@@ -26,6 +27,8 @@ export interface ServerDeps {
   taskDiff?: TaskDiff;
   /** Read-only detection of the draft plans in a session's directory. Without it the plans route answers 503. */
   plans?: PlanDrafts;
+  /** Reads the files a task worktree has changed. Without it the activity route leaves the worktree list out. */
+  fileActivity?: FileActivity;
 }
 
 export interface RouteContext {

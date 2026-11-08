@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { FsPlanDrafts } from "../../adapters/system/plan-drafts.js";
 import { FsFileTree } from "../../adapters/system/file-tree.js";
 import { GitTaskDiff } from "../../adapters/vcs/git/task-diff.js";
+import { GitFileActivity } from "../../adapters/vcs/git/file-activity.js";
 import { SqliteRunReader } from "../../adapters/storage/sqlite/run-reader.js";
 import { FileConfigFiles } from "../../adapters/system/config-files.js";
 import { useConfigFiles } from "../../server/routes/config.js";
@@ -154,6 +155,7 @@ export async function uiCommand(args: string[], io: CliIo, deps: CliDeps, env: N
       files: new FsFileTree(),
       plans: new FsPlanDrafts(),
       taskDiff: deps.taskDiff ?? new GitTaskDiff(),
+      fileActivity: deps.fileActivity ?? new GitFileActivity(),
       ...(control ? { control } : {}),
     });
   } catch (err) {
