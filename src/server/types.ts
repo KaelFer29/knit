@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { FileTree } from "../core/ports/file-tree.js";
 import type { RunReader } from "../core/ports/run-reader.js";
 
 export type Method = "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -15,6 +16,8 @@ export interface ServerDeps {
   now: () => number;
   /** Run control (start, abort, resume, retry). Optional so a read-only server stays possible. */
   control?: ControlDeps;
+  /** Read-only file explorer for the repository and the task worktrees. Without it the file routes answer 503. */
+  files?: FileTree;
 }
 
 export interface RouteContext {

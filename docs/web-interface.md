@@ -65,7 +65,7 @@ The port declares these as `AgentCapabilities` on each runner (`src/core/ports/a
 
 - **Phase A:** each task's diff, from its start commit to its last commit.
 - **Phases B and C:** the files an agent touches while a turn runs, from tool-call paths and the worktree's `git status`.
-- **Phase E:** a file explorer for the repository and the task worktrees.
+- **Phase E (API built):** a read-only file explorer for the repository and the task worktrees (`FileTree` port, `FsFileTree` adapter, routes above). The root directory always comes from the run record, never from the request. Every path is confined to its root: `..`, absolute paths, NUL, backslashes, `.git` and symlinks that resolve outside the root are `403`; the `.git` directory is not listed.
 
 ## Process model
 
@@ -266,6 +266,9 @@ Built in tasks T3 (read routes) and T8 (run control, `src/server/routes/control.
 | `GET /api/runs` | `{ runs }`: `RunListItem[]`, newest first, with status, task counts and token totals |
 | `GET /api/runs/:id` | the `RunSnapshot` (`run`, `tasks`, `attempts`, `events`, `lastEventId`, `lastAgentEventId`) plus `board`, the `BoardModel` built by `core/board`. The plan text is `run.planText` |
 | `GET /api/runs/:id/tasks/:task/attempts/:n/timeline` | `{ runId, taskId, attempt, events }`: the agent timeline of one attempt (lazy, for expanded blocks). An attempt without entries is an empty list |
+| `GET /api/runs/:id/roots` | `{ roots }`: what the explorer may show, `repo` (the run's repository) and one entry per task that has a worktree (id is the task id) |
+| `GET /api/runs/:id/files?root=<id>&path=<dir>` | `{ root, path, entries }`: one directory level, directories first; `path` is relative and empty for the root |
+| `GET /api/runs/:id/file?root=<id>&path=<file>` | `{ root, kind, path, size, ... }`: `kind` is `text` (with `text`), `binary` or `too-large` (with `limit`, 512 KiB); bytes of binary or oversized files are never sent |
 | `GET /api/runs/:id/stream` | Server-Sent Events, see below |
 | `GET /*` | the built app from `dist/web` (or the directory the server was started with) |
 

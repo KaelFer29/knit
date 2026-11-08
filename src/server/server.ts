@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { FileTree } from "../core/ports/file-tree.js";
 import type { RunReader } from "../core/ports/run-reader.js";
 import { BASE_HEADERS, HttpError, sendError } from "./http.js";
 import { decodeSegments, Router } from "./router.js";
@@ -24,6 +25,8 @@ export interface ServerOptions {
   now?: () => number;
   /** Run control (start, abort, resume, retry). Without it those routes answer 503. */
   control?: ControlDeps;
+  /** File explorer. Without it the file routes answer 503. */
+  files?: FileTree;
 }
 
 export interface RunningServer {
@@ -50,6 +53,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     heartbeatMs: options.heartbeatMs ?? 15_000,
     now: options.now ?? Date.now,
     ...(options.control ? { control: options.control } : {}),
+    ...(options.files ? { files: options.files } : {}),
   };
   const router = new Router(routeModules.flatMap((mod) => mod(deps)));
   const staticDir = options.staticDir ?? defaultStaticDir();
