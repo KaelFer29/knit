@@ -30,21 +30,22 @@ describe("PlanDrafts", () => {
     expect(screen.getByText("feat/form")).toBeTruthy();
     expect(screen.getByRole("link", { name: /run-1234 · passed/ }).getAttribute("href")).toBe("?run=run-12345678-zz#/runs");
     expect(onLaunch).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Launch run" }));
+    await user.click(screen.getByRole("button", { name: "Send plan to Knit" }));
     expect(onLaunch).toHaveBeenCalledWith(valid);
   });
 
-  it("lists the issues of an invalid plan as text and offers no launch", () => {
+  it("lists the issues of an invalid plan as text and disables sending it with the reason", () => {
     render(<PlanDrafts dir="docs/plans" plans={[invalid]} onLaunch={() => {}} />);
     expect(screen.getByText("Invalid · 2 issues")).toBeTruthy();
     expect(screen.getByText("<b>bad</b>")).toBeTruthy();
     expect(document.querySelector("b")).toBeNull();
-    expect(screen.queryByRole("button", { name: /Launch/ })).toBeNull();
+    expect((screen.getByRole("button", { name: "Send plan to Knit" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Fix 2 issues first.")).toBeTruthy();
   });
 
   it("disables launching while one is in flight and shows an error", () => {
     render(<PlanDrafts dir="docs/plans" plans={[valid]} launching={valid.path} error="Boom" onLaunch={() => {}} />);
-    expect((screen.getByRole("button", { name: "Launching…" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Sending…" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole("alert").textContent).toBe("Boom");
   });
 });
