@@ -1,0 +1,44 @@
+.logo {
+  --logo-size: var(--size-logo);
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--logo-size);
+  height: var(--logo-size);
+  border-radius: var(--radius-md);
+  background: var(--logo-accent-soft);
+  color: var(--logo-accent);
+  overflow: hidden;
+}
+
+.logo__img {
+  position: absolute;
+  inset: 18%;
+  width: 64%;
+  height: 64%;
+  object-fit: contain;
+  /* The file is drawn once it has loaded; until then (or if it never does) the monogram shows. */
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.logo[data-monochrome="true"] .logo__img {
+  filter: var(--logo-mono-filter);
+}
+
+.logo[data-state="ready"] .logo__img {
+  opacity: 1;
+}
+
+.logo[data-state="mark"] svg {
+  width: 72%;
+  height: 72%;
+}
+
+.logo__monogram {
+  font-size: calc(var(--logo-size) * 0.44);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}

@@ -1,0 +1,22 @@
+.agent-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.agent-badge__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.agent-badge__label {
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.agent-badge__role {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
