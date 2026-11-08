@@ -28,6 +28,10 @@ export interface RunDeps {
 export interface RunOptions {
   runId: string;
   planPath: string;
+  /** Plan file content, stored with the run when it starts. */
+  planText?: string;
+  /** Process executing the run, recorded so it can be found and stopped. */
+  pid?: number;
   /** Attempts per task before it is failed (default 2). */
   maxAttempts?: number;
   agentTimeoutMs?: number;
@@ -90,6 +94,16 @@ function describeFailure(f: RetryContext): string {
  * (which edits and commits), verify (process, scope, git hygiene, checks), retry with feedback,
  * then optionally push and open a PR. Deterministic code: all intelligence lives behind the ports.
  */
+/** What the plan says about a task, stored with it so a run can be shown without re-reading the plan file. */
+function snapshotOf(task: Task, index: number): Pick<TaskRecord, "goal" | "dependsOn" | "position" | "specs"> {
+  return {
+    goal: task.goal,
+    ...(task.dependsOn ? { dependsOn: task.dependsOn } : {}),
+    position: index + 1,
+    specs: task.specs.map((s) => ({ id: s.id, text: s.text })),
+  };
+}
+
 export async function runPlan(plan: ResolvedPlan, deps: RunDeps, options: RunOptions): Promise<RunSummary> {
   const { agent, checks, workspace, store } = deps;
   const maxAttempts = options.maxAttempts ?? DEFAULTS.maxAttempts;
@@ -127,10 +141,10 @@ export async function runPlan(plan: ResolvedPlan, deps: RunDeps, options: RunOpt
   const existing = new Map<string, TaskRecord>();
   if (options.resume) {
     for (const t of store.getTasks(runId)) existing.set(t.taskId, t);
-    store.reopenRun(runId);
-    for (const t of plan.tasks) {
-      if (!existing.has(t.id)) store.upsertTask({ runId, taskId: t.id, title: t.title, status: "pending" });
-    }
+    store.reopenRun(runId, options.pid);
+    plan.tasks.forEach((t, i) => {
+      if (!existing.has(t.id)) store.upsertTask({ runId, taskId: t.id, title: t.title, status: "pending", ...snapshotOf(t, i) });
+    });
     emit("run.resumed", {}, { tasks: plan.tasks.length, repo: plan.repo });
   } else {
     store.createRun({
@@ -140,8 +154,12 @@ export async function runPlan(plan: ResolvedPlan, deps: RunDeps, options: RunOpt
       repo: plan.repo,
       base: `${plan.base ?? baseRef.branch ?? "HEAD"}@${baseRef.sha.slice(0, 8)}`,
       startedAt: now().toISOString(),
+      ...(options.planText !== undefined ? { planText: options.planText } : {}),
+      ...(options.pid !== undefined ? { pid: options.pid } : {}),
     });
-    for (const t of plan.tasks) store.upsertTask({ runId, taskId: t.id, title: t.title, status: "pending" });
+    plan.tasks.forEach((t, i) => {
+      store.upsertTask({ runId, taskId: t.id, title: t.title, status: "pending", ...snapshotOf(t, i) });
+    });
     emit("run.started", {}, { tasks: plan.tasks.length, repo: plan.repo });
   }
 
@@ -285,6 +303,7 @@ export async function runPlan(plan: ResolvedPlan, deps: RunDeps, options: RunOpt
           for (const entry of entries) {
             store.recordAgentEvent({
               runId, taskId: task.id, attempt, ts: now().toISOString(), kind: entry.kind, payload: entry.payload,
+              ...(agent.name ? { agent: agent.name } : {}),
             });
           }
         };

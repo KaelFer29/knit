@@ -21,5 +21,7 @@ export interface AgentRunResult {
 export type AgentEvent = { type: string; raw: unknown };
 
 export interface AgentRunner {
+  /** Short identifier stored with every timeline entry, for example `cursor`. */
+  readonly name?: string;
   run(request: AgentRunRequest, onEvent?: (event: AgentEvent) => void): Promise<AgentRunResult>;
 }

@@ -33,6 +33,7 @@ function tailLines(text: string, count: number): string {
  * `--force` also satisfies the workspace-trust prompt that a fresh worktree triggers.
  */
 export class CursorAgentRunner implements AgentRunner {
+  readonly name = "cursor";
   private readonly command: string;
   private readonly prefixArgs: string[];
   private readonly model?: string;

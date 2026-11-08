@@ -7,6 +7,7 @@ import type {
   RunStatus,
   RunStore,
   TaskRecord,
+  TaskSpec,
 } from "../../../core/ports/run-store.js";
 
 export interface StoredRun extends RunRecord {
@@ -14,8 +15,9 @@ export interface StoredRun extends RunRecord {
   finishedAt?: string;
 }
 
-export interface StoredAgentEvent extends AgentEventRecord {
+export interface StoredAgentEvent extends Omit<AgentEventRecord, "agent"> {
   id: number;
+  agent: string;
 }
 
 export interface RunDetail {
@@ -24,7 +26,7 @@ export interface RunDetail {
   attempts: AttemptRecord[];
 }
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS runs (
@@ -35,7 +37,9 @@ CREATE TABLE IF NOT EXISTS runs (
   base TEXT NOT NULL,
   started_at TEXT NOT NULL,
   finished_at TEXT,
-  status TEXT NOT NULL
+  status TEXT NOT NULL,
+  plan_text TEXT,
+  pid INTEGER
 );
 CREATE TABLE IF NOT EXISTS tasks (
   run_id TEXT NOT NULL REFERENCES runs(id),
@@ -47,6 +51,10 @@ CREATE TABLE IF NOT EXISTS tasks (
   commit_sha TEXT,
   pr_url TEXT,
   start_sha TEXT,
+  goal TEXT,
+  depends_on TEXT,
+  position INTEGER,
+  specs TEXT,
   PRIMARY KEY (run_id, task_id)
 );
 CREATE TABLE IF NOT EXISTS attempts (
@@ -82,12 +90,20 @@ CREATE TABLE IF NOT EXISTS agent_events (
   attempt INTEGER,
   ts TEXT NOT NULL,
   kind TEXT NOT NULL,
-  payload TEXT
+  payload TEXT,
+  agent TEXT NOT NULL DEFAULT 'cursor'
 );
 CREATE INDEX IF NOT EXISTS idx_agent_events_run ON agent_events(run_id, id);
 CREATE INDEX IF NOT EXISTS idx_attempts_run ON attempts(run_id, task_id, attempt);
 CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, id);
 `;
+
+/** Columns added in schema version 4, applied to databases created before it. Existing timeline rows are all Cursor's. */
+const COLUMNS_SINCE_V4: Record<string, [name: string, definition: string][]> = {
+  runs: [["plan_text", "TEXT"], ["pid", "INTEGER"]],
+  tasks: [["goal", "TEXT"], ["depends_on", "TEXT"], ["position", "INTEGER"], ["specs", "TEXT"]],
+  agent_events: [["agent", "TEXT NOT NULL DEFAULT 'cursor'"]],
+};
 
 type Row = Record<string, unknown>;
 
@@ -108,7 +124,20 @@ export class SqliteRunStore implements RunStore {
     if (version === 1) {
       this.db.exec("ALTER TABLE tasks ADD COLUMN pr_url TEXT; ALTER TABLE tasks ADD COLUMN start_sha TEXT;");
     }
+    this.addMissingColumns();
     this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
+  }
+
+  /** Idempotent: checks the real columns instead of trusting `user_version`, so an interrupted upgrade can be repeated. */
+  private addMissingColumns(): void {
+    this.db.transaction(() => {
+      for (const [table, columns] of Object.entries(COLUMNS_SINCE_V4)) {
+        const have = new Set((this.db.pragma(`table_info(${table})`) as { name: string }[]).map((c) => c.name));
+        for (const [name, definition] of columns) {
+          if (!have.has(name)) this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+        }
+      }
+    })();
   }
 
   close(): void {
@@ -118,25 +147,27 @@ export class SqliteRunStore implements RunStore {
   createRun(run: RunRecord): void {
     this.db
       .prepare(
-        `INSERT INTO runs (id, plan_name, plan_path, repo, base, started_at, status)
-         VALUES (@id, @planName, @planPath, @repo, @base, @startedAt, 'running')`,
+        `INSERT INTO runs (id, plan_name, plan_path, repo, base, started_at, status, plan_text, pid)
+         VALUES (@id, @planName, @planPath, @repo, @base, @startedAt, 'running', @planText, @pid)`,
       )
-      .run(run);
+      .run({ planText: null, pid: null, ...run });
   }
 
   finishRun(id: string, status: RunStatus, finishedAt: string): void {
-    this.db.prepare(`UPDATE runs SET status = ?, finished_at = ? WHERE id = ?`).run(status, finishedAt, id);
+    this.db.prepare(`UPDATE runs SET status = ?, finished_at = ?, pid = NULL WHERE id = ?`).run(status, finishedAt, id);
   }
 
-  reopenRun(id: string): void {
-    this.db.prepare(`UPDATE runs SET status = 'running', finished_at = NULL WHERE id = ?`).run(id);
+  reopenRun(id: string, pid?: number): void {
+    this.db.prepare(`UPDATE runs SET status = 'running', finished_at = NULL, pid = ? WHERE id = ?`).run(pid ?? null, id);
   }
 
   upsertTask(t: TaskRecord): void {
     this.db
       .prepare(
-        `INSERT INTO tasks (run_id, task_id, title, status, branch, worktree, commit_sha, pr_url, start_sha)
-         VALUES (@runId, @taskId, @title, @status, @branch, @worktree, @commitSha, @prUrl, @startSha)
+        `INSERT INTO tasks (run_id, task_id, title, status, branch, worktree, commit_sha, pr_url, start_sha,
+           goal, depends_on, position, specs)
+         VALUES (@runId, @taskId, @title, @status, @branch, @worktree, @commitSha, @prUrl, @startSha,
+           @goal, @dependsOn, @position, @specs)
          ON CONFLICT(run_id, task_id) DO UPDATE SET
            title = excluded.title,
            status = excluded.status,
@@ -144,9 +175,18 @@ export class SqliteRunStore implements RunStore {
            worktree = COALESCE(excluded.worktree, tasks.worktree),
            commit_sha = COALESCE(excluded.commit_sha, tasks.commit_sha),
            pr_url = COALESCE(excluded.pr_url, tasks.pr_url),
-           start_sha = COALESCE(excluded.start_sha, tasks.start_sha)`,
+           start_sha = COALESCE(excluded.start_sha, tasks.start_sha),
+           goal = COALESCE(excluded.goal, tasks.goal),
+           depends_on = COALESCE(excluded.depends_on, tasks.depends_on),
+           position = COALESCE(excluded.position, tasks.position),
+           specs = COALESCE(excluded.specs, tasks.specs)`,
       )
-      .run({ branch: null, worktree: null, commitSha: null, prUrl: null, startSha: null, ...t });
+      .run({
+        branch: null, worktree: null, commitSha: null, prUrl: null, startSha: null,
+        goal: null, dependsOn: null, position: null,
+        ...t,
+        specs: t.specs === undefined ? null : JSON.stringify(t.specs),
+      });
   }
 
   getTasks(runId: string): TaskRecord[] {
@@ -198,12 +238,13 @@ export class SqliteRunStore implements RunStore {
   recordAgentEvent(e: AgentEventRecord): void {
     this.db
       .prepare(
-        `INSERT INTO agent_events (run_id, task_id, attempt, ts, kind, payload)
-         VALUES (@runId, @taskId, @attempt, @ts, @kind, @payload)`,
+        `INSERT INTO agent_events (run_id, task_id, attempt, ts, kind, payload, agent)
+         VALUES (@runId, @taskId, @attempt, @ts, @kind, @payload, COALESCE(@agent, 'cursor'))`,
       )
       .run({
         taskId: null,
         attempt: null,
+        agent: null,
         ...e,
         payload: e.payload === undefined ? null : JSON.stringify(e.payload),
       });
@@ -224,6 +265,7 @@ export class SqliteRunStore implements RunStore {
         ts: e.ts,
         kind: e.kind,
         payload: typeof e.payload === "string" ? JSON.parse(e.payload) : undefined,
+        agent: e.agent,
       }),
     );
   }
@@ -284,6 +326,10 @@ function toTask(t: Row): TaskRecord {
     startSha: t.start_sha,
     commitSha: t.commit_sha,
     prUrl: t.pr_url,
+    goal: t.goal,
+    dependsOn: t.depends_on,
+    position: t.position,
+    specs: typeof t.specs === "string" ? (JSON.parse(t.specs) as TaskSpec[]) : undefined,
   });
 }
 
@@ -297,5 +343,7 @@ function toRun(r: Row): StoredRun {
     startedAt: r.started_at,
     finishedAt: r.finished_at,
     status: r.status,
+    planText: r.plan_text,
+    pid: r.pid,
   });
 }

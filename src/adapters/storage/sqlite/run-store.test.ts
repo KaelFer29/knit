@@ -118,7 +118,94 @@ describe("SqliteRunStore agent events", () => {
   });
 });
 
+describe("SqliteRunStore plan snapshot", () => {
+  it("stores the plan text and the pid of the process that runs it", () => {
+    store.createRun({ ...RUN, id: "run-2", planText: "# Plan: demo\n", pid: 4242 });
+    expect(store.getRun("run-2")?.run).toMatchObject({ planText: "# Plan: demo\n", pid: 4242 });
+    expect(store.getRun("run-1")?.run.planText).toBeUndefined();
+    expect(store.getRun("run-1")?.run.pid).toBeUndefined();
+  });
+
+  it("clears the pid when the run finishes and sets it again when the run is reopened", () => {
+    store.createRun({ ...RUN, id: "run-2", pid: 4242 });
+    store.finishRun("run-2", "failed", "2026-11-08T11:00:00.000Z");
+    expect(store.getRun("run-2")?.run.pid).toBeUndefined();
+    store.reopenRun("run-2", 777);
+    expect(store.getRun("run-2")?.run).toMatchObject({ status: "running", pid: 777 });
+    store.reopenRun("run-2");
+    expect(store.getRun("run-2")?.run.pid).toBeUndefined();
+  });
+
+  it("stores goal, dependency, position and specs of a task and keeps them across later upserts", () => {
+    store.upsertTask({
+      runId: "run-1",
+      taskId: "T2",
+      title: "Second",
+      status: "pending",
+      goal: "Do second.",
+      dependsOn: "T1",
+      position: 2,
+      specs: [{ id: "S1", text: "second spec" }],
+    });
+    store.upsertTask({ runId: "run-1", taskId: "T2", title: "Second", status: "running", branch: "feat/second" });
+    expect(store.getTasks("run-1")[0]).toEqual({
+      runId: "run-1",
+      taskId: "T2",
+      title: "Second",
+      status: "running",
+      branch: "feat/second",
+      goal: "Do second.",
+      dependsOn: "T1",
+      position: 2,
+      specs: [{ id: "S1", text: "second spec" }],
+    });
+  });
+
+  it("labels agent events with the agent that produced them and defaults to cursor", () => {
+    store.recordAgentEvent({ runId: "run-1", ts: "t", kind: "message", agent: "claude" });
+    store.recordAgentEvent({ runId: "run-1", ts: "t", kind: "message" });
+    expect(store.getAgentEvents("run-1").map((e) => e.agent)).toEqual(["claude", "cursor"]);
+  });
+});
+
 describe("SqliteRunStore migration", () => {
+  it("adds the plan snapshot columns to a version 3 database without losing data", () => {
+    const dir = mkdtempSync(join(tmpdir(), "orq-db-"));
+    try {
+      const path = join(dir, "v3.db");
+      const old = new Database(path);
+      old.exec(`
+        CREATE TABLE runs (id TEXT PRIMARY KEY, plan_name TEXT NOT NULL, plan_path TEXT NOT NULL, repo TEXT NOT NULL, base TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT, status TEXT NOT NULL);
+        CREATE TABLE tasks (run_id TEXT NOT NULL, task_id TEXT NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, branch TEXT, worktree TEXT, commit_sha TEXT, pr_url TEXT, start_sha TEXT, PRIMARY KEY (run_id, task_id));
+        CREATE TABLE attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, task_id TEXT NOT NULL, attempt INTEGER NOT NULL, started_at TEXT NOT NULL, duration_ms INTEGER NOT NULL, exit_code INTEGER, is_error INTEGER NOT NULL, input_tokens INTEGER, output_tokens INTEGER, scope_ok INTEGER NOT NULL, failed_check TEXT, status TEXT NOT NULL, session_id TEXT, result_text TEXT);
+        CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, task_id TEXT, attempt INTEGER, ts TEXT NOT NULL, type TEXT NOT NULL, payload TEXT);
+        CREATE TABLE agent_events (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, task_id TEXT, attempt INTEGER, ts TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT);
+        INSERT INTO runs VALUES ('old-run', 'p', '/p', '/r', 'main@1', 't', NULL, 'running');
+        INSERT INTO tasks VALUES ('old-run', 'T1', 'Old', 'passed', 'feat/old', '/w', 'deadbeef', NULL, 'start1');
+        INSERT INTO agent_events (run_id, task_id, attempt, ts, kind, payload) VALUES ('old-run', 'T1', 1, 't', 'message', '{"text":"hi"}');
+        PRAGMA user_version = 3;
+      `);
+      old.close();
+
+      const migrated = new SqliteRunStore(path);
+      expect(migrated.getRun("old-run")?.run).toEqual({
+        id: "old-run", planName: "p", planPath: "/p", repo: "/r", base: "main@1", startedAt: "t", status: "running",
+      });
+      expect(migrated.getTasks("old-run")).toEqual([
+        { runId: "old-run", taskId: "T1", title: "Old", status: "passed", branch: "feat/old", worktree: "/w", commitSha: "deadbeef", startSha: "start1" },
+      ]);
+      expect(migrated.getAgentEvents("old-run")).toMatchObject([{ kind: "message", agent: "cursor", payload: { text: "hi" } }]);
+      migrated.close();
+
+      const raw = new Database(path);
+      expect(raw.pragma("user_version", { simple: true })).toBe(4);
+      raw.close();
+      expect(() => new SqliteRunStore(path).close()).not.toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("adds the agent events table to a version 2 database", () => {
     const dir = mkdtempSync(join(tmpdir(), "orq-db-"));
     try {

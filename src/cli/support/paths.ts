@@ -34,7 +34,11 @@ function gitToplevel(cwd: string): string {
 }
 
 /** Reads and validates a plan file and resolves its repository to a concrete path. */
-export function loadPlan(planFile: string, env: NodeJS.ProcessEnv, cwd: string): { plan: ResolvedPlan; path: string } {
+export function loadPlan(
+  planFile: string,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+): { plan: ResolvedPlan; path: string; text: string } {
   const path = resolve(planFile);
   let text: string;
   try {
@@ -54,7 +58,7 @@ export function loadPlan(planFile: string, env: NodeJS.ProcessEnv, cwd: string):
   if (plan.repo === undefined) repo = gitToplevel(cwd);
   else if (plan.repo.startsWith("~/")) repo = join(home, plan.repo.slice(2));
   else repo = resolve(dirname(path), plan.repo);
-  return { plan: { ...plan, repo }, path };
+  return { plan: { ...plan, repo }, path, text };
 }
 
 export function makeRunId(planName: string, now: Date): string {

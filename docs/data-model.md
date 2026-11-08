@@ -11,13 +11,17 @@ Everything a run does is recorded, so a run can be inspected, resumed and, later
 
 ## SQLite
 
-Tables: `runs`, `tasks` (status, branch, worktree, start/commit SHA, PR URL), `attempts`, `events`, `agent_events`. The schema is versioned (`user_version`) and older databases are migrated in place. The file uses WAL mode, so another process can read it while a run writes.
+Tables: `runs`, `tasks` (status, branch, worktree, start/commit SHA, PR URL), `attempts`, `events`, `agent_events`. The schema is versioned (`user_version`, now 4) and older databases are migrated in place. Columns added in version 4 are applied by checking the real columns rather than the version number, so an interrupted upgrade can simply be repeated. The file uses WAL mode, so another process can read it while a run writes.
+
+**runs**: besides plan name, repo, base and status, `plan_text` keeps the plan file exactly as it was when the run started, and `pid` is the process executing the run. `pid` is set while the run is `running` and cleared when it finishes, so a `running` run whose process no longer exists crashed. Runs created before version 4 have neither.
+
+**tasks**: `goal`, `depends_on`, `position` (1-based, which is also the execution order) and `specs` (JSON array of `{id, text}`) are copied from the plan when the task is created, so a run can be shown without re-reading the plan file. Tasks of older runs have none of them.
 
 **attempts**: `started_at`, `duration_ms`, `exit_code`, `is_error`, `input_tokens`, `output_tokens`, `scope_ok`, `failed_check`, `status`, `session_id`, `result_text`. `knit show <run-id>` prints the totals.
 
 **events** (run lifecycle): `run.started|resumed|finished`, `task.started|reused|passed|failed`, `attempt.started|finished`, `check.started`, `push.finished|failed`, `pr.created|failed`, plus one compact `agent.tool_call` per tool the agent starts.
 
-**agent_events** (what the agent did, normalized): `kind` is one of `system`, `prompt`, `thinking`, `message`, `tool_started`, `tool_completed`, `result`, `other`. Thinking deltas are coalesced into blocks; tool calls carry the tool name, arguments and result; strings longer than 4000 characters are clipped. Rows have an increasing `id`, so a reader can poll with `id > last_seen`. `knit logs <run-id> [--task T1] [--follow]` renders it.
+**agent_events** (what the agent did, normalized): `agent` names the agent that produced the row (`cursor`; every row from before version 4 is Cursor's). `kind` is one of `system`, `prompt`, `thinking`, `message`, `tool_started`, `tool_completed`, `result`, `other`. Thinking deltas are coalesced into blocks; tool calls carry the tool name, arguments and result; strings longer than 4000 characters are clipped. Rows have an increasing `id`, so a reader can poll with `id > last_seen`. `knit logs <run-id> [--task T1] [--follow]` renders it.
 
 ## Raw transcripts
 
