@@ -352,6 +352,8 @@ Rules files may be created (`expectedHash: "absent"`); names are checked per seg
 - The replaced version is copied first to `<data-dir>/config-backups/<id>/<timestamp>-<hash>.bak` (folder `0700`, files `0600`); if the backup fails nothing is written. The new version goes to a temporary file that is renamed into place, keeping the file's mode.
 - Known limit: a directory swapped for a symlink between the check and the rename is not defended against (same-user local race). The files are shown as they are, so secrets inside `cli-config.json` are visible to whoever holds the launch token.
 
+**In the app** (`#/config`, tab "Configuration"): files are grouped by agent and scope; the editor is a plain text area; "Review changes" (enabled only when the text changed and, for JSON files, still parses) shows a line diff (`web/src/config/diff.ts`), and only that step offers "Save". A `409` offers "Reload the file".
+
 ### Adding routes
 
 A route module lives in `src/server/routes/<name>.ts` and exports a function from the server's dependencies (`ServerDeps`: the reader, timings and, when present, `control`) to a list of `{ method, pattern, handler }` (patterns use `:name` segments, decoded for the handler; a handler throws `HttpError(status, message)` to answer an error). It is registered with one line in `src/server/routes/index.ts`. The guard runs before routing, so a new route, whatever its method, cannot skip it.
