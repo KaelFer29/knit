@@ -65,7 +65,7 @@ The port declares these as `AgentCapabilities` on each runner (`src/core/ports/a
 
 - **Phase A:** each task's diff, from its start commit to its last commit.
 - **Phases B and C:** the files an agent touches while a turn runs, from tool-call paths and the worktree's `git status`.
-- **Phase E (API built):** a read-only file explorer for the repository and the task worktrees (`FileTree` port, `FsFileTree` adapter, routes above). The root directory always comes from the run record, never from the request. Every path is confined to its root: `..`, absolute paths, NUL, backslashes, `.git` and symlinks that resolve outside the root are `403`; the `.git` directory is not listed.
+- **Phase E (built):** a read-only file explorer for the repository and the task worktrees (`FileTree` port, `FsFileTree` adapter, routes above). The root directory always comes from the run record, never from the request. Every path is confined to its root: `..`, absolute paths, NUL, backslashes, `.git` and symlinks that resolve outside the root are `403`; the `.git` directory is not listed. The page (`web/src/containers/FilesView.tsx`, `organisms/FileExplorer.tsx`) opens at `/?view=files&run=<run-id>` (add `&demo=1`, or omit `run`, for built-in sample files): a root switcher, a lazily loaded tree and a text viewer that renders contents as plain text, with a note for binary and oversized files.
 
 ## Process model
 
