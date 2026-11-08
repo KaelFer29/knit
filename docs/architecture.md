@@ -21,7 +21,7 @@ src/
     checks/shell/    CheckRunner (bash)
     storage/sqlite/  RunStore and SessionStore (read-write), RunReader (read-only); one shared schema and migration (`schema.ts`)
     storage/files/   TranscriptStore (raw JSONL)
-    system/          process spawning with timeouts and group kill
+    system/          process spawning with timeouts and group kill; ProcessControl (inspect and signal processes)
   server/          driving adapter: HTTP API, live stream (SSE), static files and the security guard of `knit ui`; receives a `RunReader`, knows nothing about SQLite
   cli/             command line: wires adapters into the core
     commands/        one module per command
@@ -50,6 +50,7 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 | `SessionStore` | persist chat sessions (agent-agnostic), their turns (prompt, answer, tokens, profile, meta, pid) and each turn's timeline; list sessions newest first, events after an id | `storage/sqlite` |
 | `RunReader` | read side for the web interface: runs list, snapshot of a run, events and agent events after an id, over a read-only connection that never writes or migrates | `storage/sqlite` |
 | `TranscriptStore` | keep the raw agent stream | `storage/files` |
+| `ProcessControl` | inspect and signal processes: is a pid alive, what is its command line, which process group it leads or contains, send a signal to a process or a group. Used by `knit abort`; every method is total (a gone process gives `false`/`undefined`) and pids 0 and 1 and the caller's own group are never signalled | `system` |
 
 ### Agent capabilities
 
