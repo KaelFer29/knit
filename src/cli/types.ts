@@ -19,7 +19,8 @@ export interface AgentOptions {
 export interface CliDeps {
   /**
    * Builds the agent runner (override in tests). `agent` names the agent (`claude` or `cursor`) and is set by `chat`
-   * only; `effort` and `permissionMode` are set by `chat` for Claude only. Plan runs always use Cursor.
+   * and `followup` (always `cursor`); `effort` and `permissionMode` are set by `chat` for Claude only. Plan runs
+   * always use Cursor.
    */
   agent?: (options: AgentOptions) => AgentRunner;
   /** Process inspection and signalling used by `abort` and `ui` (override in tests). Default: the system adapter. */

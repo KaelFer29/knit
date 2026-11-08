@@ -10,6 +10,8 @@ export const USAGE = `Usage:
   ${PROGRAM_NAME} abort <run-id> [options]    Stop a running run (SIGINT, then SIGKILL after a grace period); a run whose process is gone is marked failed
   ${PROGRAM_NAME} logs <run-id> [options]     Show what the agent did: thinking, messages, tool calls and results
   ${PROGRAM_NAME} chat <prompt> [options]     Run one turn of an agent (Claude by default) and record it as a resumable session
+  ${PROGRAM_NAME} followup <run-id> <task-id> <prompt> [options]
+                                      Send a follow-up to the Cursor chat of a task and verify the result again
   ${PROGRAM_NAME} clean <run-id> [options]    Remove the worktrees of a run (branches are kept)
   ${PROGRAM_NAME} ui [options]                Serve the web interface on 127.0.0.1 and print its address (Ctrl+C to stop)
 
@@ -48,6 +50,16 @@ Options for chat:
   --data-dir <dir>
   Claude runs with your normal configuration (CLAUDE.md, rules, skills, MCP servers). The turn streams as it happens,
   then prints the answer and the session id; exit code 0 when the turn passed, 1 when it failed.
+
+Options for followup:
+  --model <name>             Model for this turn (see 'agent models')
+  --agent-command <bin>      Agent binary (default: agent)
+  --data-dir <dir>
+  The agent resumes the task's chat (agent --resume) inside the task's own worktree, with your prompt as typed. Knit then
+  verifies the result like an attempt of the run: scope, git hygiene and the task's checks, against the plan snapshot stored
+  with the run. The outcome is recorded as the task's next attempt and the turn as part of a session. Refused (exit 1) while
+  the run is still running, when the worktree is gone, when no attempt recorded a chat id, or for a run from before plan
+  snapshots. Exit code 0 when the verification passed, 1 otherwise, 2 for usage mistakes.
 
 Options for clean:
   --delete-branches          Also delete the task branches that are merged (never unmerged ones)

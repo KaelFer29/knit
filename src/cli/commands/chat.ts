@@ -2,15 +2,14 @@ import { mkdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { ClaudeAgentRunner } from "../../adapters/agents/claude/claude-runner.js";
 import { CursorAgentRunner } from "../../adapters/agents/cursor/cursor-runner.js";
-import type { StoredAgentEvent } from "../../adapters/storage/sqlite/run-store.js";
 import { SqliteSessionStore } from "../../adapters/storage/sqlite/session-store.js";
 import { killActiveProcessGroups } from "../../adapters/system/spawn-with-timeout.js";
 import { runTurn, titleFromPrompt } from "../../core/chat/index.js";
 import type { AgentProfile, AgentRunner } from "../../core/ports/agent-runner.js";
-import type { SessionEventRecord, TurnRecord } from "../../core/ports/session-store.js";
+import type { TurnRecord } from "../../core/ports/session-store.js";
 import { UsageError } from "../errors.js";
 import { parse } from "../support/args.js";
-import { formatAgentEvent } from "../support/format.js";
+import { formatSessionEvent } from "../support/format.js";
 import { DB_FILENAME, dataDirOf, makeSessionId } from "../support/paths.js";
 import type { AgentOptions, CliDeps, CliIo } from "../types.js";
 import { PROGRAM_NAME } from "../usage.js";
@@ -35,12 +34,6 @@ function buildAgent(deps: CliDeps, options: AgentOptions): AgentRunner {
   if (deps.agent) return deps.agent(options);
   const { agent, effort, permissionMode, ...common } = options;
   return agent === "cursor" ? new CursorAgentRunner(common) : new ClaudeAgentRunner({ ...common, ...(effort ? { effort } : {}), ...(permissionMode ? { permissionMode } : {}) });
-}
-
-/** The line `knit logs` would print for a timeline entry, without its `[run]` label (a chat has no tasks). */
-function formatEntry(e: SessionEventRecord): string {
-  const stored: StoredAgentEvent = { id: 0, runId: e.sessionId, ts: e.ts, kind: e.kind, agent: e.agent, ...(e.payload !== undefined ? { payload: e.payload } : {}) };
-  return formatAgentEvent(stored).replace(" [run] ", " ");
 }
 
 function directoryOf(path: string): string {
@@ -141,7 +134,7 @@ export async function chatCommand(args: string[], io: CliIo, deps: CliDeps, env:
         onTurnStart: (t) => {
           turn = t;
         },
-        onEvent: (e) => io.out(`${formatEntry(e)}\n`),
+        onEvent: (e) => io.out(`${formatSessionEvent(e)}\n`),
       },
     );
 
