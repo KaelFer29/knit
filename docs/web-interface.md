@@ -353,6 +353,23 @@ Rules files may be created (`expectedHash: "absent"`); names are checked per seg
 - Known limit: a directory swapped for a symlink between the check and the rename is not defended against (same-user local race). The files are shown as they are, so secrets inside `cli-config.json` are visible to whoever holds the launch token.
 
 **In the app** (`#/config`, tab "Configuration"): files are grouped by agent and scope; the editor is a plain text area; "Review changes" (enabled only when the text changed and, for JSON files, still parses) shows a line diff (`web/src/config/diff.ts`), and only that step offers "Save". A `409` offers "Reload the file".
+### Sessions
+
+Phase B (`src/server/routes/sessions.ts`). Reads go through the `SessionReader` port (a read-only SQLite connection that never writes or migrates; a database from before schema 5 reads as having no sessions). A turn starts by spawning `knit chat` through the same spawner as run control, so the server never writes the database. The session dependencies (`SessionsDeps`: the reader and one `AgentInfo` per agent) travel inside `ControlDeps.sessions`: without control (no build) the read routes answer empty lists and the POSTs `503`.
+
+`AgentInfo` is built in `cli/commands/ui.ts`, the one place that knows the adapters: id, label, the adapter's declared `capabilities`, the `profileFields` it takes (`model`, `effort`, `permissionMode`), `listModels` and the terminal command that resumes its own session. The page renders from that, never from an agent's name.
+
+| Route | Returns / does |
+| --- | --- |
+| `GET /api/agents` | `{ agents: [{ id, label, capabilities, profileFields }] }` |
+| `GET /api/agents/:agent/models` | `{ models }` from `listModels`; empty for an agent that cannot choose its model or cannot be asked; `404` for an unknown agent |
+| `GET /api/sessions` | `{ sessions: [{ session, turnCount, inputTokens, outputTokens }] }`, most recently active first |
+| `GET /api/sessions/:id` | `{ session, turns, meta, lastEventId, continueCommand? }`. `meta` is the newest `commands` and `planUsage` any turn reported (plus `model`); `continueCommand` is `cd '<cwd>' && <agent> --resume <agent session id>`, present once the agent reported its session id and only if it can resume |
+| `GET /api/sessions/:id/events?after=<id>` | `{ sessionId, events, lastEventId }`: timeline entries with `id > after` (at most 2000), so a poller resumes with no gap or duplicate |
+| `POST /api/sessions` | `{ agent, cwd, prompt, profile? }` runs `knit chat --agent <a> --cwd <cwd> [profile flags] --data-dir <dir> -- <prompt>` and answers `202 { sessionId, logPath }` once a new session shows up |
+| `POST /api/sessions/:id/turns` | `{ prompt, profile? }` runs `knit chat --session <id> ...` and answers `202 { sessionId, logPath }` once the turn is recorded; `409` while a turn is running or when the agent cannot resume |
+
+`cwd` must be an absolute existing directory; `prompt` at most 32,000 characters; a profile field must be one the agent takes and match `[A-Za-z0-9][A-Za-z0-9._:/[\]-]*` (never starts with a dash). The prompt goes after `--`, so a prompt that starts with a dash is still a prompt. `502` and `504` as for run control when the child dies or is too slow to record its turn.
 
 ### Adding routes
 

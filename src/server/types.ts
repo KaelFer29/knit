@@ -2,6 +2,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { FileTree } from "../core/ports/file-tree.js";
 import type { RunReader } from "../core/ports/run-reader.js";
 import type { TaskDiff } from "../core/ports/task-diff.js";
+import type { AgentCapabilities } from "../core/ports/agent-runner.js";
+import type { SessionReader } from "../core/ports/session-reader.js";
 
 export type Method = "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -72,4 +74,28 @@ export interface ControlDeps {
   spawn: Spawner;
   /** How long to wait for a started or resumed run to show up in the database (default 10000). */
   registerTimeoutMs?: number;
+  /** Chat sessions (list, turns, start a turn). Absent: the session routes answer empty lists or 503. */
+  sessions?: SessionsDeps;
+}
+
+/** Per-turn knobs the composer may show for an agent. */
+export type ProfileField = "model" | "effort" | "permissionMode";
+
+/** What the server knows about one agent: declared by its adapter, wired by the composition root. */
+export interface AgentInfo {
+  id: string;
+  label: string;
+  capabilities: AgentCapabilities;
+  /** The profile fields the agent accepts. */
+  profileFields: ProfileField[];
+  /** Model ids for the picker; resolves to an empty list when the agent cannot be asked. */
+  listModels?: () => Promise<string[]>;
+  /** The terminal command that continues the agent's own session (for example `claude --resume <id>`). */
+  resumeCommand: (agentSessionId: string) => string;
+}
+
+/** What the session routes need. Writes happen only in the `knit chat` processes the control spawner starts. */
+export interface SessionsDeps {
+  reader: SessionReader;
+  agents: AgentInfo[];
 }

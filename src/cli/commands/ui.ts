@@ -8,7 +8,13 @@ import { GitTaskDiff } from "../../adapters/vcs/git/task-diff.js";
 import { SqliteRunReader } from "../../adapters/storage/sqlite/run-reader.js";
 import { FileConfigFiles } from "../../adapters/system/config-files.js";
 import { useConfigFiles } from "../../server/routes/config.js";
+import { ClaudeAgentRunner } from "../../adapters/agents/claude/claude-runner.js";
+import { CursorAgentRunner } from "../../adapters/agents/cursor/cursor-runner.js";
+import { SqliteSessionReader } from "../../adapters/storage/sqlite/session-reader.js";
+import { capabilitiesOf, type AgentRunner } from "../../core/ports/agent-runner.js";
 import { lazyRunReader, PortInUseError, startServer, type ControlDeps, type Spawner } from "../../server/index.js";
+import { lazySessionReader } from "../../server/routes/sessions.js";
+import type { AgentInfo } from "../../server/types.js";
 import { UsageError } from "../errors.js";
 import { parse } from "../support/args.js";
 import { DB_FILENAME, dataDirOf } from "../support/paths.js";
@@ -66,12 +72,36 @@ export function knitSpawner({ entry, env, runArgs = [] }: KnitSpawnerOptions): S
   };
 }
 
+/**
+ * The agents the interface offers, built here because only the composition root knows the adapters. The server and the
+ * page work from what each one declares (capabilities, profile fields, models), never from its name.
+ */
+export function agentInfos(build: (agent: string) => AgentRunner): AgentInfo[] {
+  const describe = (id: string, label: string, profileFields: AgentInfo["profileFields"], binary: string): AgentInfo => {
+    const runner = build(id);
+    return {
+      id,
+      label,
+      capabilities: capabilitiesOf(runner),
+      profileFields,
+      ...(runner.listModels ? { listModels: () => runner.listModels!() } : {}),
+      resumeCommand: (agentSessionId) => `${binary} --resume ${agentSessionId}`,
+    };
+  };
+  return [describe("claude", "Claude", ["model", "effort", "permissionMode"], "claude"), describe("cursor", "Cursor", ["model"], "agent")];
+}
+
 /** Run control needs the compiled CLI to start children from; a source checkout without a build has none, and the server is then read-only. */
-function controlFor(dataDir: string, env: NodeJS.ProcessEnv, injected: Spawner | undefined): ControlDeps | undefined {
-  if (injected) return { dataDir, spawn: injected };
+function controlFor(
+  dataDir: string,
+  env: NodeJS.ProcessEnv,
+  injected: Spawner | undefined,
+  sessions: ControlDeps["sessions"],
+): ControlDeps | undefined {
+  if (injected) return { dataDir, spawn: injected, sessions };
   const entry = fileURLToPath(new URL("../index.js", import.meta.url));
   if (!existsSync(entry)) return undefined;
-  return { dataDir, spawn: knitSpawner({ entry, env: { ...process.env, ...env } }) };
+  return { dataDir, spawn: knitSpawner({ entry, env: { ...process.env, ...env } }), sessions };
 }
 
 /** Resolves when SIGINT or SIGTERM arrives (or when `signal` aborts, which tests use instead). */
@@ -102,7 +132,6 @@ export async function uiCommand(args: string[], io: CliIo, deps: CliDeps, env: N
   const port = parsePort(values.port);
   const dataDir = dataDirOf({ "data-dir": values["data-dir"] }, env);
   const dbPath = join(dataDir, DB_FILENAME);
-  const control = controlFor(dataDir, env, deps.spawnKnit);
   // The configuration editor edits the project `knit ui` was started in and the user's home; backups go to the data dir.
   useConfigFiles(
     new FileConfigFiles({
@@ -111,6 +140,9 @@ export async function uiCommand(args: string[], io: CliIo, deps: CliDeps, env: N
       backupDir: join(dataDir, "config-backups"),
     }),
   );
+  const sessionReader = lazySessionReader(() => (existsSync(dbPath) ? new SqliteSessionReader(dbPath) : undefined));
+  const build = (agent: string): AgentRunner => (deps.agent ? deps.agent({ agent }) : agent === "cursor" ? new CursorAgentRunner() : new ClaudeAgentRunner());
+  const control = controlFor(dataDir, env, deps.spawnKnit, { reader: sessionReader, agents: agentInfos(build) });
   const reader = lazyRunReader(() => (existsSync(dbPath) ? new SqliteRunReader(dbPath) : undefined));
 
   let server;
@@ -125,6 +157,7 @@ export async function uiCommand(args: string[], io: CliIo, deps: CliDeps, env: N
   } catch (err) {
     reader.close();
     useConfigFiles(undefined);
+    sessionReader.close();
     if (err instanceof PortInUseError) {
       io.err(`Port ${err.port} is already in use. Stop the other process, pick another with --port <n>, or use --port 0 for a free one.\n`);
       return 1;
@@ -138,5 +171,6 @@ export async function uiCommand(args: string[], io: CliIo, deps: CliDeps, env: N
   await server.close();
   reader.close();
   useConfigFiles(undefined);
+  sessionReader.close();
   return 0;
 }
