@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { FileTree } from "../core/ports/file-tree.js";
 import type { RunReader } from "../core/ports/run-reader.js";
+import type { TaskDiff } from "../core/ports/task-diff.js";
 
 export type Method = "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -18,6 +19,8 @@ export interface ServerDeps {
   control?: ControlDeps;
   /** Read-only file explorer for the repository and the task worktrees. Without it the file routes answer 503. */
   files?: FileTree;
+  /** Reads what a task changed from its worktree. Without it the diff route answers 503. */
+  taskDiff?: TaskDiff;
 }
 
 export interface RouteContext {

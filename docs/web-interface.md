@@ -269,6 +269,7 @@ Built in tasks T3 (read routes) and T8 (run control, `src/server/routes/control.
 | `GET /api/runs/:id/roots` | `{ roots }`: what the explorer may show, `repo` (the run's repository) and one entry per task that has a worktree (id is the task id) |
 | `GET /api/runs/:id/files?root=<id>&path=<dir>` | `{ root, path, entries }`: one directory level, directories first; `path` is relative and empty for the root |
 | `GET /api/runs/:id/file?root=<id>&path=<file>` | `{ root, kind, path, size, ... }`: `kind` is `text` (with `text`), `binary` or `too-large` (with `limit`, 512 KiB); bytes of binary or oversized files are never sent |
+| `GET /api/runs/:id/tasks/:task/diff` | `{ runId, taskId, startSha, commitSha?, files, moreFiles }`: what the task changed, read from its worktree between `startSha` and `commitSha` (to the worktree content while the task has no commit). Each file has `path`, `status` (`added`, `modified`, `deleted`), `binary`, `additions`, `deletions` and the `patch` hunks; a patch over 100,000 characters is left out with `truncated: true`, and at most 200 files are listed (`moreFiles`). 404 when the task has not started or its worktree is gone, 503 on a server without the diff port |
 | `GET /api/runs/:id/stream` | Server-Sent Events, see below |
 | `GET /*` | the built app from `dist/web` (or the directory the server was started with) |
 

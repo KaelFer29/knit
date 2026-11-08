@@ -1,6 +1,7 @@
 import type { AgentRunner } from "../core/ports/agent-runner.js";
 import type { ProcessControl } from "../core/ports/process-control.js";
 import type { PullRequests } from "../core/ports/pull-requests.js";
+import type { TaskDiff } from "../core/ports/task-diff.js";
 import type { Spawner } from "../server/index.js";
 
 export interface CliIo {
@@ -27,6 +28,8 @@ export interface CliDeps {
   processControl?: ProcessControl;
   /** Starts `knit` child processes for the web interface's run control (override in tests). Default: detached children of this CLI. */
   spawnKnit?: Spawner;
+  /** Reads what a task changed for the web interface (override in tests). Default: the diff of the task's worktree. */
+  taskDiff?: TaskDiff;
   /** Pull request adapter (override in tests). Default: GitHub CLI. */
   pullRequests?: PullRequests;
   /** Extra git args for every git call (tests disable hooks with this). */
