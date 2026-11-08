@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,6 +27,10 @@ beforeAll(() => {
   symlinkSync(outside, join(root, "escape-dir"));
   symlinkSync(join(outside, "passwd"), join(root, "escape-file"));
   symlinkSync(join(root, "README.md"), join(root, "inside-link"));
+  mkdirSync(join(root, "vendor", "lib", ".git"), { recursive: true });
+  writeFileSync(join(root, "vendor", "lib", ".git", "config"), "nested secret");
+  writeFileSync(join(root, "vendor", "lib", "ok.txt"), "fine");
+  symlinkSync(join(root, ".git"), join(root, "git-link"));
 });
 afterAll(() => rmSync(base, { recursive: true, force: true }));
 
@@ -44,11 +49,13 @@ describe("FsFileTree.list", () => {
     expect(listing.path).toBe("");
     expect(listing.entries.map((e) => `${e.kind}:${e.name}`)).toEqual([
       "directory:src",
+      "directory:vendor",
       "file:README.md",
       "file:big.txt",
       "file:bin.dat",
       "symlink:escape-dir",
       "symlink:escape-file",
+      "symlink:git-link",
       "symlink:inside-link",
     ]);
     expect(listing.entries.find((e) => e.name === "README.md")).toEqual({ name: "README.md", path: "README.md", kind: "file", size: 5 });
@@ -102,5 +109,31 @@ describe("FsFileTree.read", () => {
   it("rejects a directory and a missing file", () => {
     expect(codeOf(() => tree.read(root, "src"))).toBe("not-file");
     expect(codeOf(() => tree.read(root, "nope.txt"))).toBe("not-found");
+  });
+});
+
+describe("FsFileTree and the version-control directory", () => {
+  it("rejects .git in any letter case and at any depth", () => {
+    for (const p of [".GIT", ".Git/config", "vendor/lib/.git", "vendor/lib/.git/config", "vendor/lib/.GIT/config"]) {
+      expect(codeOf(() => tree.read(root, p)), p).toBe("outside");
+      expect(codeOf(() => tree.list(root, p)), p).toBe("outside");
+    }
+  });
+
+  it("rejects a symlink that resolves into .git, for reading and listing", () => {
+    expect(codeOf(() => tree.read(root, "git-link/config"))).toBe("outside");
+    expect(codeOf(() => tree.list(root, "git-link"))).toBe("outside");
+  });
+
+  it("does not list a nested .git directory and still lists its siblings", () => {
+    expect(tree.list(root, "vendor/lib").entries.map((e) => e.name)).toEqual(["ok.txt"]);
+    expect(tree.read(root, "vendor/lib/ok.txt")).toMatchObject({ kind: "text", text: "fine" });
+  });
+});
+
+describe("FsFileTree.read on something that is not a regular file", () => {
+  it("refuses a FIFO without waiting for a writer", () => {
+    execFileSync("mkfifo", [join(root, "pipe")]);
+    expect(codeOf(() => tree.read(root, "pipe"))).toBe("not-file");
   });
 });
