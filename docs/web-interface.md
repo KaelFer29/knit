@@ -258,7 +258,7 @@ Built in task T7. `?run=<id>` draws a real run; with no `run` the page keeps sho
 Reduced motion is handled by the canvas (static highlight instead of a travelling dot), so live pulses need nothing extra. `RunReader` gained `getRun(runId)` (the run row alone, used by the stream for its status check instead of a full snapshot) and `getLatestAgentEvents(runId, limit, { taskId?, attempt? })` (the newest rows, oldest first; `GET /api/runs/:id` reads 20 of them for the live line instead of the whole attempt).
 ## Detail panels (built)
 
-Built in task T6 on top of the flow canvas: the `renderDetail` slot of every disclosure widget is filled by `containers/detailRenderer.tsx`. What a panel needs beyond the board comes from a `DetailSource` (`web/src/detail/types.ts`): `createApiDetailSource` reads the attempts' notes from the run snapshot and fetches the timeline and the diff lazily; `fixtures/detail.ts` supplies samples for the fixtures. A panel is mounted only while open, so nothing is fetched for a closed block.
+Built in task T6 on top of the flow canvas: the `renderDetail` slot of every disclosure widget is filled by `containers/detailRenderer.tsx`. What a panel needs beyond the board comes from a `DetailSource` (`web/src/detail/types.ts`): `createApiDetailSource` reads the attempts' notes from the run snapshot and fetches the timeline and the diff lazily; `fixtures/detail.ts` supplies samples for the fixtures. A panel is mounted only while open, so nothing is fetched for a closed block. With `?run=<id>` the page uses the API source, fed by the snapshot that `useBoard` keeps current; without it, the fixture source.
 
 | Block | Panel |
 | --- | --- |
