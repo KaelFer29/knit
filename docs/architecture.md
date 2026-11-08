@@ -11,7 +11,7 @@ src/
     verification/    acceptance rules: scope of changed files, git hygiene
     timeline/        normalize each agent's raw stream (Cursor, Claude) into one readable timeline
     board/           pure view model of a run for the web interface (task states, queue, wires, totals)
-    run/             the run loop and pull request text
+    run/             the run loop, the verification of an attempt (shared with follow-ups), follow-ups on a task's chat, and pull request text
     chat/            run one turn of any agent in a session and record it (`runTurn`), agent-agnostic
   adapters/        implementations of the ports
     agents/cursor/   AgentRunner for the Cursor CLI
@@ -56,7 +56,9 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 
 `AgentRunner.capabilities` (`resume`, `chooseModel`, `commandList`, `visibleReasoning`, `planUsage`, all booleans) states what an adapter supports, so a caller asks the runner and never branches on its name. It is optional: `capabilitiesOf(runner)` returns all-false for a runner that declares none, which keeps simple runners and test fakes unchanged. A runner ignores request fields its capabilities do not cover.
 
-`core/chat` runs one turn over the ports `AgentRunner`, `SessionStore` and a clock: it records the turn, runs the agent (passing `resumeSessionId` when the session has an agent session id and the runner's capabilities say it can resume; resuming with a runner that cannot is a `ChatError`, never silent), normalizes each raw event with the session's agent's normalizer (`ClaudeEventNormalizer` for `claude`, `AgentEventNormalizer` otherwise), stores each entry in `session_events` labelled with the agent, and stores the answer, tokens, exit code and `meta`, remembering the agent's own session id for the next turn. It flushes the normalizer and closes the turn even when the agent throws. `knit chat` is its only caller today.
+`core/chat` runs one turn over the ports `AgentRunner`, `SessionStore` and a clock: it records the turn, runs the agent (passing `resumeSessionId` when the session has an agent session id and the runner's capabilities say it can resume; resuming with a runner that cannot is a `ChatError`, never silent), normalizes each raw event with the session's agent's normalizer (`ClaudeEventNormalizer` for `claude`, `AgentEventNormalizer` otherwise), stores each entry in `session_events` labelled with the agent, and stores the answer, tokens, exit code and `meta`, remembering the agent's own session id for the next turn. It flushes the normalizer and closes the turn even when the agent throws. `knit chat` calls it for free-standing sessions, and follow-ups (below) call it for their turn.
+
+`core/run/verify-attempt.ts` is Knit's verification of one attempt (process, scope, git hygiene, changes, the task's checks), extracted from the run loop so a follow-up cannot drift from it; the run loop's behaviour is unchanged. `core/run/run-followup.ts` runs a follow-up: it checks the request before changing anything (the agent can resume, the session and its chat exist, the worktree is on disk), runs the turn through `runTurn` inside the task's worktree, verifies it with `verifyAttempt` against the task as the run's plan snapshot defines it, and records the next attempt, the task's status and commit, and the lifecycle events. The caller (`cli/commands/followup.ts`) decides what depends on the machine: whether the run's process is alive, which session holds the chat, which agent is built.
 
 `core/board` is data in, view model out: it takes the records a `RunReader` returns and builds what the page draws (see [web-interface.md](web-interface.md#read-side-and-board-view-model)). It imports only port types, so `web/` can `import type` it.
 
@@ -74,7 +76,7 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 - **Another code host**: implement `PullRequests` under `adapters/vcs/<host>/`.
 - **Another command**: add `cli/commands/<name>.ts`, route it in `cli/main.ts` and describe it in `cli/usage.ts`.
 - **Another HTTP route**: add `server/routes/<name>.ts` and register it with one line in `server/routes/index.ts`; it sits behind the security guard automatically.
-- **A new acceptance rule**: add a pure function under `core/verification/` and call it from `core/run/run-plan.ts`.
+- **A new acceptance rule**: add a pure function under `core/verification/` and call it from `verifyAttempt` in `core/run/verify-attempt.ts`, which the run loop and follow-ups share.
 
 ## Tests
 

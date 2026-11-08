@@ -28,6 +28,7 @@ node dist/cli/index.js clean <run-id>            # remove the run's worktrees
 node dist/cli/index.js ui [--port 4317]          # serve the web interface on 127.0.0.1 (view of the runs; its API can start, abort and resume them)
 node dist/cli/index.js chat "Plan the board" --cwd ~/code/app    # one turn with Claude, recorded as a session
 node dist/cli/index.js chat "Split it in tasks" --session <id>   # next turn: Claude resumes the same conversation
+node dist/cli/index.js followup <run-id> T1 "Also cover the empty case"   # more work on a task's Cursor chat, verified again
 ```
 
 Optionally run `pnpm link --global` to get a `knit` command instead of `node dist/cli/index.js`.
@@ -44,7 +45,11 @@ Exit codes: `0` run passed, `1` a task failed, `2` usage or plan error.
 
 Claude runs through `claude -p` with your normal Claude configuration (CLAUDE.md, rules, skills, MCP servers) and your subscription; no API key is involved. Sessions, turns and their timelines go to the same SQLite database as runs (see [docs/data-model.md](docs/data-model.md#chat-sessions)). Cursor sessions resume too (`agent --resume <chatId>`), and `--model` sets the model of a turn for either agent.
 
-It is a one-shot command, not a server: it starts, runs the plan, writes the history to SQLite and exits. Nothing listens in the background.
+It is a one-shot command, not a server: it starts, runs the turn, writes the history to SQLite and exits. Nothing listens in the background.
+
+### Follow-ups on a task
+
+`knit followup <run-id> <task-id> "<prompt>"` sends one more prompt to the Cursor chat of a task (`agent --resume`), inside the task's own worktree, and has Knit verify the result again: scope, git hygiene and the task's checks, against the plan stored with the run. Options: `--model`, `--agent-command`, `--data-dir`. The outcome is recorded as the task's next attempt, so `show` and `logs` list it, and the turn is kept as a session (see `chat`). Exit code `0` when the verification passed, `1` when it failed or the follow-up was refused (the run is still running, the worktree is gone, no chat id was recorded, or the run predates plan snapshots), `2` for usage mistakes. After a passing follow-up on a failed run, `resume` keeps the task as passed and continues. Details in [docs/run-lifecycle.md](docs/run-lifecycle.md#follow-ups).
 
 ## What a run does
 

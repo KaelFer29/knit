@@ -75,6 +75,17 @@ Off by default. `--push` pushes each passed branch to `origin`. `--pr` also open
 
 A terminal-started run is not a group leader, so its group is never signalled: that group also holds the user's shell. Agents run in their own groups, which is why the escalation signals them explicitly.
 
+## Follow-ups
+
+`followup <run-id> <task-id> "<prompt>" [--model <m>] [--agent-command <bin>] [--data-dir <dir>]` sends one more prompt to the Cursor chat of a task, for when the result needs a correction or an addition that is not worth a new run. It does not start a run: it is a one-shot command like `chat`.
+
+1. **Refusals (exit 1, nothing changed).** The run is unknown, the task is unknown, the run is still running (its `pid` belongs to a live process; a `running` run whose process is gone crashed and does not block), the run predates plan snapshots (`runs.plan_text` is empty), the task has no worktree on disk, no attempt of the task recorded an agent session id, the agent cannot resume, or another turn of the same chat is still running.
+2. **The turn.** The agent resumes the chat of the task's latest attempt that has a session id (`agent --resume <chatId>`) with the prompt exactly as typed, inside the task's own worktree, so it still has the task's context. The turn is recorded through the session store: one session per chat (its working directory is the worktree, its agent session id is the chat id, titled after the run and task), reused by every later follow-up on that task.
+3. **Verification.** The result is checked exactly as an attempt of the run loop is (the code is shared: `core/run/verify-attempt.ts`): process, scope, git hygiene, changes, then the task's checks. The allowed files and the checks come from the plan snapshot stored with the run, not from the plan file on disk, so editing the plan afterwards changes nothing.
+4. **Record.** The outcome is the task's next attempt (its row, its timeline in `agent_events`, its tokens); the task's status becomes `passed` or `failed`, and a pass updates its commit. Events: `followup.started`, `attempt.started`, `check.started`, `attempt.finished`, `task.passed` or `task.failed`, `followup.finished`. Exit 0 when the verification passed, 1 otherwise, 2 for usage mistakes.
+
+The run's own status and pid are not changed. A run that failed on this task stays `failed` after a passing follow-up; `resume` then keeps the task as passed and continues with the next one. A failing follow-up marks the task `failed`; another follow-up can fix it, or `resume` re-runs the task from its kept worktree.
+
 ## Open items
 
 - Parallel tasks and multiple dependencies are out of scope: one task depends on at most one earlier task, and tasks run one at a time.
