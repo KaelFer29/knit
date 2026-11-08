@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../api/client";
 import { listConfigFiles, readConfigFile, saveConfigFile, type ConfigFileContent, type ConfigFileEntry } from "../config/api";
 import { diffLines, isChanged, withContext } from "../config/diff";
@@ -35,6 +35,8 @@ export function ConfigView() {
   const [step, setStep] = useState<"edit" | "review">("edit");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<Notice | undefined>();
+  /** Counts file loads: an answer for an earlier click is dropped, so a slow read never lands under another file's name. */
+  const loadSeq = useRef(0);
 
   const refreshList = useCallback(async () => {
     try {
@@ -50,14 +52,18 @@ export function ConfigView() {
   }, [refreshList]);
 
   const load = useCallback(async (id: string, keepNotice?: Notice) => {
+    const mine = ++loadSeq.current;
     setSelectedId(id);
+    setLoaded(undefined);
     setStep("edit");
     setNotice(keepNotice);
     try {
       const content = await readConfigFile(id);
+      if (mine !== loadSeq.current) return;
       setLoaded(content);
       setDraft(content.content);
     } catch (err) {
+      if (mine !== loadSeq.current) return;
       setLoaded(undefined);
       setNotice({ kind: "error", text: message(err) });
     }

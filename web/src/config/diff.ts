@@ -15,6 +15,11 @@ export type DiffItem = DiffLine | { kind: "skip"; count: number };
 
 const split = (text: string): string[] => (text === "" ? [] : text.split("\n"));
 
+/** Above this many table cells (changed lines of one side times the other) the quadratic table is not built. */
+export const MAX_DIFF_CELLS = 1_000_000;
+/** The greedy diff used instead gives up past this many edited lines and the block is shown as replaced. */
+const MAX_EDITS = 2_000;
+
 /**
  * Longest-common-subsequence diff by lines. The common head and tail are peeled off first, so the quadratic table only
  * covers the part that changed (config files are small, and edits are local).
@@ -31,6 +36,7 @@ export function diffLines(oldText: string, newText: string): DiffLine[] {
   const midB = b.slice(head, b.length - tail);
   const n = midA.length;
   const m = midB.length;
+  if (n * m > MAX_DIFF_CELLS) return largeDiff(a, b, head, tail, midA, midB);
   // lcs[i][j]: length of the common subsequence of midA[i..] and midB[j..].
   const lcs: Uint32Array[] = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
   for (let i = n - 1; i >= 0; i--) {
@@ -85,4 +91,93 @@ export function withContext(lines: DiffLine[], context: number): DiffItem[] {
   });
   if (skipped > 0) items.push({ kind: "skip", count: skipped });
   return items;
+}
+
+/** Fallback for huge edits: keep the common head and tail, show everything between as removed then added. */
+function replaceBlock(a: string[], b: string[], head: number, tail: number): DiffLine[] {
+  const out: DiffLine[] = [];
+  let oldNo = 1;
+  let newNo = 1;
+  for (let k = 0; k < head; k++) out.push({ kind: "same", text: a[k]!, oldNumber: oldNo++, newNumber: newNo++ });
+  for (let k = head; k < a.length - tail; k++) out.push({ kind: "del", text: a[k]!, oldNumber: oldNo++ });
+  for (let k = head; k < b.length - tail; k++) out.push({ kind: "add", text: b[k]!, newNumber: newNo++ });
+  for (let k = a.length - tail; k < a.length; k++) out.push({ kind: "same", text: a[k]!, oldNumber: oldNo++, newNumber: newNo++ });
+  return out;
+}
+
+type Op = "same" | "del" | "add";
+
+/**
+ * Myers' greedy diff: time and memory grow with the number of edited lines, not with the file size, so a few edits in
+ * a huge file stay cheap. Returns the operations in order, or `undefined` past `MAX_EDITS` edits.
+ */
+function myers(a: string[], b: string[]): Op[] | undefined {
+  const n = a.length;
+  const m = b.length;
+  const limit = Math.min(n + m, MAX_EDITS);
+  const offset = n + m + 1;
+  const v = new Int32Array(2 * offset + 2);
+  const trace: Int32Array[] = [];
+  for (let d = 0; d <= limit; d++) {
+    trace.push(v.slice(offset - d - 1, offset + d + 2));
+    for (let k = -d; k <= d; k += 2) {
+      let x = k === -d || (k !== d && v[offset + k - 1]! < v[offset + k + 1]!) ? v[offset + k + 1]! : v[offset + k - 1]! + 1;
+      let y = x - k;
+      while (x < n && y < m && a[x] === b[y]) {
+        x++;
+        y++;
+      }
+      v[offset + k] = x;
+      if (x >= n && y >= m) return backtrack(a, b, trace, d);
+    }
+  }
+  return undefined;
+}
+
+function backtrack(a: string[], b: string[], trace: Int32Array[], last: number): Op[] {
+  const ops: Op[] = [];
+  let x = a.length;
+  let y = b.length;
+  for (let d = last; d >= 0; d--) {
+    const snap = trace[d]!;
+    const at = (k: number): number => snap[k + d + 1]!;
+    const k = x - y;
+    const prevK = d === 0 ? 0 : k === -d || (k !== d && at(k - 1) < at(k + 1)) ? k + 1 : k - 1;
+    const prevX = d === 0 ? 0 : at(prevK);
+    const prevY = d === 0 ? 0 : prevX - prevK;
+    while (x > prevX && y > prevY) {
+      ops.push("same");
+      x--;
+      y--;
+    }
+    if (d > 0) {
+      if (x === prevX) {
+        ops.push("add");
+        y--;
+      } else {
+        ops.push("del");
+        x--;
+      }
+    }
+  }
+  return ops.reverse();
+}
+
+/** Diff of a big changed block: the greedy diff when the edits are few, otherwise the block replaced. */
+function largeDiff(a: string[], b: string[], head: number, tail: number, midA: string[], midB: string[]): DiffLine[] {
+  const ops = myers(midA, midB);
+  if (!ops) return replaceBlock(a, b, head, tail);
+  const out: DiffLine[] = [];
+  let oldNo = 1;
+  let newNo = 1;
+  for (let k = 0; k < head; k++) out.push({ kind: "same", text: a[k]!, oldNumber: oldNo++, newNumber: newNo++ });
+  let i = 0;
+  let j = 0;
+  for (const op of ops) {
+    if (op === "same") out.push({ kind: "same", text: midA[i++]!, oldNumber: oldNo++, newNumber: newNo++ }), j++;
+    else if (op === "del") out.push({ kind: "del", text: midA[i++]!, oldNumber: oldNo++ });
+    else out.push({ kind: "add", text: midB[j++]!, newNumber: newNo++ });
+  }
+  for (let k = a.length - tail; k < a.length; k++) out.push({ kind: "same", text: a[k]!, oldNumber: oldNo++, newNumber: newNo++ });
+  return out;
 }
