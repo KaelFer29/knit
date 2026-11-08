@@ -1,5 +1,4 @@
 import { AgentEventNormalizer, type AgentLogEntry } from "../timeline/normalize-agent-events.js";
-import { checkGit } from "../verification/check-git.js";
 import type { ResolvedPlan, Task } from "../plan/parse-plan.js";
 import type { AgentRunResult, AgentRunner } from "../ports/agent-runner.js";
 import type { CheckRunner } from "../ports/check-runner.js";
@@ -8,8 +7,8 @@ import type { EventRecord, RunStore, TaskRecord } from "../ports/run-store.js";
 import type { TranscriptStore } from "../ports/transcript.js";
 import type { TaskWorkspace, Workspace } from "../ports/workspace.js";
 import { renderPrompt, type RetryContext } from "../prompt/render-prompt.js";
-import { checkScope } from "../verification/check-scope.js";
 import { prBody, prTitle } from "./pull-request-text.js";
+import { RESULT_TEXT_LIMIT, describeFailure, truncate, verifyAttempt } from "./verify-attempt.js";
 
 export interface RunDeps {
   agent: AgentRunner;
@@ -64,29 +63,11 @@ export interface RunSummary {
 }
 
 const DEFAULTS = { maxAttempts: 2, agentTimeoutMs: 10 * 60_000, checkTimeoutMs: 5 * 60_000 };
-const RESULT_TEXT_LIMIT = 2000;
 const RESUME_NOTE =
   "A previous run of this task did not finish. Check the current state of the branch, finish the work, and leave everything committed.";
 
-function truncate(text: string, limit: number): string {
-  return text.length > limit ? `${text.slice(0, limit)}…` : text;
-}
-
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
-}
-
-function processFailureText(result: AgentRunResult): string {
-  if (result.timedOut) return "The agent timed out.";
-  return `The agent process failed (exit code ${result.exitCode ?? "none"}): ${truncate(result.resultText, 500)}`;
-}
-
-function describeFailure(f: RetryContext): string {
-  if (f.processFailure) return f.processFailure;
-  if (f.scopeViolations?.length) return `Scope violations: ${f.scopeViolations.join(", ")}`;
-  if (f.gitProblems?.length) return `Git problems: ${f.gitProblems.join(" ")}`;
-  if (f.failedCheck) return `Check failed: ${f.failedCheck}`;
-  return "Unknown failure";
 }
 
 /**
@@ -328,33 +309,18 @@ export async function runPlan(plan: ResolvedPlan, deps: RunDeps, options: RunOpt
           transcript?.close();
         }
 
-        const processOk = result.exitCode === 0 && !result.isError && !result.timedOut;
-        const changed = workspace.changedPaths(ws);
-        const violations = [...checkScope(changed, task.allowedFiles), ...workspace.outsideChanges(ws)];
-        const inspection = workspace.inspect(ws);
-        const gitProblems = checkGit(inspection, ws.branch);
+        const verdict = await verifyAttempt(
+          { checks, workspace },
+          {
+            task,
+            ws,
+            result,
+            checkTimeoutMs,
+            onCheckStarted: (command) => emit("check.started", actx, { command }),
+          },
+        );
+        const { problems: next, violations, gitProblems, failedCheck, inspection, passed } = verdict;
 
-        const next: RetryContext = {};
-        let failedCheck: string | undefined;
-        if (!processOk) next.processFailure = processFailureText(result);
-        if (violations.length > 0) next.scopeViolations = violations;
-        if (gitProblems.length > 0) next.gitProblems = gitProblems;
-        const clean = processOk && violations.length === 0 && gitProblems.length === 0;
-        if (clean && changed.length === 0) next.processFailure = "No files were changed.";
-        if (clean && changed.length > 0) {
-          for (const command of task.checks) {
-            emit("check.started", actx, { command });
-            const r = await checks.run(command, ws.path, checkTimeoutMs);
-            if (r.exitCode !== 0 || r.timedOut) {
-              failedCheck = command;
-              next.failedCheck = command;
-              next.output = r.timedOut ? `(timed out after ${checkTimeoutMs} ms)\n${r.output}` : r.output;
-              break;
-            }
-          }
-        }
-
-        const passed = Object.keys(next).length === 0;
         store.recordAttempt({
           runId, taskId: task.id, attempt, startedAt, durationMs: result.durationMs, exitCode: result.exitCode,
           isError: result.isError, scopeOk: violations.length === 0, status: passed ? "passed" : "failed",
