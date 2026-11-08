@@ -14,7 +14,8 @@ export interface PaletteCommand {
 export function paletteCommands(agent: AgentView | undefined, agentCommands: string[]): PaletteCommand[] {
   const own: PaletteCommand[] = [{ name: "clear", description: "Start a new session", source: "knit" }];
   if (agent?.capabilities.chooseModel) own.push({ name: "model", description: "Pick the model for the next turn", source: "knit" });
-  if (agent?.capabilities.planUsage) own.push({ name: "usage", description: "Show plan usage", source: "knit" });
+  // Offered to every agent so `/usage` never vanishes silently: see `usageAction` for what it does.
+  if (agent) own.push({ name: "usage", description: agent.capabilities.planUsage ? "Ask for plan usage" : "Plan usage (not reported by this agent)", source: "knit" });
   const taken = new Set(own.map((c) => c.name));
   const theirs: PaletteCommand[] = [];
   if (agent?.capabilities.commandList) {
@@ -44,4 +45,9 @@ export function paletteQuery(text: string): string | undefined {
 export function knitCommandOf(text: string, commands: PaletteCommand[]): PaletteCommand | undefined {
   const match = /^\/([\w:.-]+)$/.exec(text.trim());
   return commands.find((c) => c.source === "knit" && c.name === match?.[1]);
+}
+
+/** What `/usage` does: an agent that reports plan usage answers it as a turn; for any other the interface says so. */
+export function usageAction(agent: AgentView): { kind: "send"; prompt: string } | { kind: "notice"; text: string } {
+  return agent.capabilities.planUsage ? { kind: "send", prompt: "/usage" } : { kind: "notice", text: `${agent.label} does not report plan usage.` };
 }

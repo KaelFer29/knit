@@ -130,6 +130,15 @@ describe("WorkspaceView: an open session", () => {
     expect(posted[0]).toEqual({ url: "/api/sessions/a1/turns", body: { prompt: "Next step", profile: { model: "alpha-deep", effort: "high" } } });
   });
 
+  it("/usage sends a /usage turn to an agent that reports plan usage", async () => {
+    const user = userEvent.setup();
+    render(<WorkspaceView sessionId="a1" />);
+    await screen.findByText("<b>Here is the plan</b>");
+    await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "/usage{Enter}");
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({ url: "/api/sessions/a1/turns", body: { prompt: "/usage" } });
+  });
+
   it("disables sending while a turn runs", async () => {
     details.a1 = detail("a1", "alpha", {
       session: { ...entry("a1", "alpha").session, status: "running", agentSessionId: "s" },
