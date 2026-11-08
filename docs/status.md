@@ -18,14 +18,12 @@ It was verified end to end against the real Cursor CLI. 200 tests pass, and ever
 
 ## Conventions
 
-- Chat replies in neutral Spanish without voseo (see `CLAUDE.md`); code, comments, docs and commits in English.
-- Commits are `type(scope): description`, one line, no body, no co-author trailers, grouped by work unit with their tests and docs.
-- Unit tests sit next to the module they test; `test/integration/` is for tests that cross layers.
+Project-wide rules (language, commits, where to look) live in `CLAUDE.md`, which every session loads. Per-layer rules live in `.claude/rules/` and load only when a file of that layer is opened. Active features are tracked in `odd/tasks/<feature>.md`.
 
 ## Next steps
 
-1. **Interface.** A separate process that reads the SQLite database (WAL allows reading while a run writes). Poll `agent_events` for `id > last_seen` to show Cursor's thinking, messages and tool calls live; `events`, `tasks` and `attempts` give the run view. `knit logs --follow` is the terminal reference (`src/cli/commands/logs.ts`). See [data-model.md](data-model.md). It is observation only: headless mode is one-shot, so intervening means aborting and resuming.
-2. **A Claude Code skill** so a planning session can write a plan, run `knit validate`, launch the run in the background and read the result.
+1. **Web interface** (in progress): Knit becomes one workspace for planning with Claude, orchestrating and implementing with Cursor. Design in [web-interface.md](web-interface.md); specs, phases and tasks in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md). `knit logs --follow` (`src/cli/commands/logs.ts`) is the terminal reference for the live timeline.
+2. **A `knit-plan` skill** so Claude writes a valid plan and runs `knit validate`; now part of the interface's plan handoff (task T13).
 3. **A first real run on a real project** with a minimal docs-only task, since the agent has no sandbox.
 4. Smaller items: a `LICENSE`, continue independent tasks after a failure, a `claude -p` adapter for planner or verifier roles, and measuring token cost on real tasks.
 
