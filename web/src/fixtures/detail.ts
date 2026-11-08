@@ -84,5 +84,11 @@ export function fixtureDetailSource(board: BoardModel): DetailSource {
       const task = board.tasks.find((t) => t.taskId === taskId);
       return { startSha: task?.startSha ?? "a1b2c3d", ...(task?.commitSha === undefined ? {} : { commitSha: task.commitSha }), ...DIFF };
     },
+    activity: async (taskId, attempt) => {
+      const touched = ["src/webhooks/signature.ts", "src/webhooks/signature.test.ts"];
+      if (attempt !== undefined) return { touched };
+      const task = board.tasks.find((t) => t.taskId === taskId);
+      return { touched, worktree: task?.startSha === undefined ? null : { paths: ["src/webhooks/signature.ts"], moreFiles: false } };
+    },
   };
 }

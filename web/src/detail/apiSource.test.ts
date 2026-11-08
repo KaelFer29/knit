@@ -32,4 +32,14 @@ describe("createApiDetailSource", () => {
     expect((await source.diff("T1")).files).toEqual([]);
     expect(fetcher).toHaveBeenLastCalledWith("/api/runs/run%201/tasks/T1/diff");
   });
+
+  it("fetches the files of one attempt, or of the whole task with its worktree, lazily", async () => {
+    const fetcher = vi.fn(async (path: string) => ({ runId: "run 1", taskId: "T1", touched: ["a.ts"], worktree: null }));
+    const source = createApiDetailSource(snapshot, fetcher as never);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(await source.activity("T1", 2)).toEqual({ runId: "run 1", taskId: "T1", touched: ["a.ts"], worktree: null });
+    expect(fetcher).toHaveBeenLastCalledWith("/api/runs/run%201/tasks/T1/activity?attempt=2");
+    await source.activity("T1");
+    expect(fetcher).toHaveBeenLastCalledWith("/api/runs/run%201/tasks/T1/activity");
+  });
 });

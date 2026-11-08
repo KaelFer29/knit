@@ -2,6 +2,7 @@ import type { TaskView } from "@board";
 import type { DetailSource } from "../detail/types";
 import { formatDuration, formatTokens } from "../flow/format";
 import { Disclosure } from "../molecules/Disclosure";
+import { FileList } from "../molecules/FileList";
 import { DiffView } from "../organisms/DiffView";
 import { VerdictList } from "../organisms/KnitDetail";
 import { TimelineList } from "../organisms/TimelineList";
@@ -43,6 +44,10 @@ export function TaskDetail({ task, source }: Props) {
             <>
               <p className="detail-label">Agent timeline</p>
               <Loaded load={() => source.timeline(task.taskId, attempt.attempt)}>{(entries) => <TimelineList entries={entries} />}</Loaded>
+              <p className="detail-label">Files touched</p>
+              <Loaded load={() => source.activity(task.taskId, attempt.attempt)}>
+                {(activity) => <FileList label="Files touched" paths={activity.touched} empty="This attempt touched no files." />}
+              </Loaded>
             </>
           )}
         </Disclosure>
@@ -50,6 +55,20 @@ export function TaskDetail({ task, source }: Props) {
       {hasCode ? (
         <Disclosure title="Changes" meta={task.commitSha === undefined ? "in progress" : undefined}>
           <Loaded load={() => source.diff(task.taskId)}>{(diff) => <DiffView diff={diff} />}</Loaded>
+        </Disclosure>
+      ) : null}
+      {hasCode ? (
+        <Disclosure title="Worktree changes">
+          <Loaded load={() => source.activity(task.taskId)}>
+            {(activity) => (
+              <FileList
+                label="Worktree changes"
+                paths={activity.worktree?.paths ?? []}
+                moreFiles={activity.worktree?.moreFiles ?? false}
+                empty={activity.worktree === null ? "The worktree cannot be read." : "No uncommitted changes in the worktree."}
+              />
+            )}
+          </Loaded>
         </Disclosure>
       ) : null}
     </div>

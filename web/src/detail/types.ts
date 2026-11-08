@@ -28,6 +28,13 @@ export interface TaskDiffData {
   moreFiles: boolean;
 }
 
+/** Files a task touched (its timeline's tool calls) and, for the whole task, what its worktree changed now. */
+export interface FileActivityData {
+  touched: string[];
+  /** Absent for one attempt; null when the worktree cannot be read (it is gone, or not a git worktree). */
+  worktree?: { paths: string[]; moreFiles: boolean } | null;
+}
+
 /** What Knit recorded about one attempt besides the board's own fields. */
 export interface AttemptNotes {
   /** The attempt's recorded output: the setup command's output for attempt 0, the agent's final answer otherwise. */
@@ -43,4 +50,6 @@ export interface DetailSource {
   attemptNotes(taskId: string, attempt: number): AttemptNotes;
   timeline(taskId: string, attempt: number): Promise<TimelineEntry[]>;
   diff(taskId: string): Promise<TaskDiffData>;
+  /** Files touched by one attempt, or by the whole task (and its worktree) when `attempt` is absent. */
+  activity(taskId: string, attempt?: number): Promise<FileActivityData>;
 }
