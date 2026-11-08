@@ -9,6 +9,7 @@ import type {
   TaskRecord,
   TaskSpec,
 } from "../../../core/ports/run-store.js";
+import { openDatabase } from "./schema.js";
 
 export interface StoredRun extends RunRecord {
   status: RunStatus;
@@ -26,85 +27,6 @@ export interface RunDetail {
   attempts: AttemptRecord[];
 }
 
-const SCHEMA_VERSION = 4;
-
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS runs (
-  id TEXT PRIMARY KEY,
-  plan_name TEXT NOT NULL,
-  plan_path TEXT NOT NULL,
-  repo TEXT NOT NULL,
-  base TEXT NOT NULL,
-  started_at TEXT NOT NULL,
-  finished_at TEXT,
-  status TEXT NOT NULL,
-  plan_text TEXT,
-  pid INTEGER
-);
-CREATE TABLE IF NOT EXISTS tasks (
-  run_id TEXT NOT NULL REFERENCES runs(id),
-  task_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  status TEXT NOT NULL,
-  branch TEXT,
-  worktree TEXT,
-  commit_sha TEXT,
-  pr_url TEXT,
-  start_sha TEXT,
-  goal TEXT,
-  depends_on TEXT,
-  position INTEGER,
-  specs TEXT,
-  PRIMARY KEY (run_id, task_id)
-);
-CREATE TABLE IF NOT EXISTS attempts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  run_id TEXT NOT NULL REFERENCES runs(id),
-  task_id TEXT NOT NULL,
-  attempt INTEGER NOT NULL,
-  started_at TEXT NOT NULL,
-  duration_ms INTEGER NOT NULL,
-  exit_code INTEGER,
-  is_error INTEGER NOT NULL,
-  input_tokens INTEGER,
-  output_tokens INTEGER,
-  scope_ok INTEGER NOT NULL,
-  failed_check TEXT,
-  status TEXT NOT NULL,
-  session_id TEXT,
-  result_text TEXT
-);
-CREATE TABLE IF NOT EXISTS events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  run_id TEXT NOT NULL REFERENCES runs(id),
-  task_id TEXT,
-  attempt INTEGER,
-  ts TEXT NOT NULL,
-  type TEXT NOT NULL,
-  payload TEXT
-);
-CREATE TABLE IF NOT EXISTS agent_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  run_id TEXT NOT NULL REFERENCES runs(id),
-  task_id TEXT,
-  attempt INTEGER,
-  ts TEXT NOT NULL,
-  kind TEXT NOT NULL,
-  payload TEXT,
-  agent TEXT NOT NULL DEFAULT 'cursor'
-);
-CREATE INDEX IF NOT EXISTS idx_agent_events_run ON agent_events(run_id, id);
-CREATE INDEX IF NOT EXISTS idx_attempts_run ON attempts(run_id, task_id, attempt);
-CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, id);
-`;
-
-/** Columns added in schema version 4, applied to databases created before it. Existing timeline rows are all Cursor's. */
-const COLUMNS_SINCE_V4: Record<string, [name: string, definition: string][]> = {
-  runs: [["plan_text", "TEXT"], ["pid", "INTEGER"]],
-  tasks: [["goal", "TEXT"], ["depends_on", "TEXT"], ["position", "INTEGER"], ["specs", "TEXT"]],
-  agent_events: [["agent", "TEXT NOT NULL DEFAULT 'cursor'"]],
-};
-
 export type Row = Record<string, unknown>;
 
 /** Drops null/undefined keys so optional fields stay absent on the returned objects. */
@@ -116,32 +38,7 @@ export class SqliteRunStore implements RunStore {
   private readonly db: Database.Database;
 
   constructor(path: string) {
-    this.db = new Database(path);
-    if (path !== ":memory:") this.db.pragma("journal_mode = WAL");
-    this.db.pragma("foreign_keys = ON");
-    const version = this.db.pragma("user_version", { simple: true }) as number;
-    this.db.exec(SCHEMA);
-    if (version === 1) {
-      this.db.exec("ALTER TABLE tasks ADD COLUMN pr_url TEXT; ALTER TABLE tasks ADD COLUMN start_sha TEXT;");
-    }
-    this.addMissingColumns();
-    this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
-  }
-
-  /**
-   * Idempotent: checks the real columns instead of trusting `user_version`, so an interrupted upgrade can be repeated.
-   * The transaction takes the write lock up front (`immediate`): a deferred one reads first and then fails with
-   * SQLITE_BUSY when another process opens the same old database at the same moment.
-   */
-  private addMissingColumns(): void {
-    this.db.transaction(() => {
-      for (const [table, columns] of Object.entries(COLUMNS_SINCE_V4)) {
-        const have = new Set((this.db.pragma(`table_info(${table})`) as { name: string }[]).map((c) => c.name));
-        for (const [name, definition] of columns) {
-          if (!have.has(name)) this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
-        }
-      }
-    }).immediate();
+    this.db = openDatabase(path);
   }
 
   close(): void {

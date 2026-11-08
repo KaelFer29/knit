@@ -18,7 +18,7 @@ src/
     vcs/git/         Workspace (worktrees, branches, inspection, push)
     vcs/github/      PullRequests through the gh CLI
     checks/shell/    CheckRunner (bash)
-    storage/sqlite/  RunStore (read-write) and RunReader (read-only)
+    storage/sqlite/  RunStore and SessionStore (read-write), RunReader (read-only); one shared schema and migration (`schema.ts`)
     storage/files/   TranscriptStore (raw JSONL)
     system/          process spawning with timeouts and group kill
   server/          driving adapter: HTTP API, live stream (SSE), static files and the security guard of `knit ui`; receives a `RunReader`, knows nothing about SQLite
@@ -46,6 +46,7 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 | `Workspace` | worktree and branch per task, inspection, push | `vcs/git` |
 | `PullRequests` | open pull requests | `vcs/github` |
 | `RunStore` | persist runs (with a snapshot of the plan and the pid executing them), tasks, attempts, events | `storage/sqlite` |
+| `SessionStore` | persist chat sessions (agent-agnostic), their turns (prompt, answer, tokens, profile, meta, pid) and each turn's timeline; list sessions newest first, events after an id | `storage/sqlite` |
 | `RunReader` | read side for the web interface: runs list, snapshot of a run, events and agent events after an id, over a read-only connection that never writes or migrates | `storage/sqlite` |
 | `TranscriptStore` | keep the raw agent stream | `storage/files` |
 

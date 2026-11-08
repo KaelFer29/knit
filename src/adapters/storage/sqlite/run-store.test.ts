@@ -198,7 +198,7 @@ describe("SqliteRunStore migration", () => {
       migrated.close();
 
       const raw = new Database(path);
-      expect(raw.pragma("user_version", { simple: true })).toBe(4);
+      expect(raw.pragma("user_version", { simple: true })).toBe(5);
       raw.close();
       expect(() => new SqliteRunStore(path).close()).not.toThrow();
     } finally {
