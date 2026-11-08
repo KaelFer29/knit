@@ -128,7 +128,11 @@ export class SqliteRunStore implements RunStore {
     this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
   }
 
-  /** Idempotent: checks the real columns instead of trusting `user_version`, so an interrupted upgrade can be repeated. */
+  /**
+   * Idempotent: checks the real columns instead of trusting `user_version`, so an interrupted upgrade can be repeated.
+   * The transaction takes the write lock up front (`immediate`): a deferred one reads first and then fails with
+   * SQLITE_BUSY when another process opens the same old database at the same moment.
+   */
   private addMissingColumns(): void {
     this.db.transaction(() => {
       for (const [table, columns] of Object.entries(COLUMNS_SINCE_V4)) {
@@ -137,7 +141,7 @@ export class SqliteRunStore implements RunStore {
           if (!have.has(name)) this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
         }
       }
-    })();
+    }).immediate();
   }
 
   close(): void {
