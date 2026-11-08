@@ -13,6 +13,7 @@ src/
     run/             the run loop and pull request text
   adapters/        implementations of the ports
     agents/cursor/   AgentRunner for the Cursor CLI
+    agents/claude/   AgentRunner for Claude Code headless (`claude -p`, stream-json, resumable sessions); not chosen by any command yet
     vcs/git/         Workspace (worktrees, branches, inspection, push)
     vcs/github/      PullRequests through the gh CLI
     checks/shell/    CheckRunner (bash)
@@ -33,7 +34,7 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 
 | Port | Role | Adapter |
 | --- | --- | --- |
-| `AgentRunner` | run one agent attempt or turn in a directory, streaming events; may name itself (`name`), which labels its timeline entries; may declare `capabilities`; a request may resume a session (`resumeSessionId`) and carry a per-turn `profile`; a result may carry `meta` (command list, plan usage, model) | `agents/cursor` |
+| `AgentRunner` | run one agent attempt or turn in a directory, streaming events; may name itself (`name`), which labels its timeline entries; may declare `capabilities`; a request may resume a session (`resumeSessionId`) and carry a per-turn `profile`; a result may carry `meta` (command list, plan usage, model) | `agents/cursor`, `agents/claude` |
 | `CheckRunner` | run a shell check or setup command | `checks/shell` |
 | `Workspace` | worktree and branch per task, inspection, push | `vcs/git` |
 | `PullRequests` | open pull requests | `vcs/github` |
