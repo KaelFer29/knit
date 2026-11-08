@@ -1,4 +1,5 @@
 import type { RouteModule } from "../types.js";
+import { controlRoutes } from "./control.js";
 import { runsRoutes } from "./runs.js";
 import { streamRoutes } from "./stream.js";
 
@@ -8,5 +9,6 @@ import { streamRoutes } from "./stream.js";
  */
 export const routeModules: RouteModule[] = [
   runsRoutes,
+  controlRoutes,
   streamRoutes,
 ];

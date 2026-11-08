@@ -5,7 +5,7 @@ import { decodeSegments, Router } from "./router.js";
 import { routeModules } from "./routes/index.js";
 import { generateToken, guard, hostAllowed, queryTokenRedirect } from "./security.js";
 import { defaultStaticDir, serveStatic } from "./static.js";
-import type { ServerDeps } from "./types.js";
+import type { ControlDeps, ServerDeps } from "./types.js";
 
 /** The server only ever listens here. There is deliberately no option to change it. */
 export const HOST = "127.0.0.1";
@@ -22,6 +22,8 @@ export interface ServerOptions {
   statusIntervalMs?: number;
   heartbeatMs?: number;
   now?: () => number;
+  /** Run control (start, abort, resume, retry). Without it those routes answer 503. */
+  control?: ControlDeps;
 }
 
 export interface RunningServer {
@@ -47,6 +49,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     statusIntervalMs: options.statusIntervalMs ?? 2000,
     heartbeatMs: options.heartbeatMs ?? 15_000,
     now: options.now ?? Date.now,
+    ...(options.control ? { control: options.control } : {}),
   };
   const router = new Router(routeModules.flatMap((mod) => mod(deps)));
   const staticDir = options.staticDir ?? defaultStaticDir();
