@@ -240,3 +240,49 @@ describe("write", () => {
     expect(readFileSync(join(project, "CLAUDE.md"), "utf8")).toBe("v1");
   });
 });
+
+describe("FileConfigFiles when something else writes during a save", () => {
+  it("reports a conflict and keeps the other writer's version when the file changes after the first hash check", () => {
+    const path = join(project, "CLAUDE.md");
+    put(path, "original");
+    let touched = false;
+    const racing = new FileConfigFiles({
+      projectDir: project,
+      homeDir: home,
+      backupDir: backups,
+      // The backup stamps the time between the first hash check and the replacement: another tool writes right then.
+      now: () => {
+        if (!touched) {
+          touched = true;
+          writeFileSync(path, "written by another tool");
+        }
+        return new Date("2026-11-08T10:00:00.000Z");
+      },
+    });
+    const hash = racing.read("claude:project:claude-md").hash;
+    expect(codeOf(() => racing.write("claude:project:claude-md", "mine", hash))).toBe("conflict");
+    expect(readFileSync(path, "utf8")).toBe("written by another tool");
+    expect(readdirSync(project).filter((n) => n.includes(".tmp"))).toEqual([]);
+  });
+
+  it("refuses to replace a file whose folder was swapped for a link that leaves the root after the first check", () => {
+    put(join(project, ".claude", "settings.json"), "{}");
+    let swapped = false;
+    const racing = new FileConfigFiles({
+      projectDir: project,
+      homeDir: home,
+      backupDir: backups,
+      now: () => {
+        if (!swapped) {
+          swapped = true;
+          rmSync(join(project, ".claude"), { recursive: true });
+          symlinkSync(outside, join(project, ".claude"));
+        }
+        return new Date("2026-11-08T10:00:00.000Z");
+      },
+    });
+    const hash = racing.read("claude:project:settings").hash;
+    expect(["forbidden", "conflict"]).toContain(codeOf(() => racing.write("claude:project:settings", "{\"a\":1}", hash)));
+    expect(readdirSync(outside)).toEqual([]);
+  });
+});

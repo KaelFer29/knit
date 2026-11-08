@@ -141,7 +141,18 @@ export class FileConfigFiles implements ConfigFiles {
     }
     const backupPath = previous ? this.backup(target, previous) : undefined;
     const bytes = Buffer.from(content, "utf8");
-    this.replace(resolved.path, bytes, mode);
+    // Another tool may have written, or a folder may have been swapped for a link, since the first check: look again
+    // right before the file is replaced, so that window is as short as it can be.
+    this.replace(resolved.path, bytes, mode, () => {
+      const again = this.resolve(target);
+      if (again.path !== resolved.path || again.exists !== resolved.exists) {
+        throw new ConfigFileError("conflict", "The file changed since it was read. Reload it and review the differences again.");
+      }
+      const now = again.exists ? sha256(this.readBytes(again.path)) : "absent";
+      if (now !== currentHash) {
+        throw new ConfigFileError("conflict", "The file changed since it was read. Reload it and review the differences again.");
+      }
+    });
     return { hash: sha256(bytes), ...(backupPath ? { backupPath } : {}) };
   }
 
@@ -360,14 +371,16 @@ export class FileConfigFiles implements ConfigFiles {
     }
   }
 
-  private replace(path: string, bytes: Buffer, mode: number): void {
+  private replace(path: string, bytes: Buffer, mode: number, verify: () => void): void {
     const temp = `${path}.knit-${randomBytes(4).toString("hex")}.tmp`;
     try {
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(temp, bytes, { mode, flag: "wx" });
+      verify();
       renameSync(temp, path);
-    } catch {
+    } catch (err) {
       rmSync(temp, { force: true });
+      if (err instanceof ConfigFileError) throw err;
       throw new ConfigFileError("io", "Could not write the file; the previous version is untouched");
     }
   }
