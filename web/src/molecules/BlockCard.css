@@ -1,0 +1,100 @@
+.block-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--block-accent);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    box-shadow var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+}
+
+.block-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  border-top-color: var(--block-accent);
+}
+
+.block-card[aria-expanded="true"] {
+  background: linear-gradient(var(--block-soft), var(--surface-1) 55%);
+}
+
+.block-card[data-status="working"] {
+  box-shadow: var(--shadow-md);
+}
+
+.block-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.block-card__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.block-card__name {
+  font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.block-card__role {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  text-transform: capitalize;
+}
+
+.block-card__headline {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.block-card__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: calc(3 * 1.5 * var(--text-sm) + 2 * var(--space-1));
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.block-card__line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.block-card__line--empty {
+  color: var(--text-faint);
+  font-family: var(--font-sans);
+}
+
+.block-card__open {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.block-card:hover .block-card__open {
+  color: var(--block-accent);
+}

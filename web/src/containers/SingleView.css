@@ -1,0 +1,58 @@
+.single {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+}
+
+.single[data-panel-open="true"] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 36rem);
+}
+
+.single__stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.single .side-panel {
+  position: sticky;
+  top: var(--space-4);
+  max-height: calc(100dvh - 6rem);
+}
+
+.single__config {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.single__config:hover,
+.single__config[aria-expanded="true"] {
+  background: var(--surface-3);
+}
+
+/* On narrow windows the panel is a sheet over the right of the screen, so the pipeline still shows beside it. */
+@media (max-width: 900px) {
+  .single[data-panel-open="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .single .side-panel {
+    position: fixed;
+    top: var(--space-3);
+    right: var(--space-3);
+    bottom: var(--space-3);
+    z-index: 5;
+    width: min(32rem, 80vw);
+    max-height: none;
+  }
+}

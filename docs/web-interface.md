@@ -1,6 +1,6 @@
 # Web interface
 
-`knit ui` is a local web app on `127.0.0.1` that joins Claude and Cursor into one workflow and is the single place to review everything. It is built: runs (live canvas, run control, task diffs), a workspace for chat sessions with Claude and Cursor, a configuration editor and a read-only file explorer. Known limits are listed at the end. Progress is tracked in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md).
+`knit ui` is a local web app on `127.0.0.1` that joins Claude and Cursor into one workflow and is the single place to review everything. It is built as one interactive view (see [Single view](#single-view)): Claude, Knit and Cursor joined by a live pipeline, with runs, sessions, the file explorer and the configuration editor opening in a side panel. Known limits are listed at the end. Progress is tracked in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md).
 
 ## Workflow
 
@@ -303,6 +303,20 @@ Built in task T12: the sessions of any agent in one place (S10, S13, S16, D5, D8
 **Plan handoff (T13, S15, D7).** `skills/knit-plan` (`.claude/skills/knit-plan/SKILL.md`) teaches Claude to write a plan in the [plan format](plan-format.md) to `docs/plans/<slug>.md` of the repository the session runs in and to run `knit validate` until it passes. The directory is the constant `PLAN_DIR` in `src/core/ports/plan-drafts.ts`. The session view lists the drafts it finds there (`GET /api/sessions/:id/plans`) as a card above the composer: name, validation result (every issue when invalid), the tasks and their branches. **Launch** is an explicit button that posts `{ planPath }` to the run-control start route (`POST /api/runs`); a Claude turn never starts a run, and an invalid plan cannot be launched. The run is linked to its session by its plan file: the runs list of a draft is every run whose recorded `planPath` is that file, and each links to the run view. The link is derived, not stored, so the server still writes nothing and the schema is unchanged; two sessions in the same directory share their drafts.
 
 **Two timeline components.** The workspace renders its turns with `Timeline` and `TimelineEntry` (`sessions/timeline.ts`). The run's task panels render their attempts with `TimelineList` (`web/src/detail/describe.ts`). Both read the same normalized entry kinds, but they are separate components; merging them is open (see Known limits).
+
+## Single view
+
+The app has one screen and no page navigation (the Runs, Workspace and Configuration tabs and their `#/runs`, `#/workspace`, `#/config` page routes are gone). It opens on three blocks, Claude on the left, Knit in the middle and Cursor on the right, each styled from the agent identity module (the monogram stays when a logo file is missing).
+
+**Which run it shows.** `#/runs/<id>` or `?run=<id>` picks a run; without either, the most recent run. `?fixture=<name>` and `?demo=1` show a built-in sample instead (used for screenshots). The hashes `#/runs/<id>` and `#/workspace/<id>` remain only as the selection the existing panel bodies make (`web/src/route.ts`); they open no page.
+
+**Blocks.** Each block shows, without being opened, its state and latest actions: Claude from the latest session (its last timeline entries, from the sessions API), Knit from the run's board (`useBoard`), Cursor from the board's active task and attempt. Derived by `deriveBlocks` in `web/src/single/pipeline.ts`.
+
+**Pipeline.** Three hops join the blocks: Claude to Knit (stages plan drafted, plan sent, tasks queued), Knit to Cursor (task queued, prompt sent, agent working) and Cursor back to Knit (result back, checks running, verdict). Each hop shows its current stage, a flowing wire while something travels on it, and up to three short log lines. `deriveHops` (pure, unit-tested) derives stage, status (`idle`, `active`, `done`, `failed`) and lines from the board and the latest session. Wide containers lay the pipeline out left to right, narrow ones stack it; every animation is off under `prefers-reduced-motion`.
+
+**Side panel.** Clicking a block, or pressing Enter on it, opens a non-modal dialog next to the pipeline, which stays visible and animated. Focus moves into the panel, Escape or the Close button closes it, and focus returns to the block. The header button Configuration opens the `config` slot the same way. On windows under 900 px the panel is a sheet over the right side.
+
+**Panel contract** (`web/src/single/panels/registry.ts`). `PANELS` maps `PanelId` (`"claude" | "knit" | "cursor" | "config"`) to `{ title, Component }`; every component receives `PanelProps` (`board`, `runId`, `live`, `renderDetail`, `selectRun`). Each panel lives in `web/src/single/panels/<name>/<Name>Panel.tsx` and can be replaced without touching the shell or the registry. Today the bodies wrap the existing containers: Claude = `WorkspaceView`, Knit = run control plus `RunsView`, Cursor = the active task's detail plus `FilesView`, config = `ConfigView`.
 
 ## HTTP API
 

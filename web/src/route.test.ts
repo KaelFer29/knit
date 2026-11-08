@@ -1,36 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { parseRoute, runsHash, workspaceHash } from "./route";
 
-describe("run routes", () => {
-  it("reads an optional run id after #/runs", () => {
-    expect(parseRoute("#/runs/run-1")).toEqual({ view: "runs", runId: "run-1" });
-    expect(parseRoute("#/runs/a%2Fb")).toEqual({ view: "runs", runId: "a/b" });
-    expect(parseRoute("#/runs/%E0%A4%A")).toEqual({ view: "runs" });
-    expect(parseRoute(runsHash("x y"))).toEqual({ view: "runs", runId: "x y" });
+describe("selection hashes", () => {
+  it("reads the run a panel picked from #/runs/<id>", () => {
+    expect(parseRoute("#/runs/run-1")).toEqual({ runId: "run-1" });
+    expect(parseRoute("#/runs/a%2Fb")).toEqual({ runId: "a/b" });
+    expect(parseRoute(runsHash("x y"))).toEqual({ runId: "x y" });
     expect(runsHash()).toBe("#/runs");
   });
-});
 
-describe("parseRoute", () => {
-  it("defaults to the runs view", () => {
-    expect(parseRoute("")).toEqual({ view: "runs" });
-    expect(parseRoute("#/runs")).toEqual({ view: "runs" });
-    expect(parseRoute("#/nope")).toEqual({ view: "runs" });
-  });
-
-  it("reads the workspace and an optional session id", () => {
-    expect(parseRoute("#/workspace")).toEqual({ view: "workspace" });
-    expect(parseRoute("#/workspace/chat-1")).toEqual({ view: "workspace", sessionId: "chat-1" });
-    expect(parseRoute("#/workspace/a%20b")).toEqual({ view: "workspace", sessionId: "a b" });
-  });
-
-  it("survives a malformed escape and extra segments", () => {
-    expect(parseRoute("#/workspace/%E0%A4%A")).toEqual({ view: "workspace" });
-    expect(parseRoute("#/workspace/a/b")).toEqual({ view: "runs" });
-  });
-
-  it("builds hashes that parse back", () => {
+  it("reads the open session from #/workspace/<id>", () => {
+    expect(parseRoute("#/workspace/chat-1")).toEqual({ sessionId: "chat-1" });
+    expect(parseRoute("#/workspace/a%20b")).toEqual({ sessionId: "a b" });
+    expect(parseRoute(workspaceHash("x/y z"))).toEqual({ sessionId: "x/y z" });
     expect(workspaceHash()).toBe("#/workspace");
-    expect(parseRoute(workspaceHash("x/y z"))).toEqual({ view: "workspace", sessionId: "x/y z" });
+  });
+
+  it("selects nothing for page routes that no longer exist, a bare prefix, a bad escape or extra segments", () => {
+    for (const hash of ["", "#/runs", "#/workspace", "#/config", "#/nope", "#/workspace/%E0%A4%A", "#/runs/%E0%A4%A", "#/workspace/a/b"]) {
+      expect(parseRoute(hash)).toEqual({});
+    }
   });
 });
