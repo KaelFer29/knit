@@ -33,12 +33,16 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 
 | Port | Role | Adapter |
 | --- | --- | --- |
-| `AgentRunner` | run one agent attempt in a directory, streaming events; may name itself (`name`), which labels its timeline entries | `agents/cursor` |
+| `AgentRunner` | run one agent attempt or turn in a directory, streaming events; may name itself (`name`), which labels its timeline entries; may declare `capabilities`; a request may resume a session (`resumeSessionId`) and carry a per-turn `profile`; a result may carry `meta` (command list, plan usage, model) | `agents/cursor` |
 | `CheckRunner` | run a shell check or setup command | `checks/shell` |
 | `Workspace` | worktree and branch per task, inspection, push | `vcs/git` |
 | `PullRequests` | open pull requests | `vcs/github` |
 | `RunStore` | persist runs (with a snapshot of the plan and the pid executing them), tasks, attempts, events | `storage/sqlite` |
 | `TranscriptStore` | keep the raw agent stream | `storage/files` |
+
+### Agent capabilities
+
+`AgentRunner.capabilities` (`resume`, `chooseModel`, `commandList`, `visibleReasoning`, `planUsage`, all booleans) states what an adapter supports, so a caller asks the runner and never branches on its name. It is optional: `capabilitiesOf(runner)` returns all-false for a runner that declares none, which keeps simple runners and test fakes unchanged. A runner ignores request fields its capabilities do not cover.
 
 ## Extending
 
