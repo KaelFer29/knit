@@ -286,13 +286,13 @@ Gaps: Knit stores only the failed check's command, not its output, so the "check
 
 ## Workspace (built)
 
-Built in task T12: the sessions of any agent in one place (S10, S13, S16, D5, D8 to D10). The page is at `#/workspace` (a header link next to Runs); `#/workspace/<id>` opens a session and `#/workspace/new` the new-session form. Everything it shows comes from the [session routes](#sessions); nothing in `web/` checks an agent's name. An agent the interface has no brand for gets a neutral monogram identity (`identityOf`), so a new adapter appears without a change to the components.
+Built in task T12: the sessions of any agent in one place (S10, S13, S16, D5, D8 to D10). The workspace is now Claude's side panel in the [single view](#single-view) (see [Claude panel](#claude-panel)); the page and its `#/workspace` routes are gone. Everything it shows comes from the [session routes](#sessions); nothing in `web/` checks an agent's name. An agent the interface has no brand for gets a neutral monogram identity (`identityOf`), so a new adapter appears without a change to the components.
 
 | Piece | Where | Notes |
 | --- | --- | --- |
-| `WorkspaceView` (container) | `containers/WorkspaceView.tsx` | Fetches agents, the session list (every 3 s) and the open session, owns the composer's choices (per-agent profile, directory), starts turns and hands everything to presentational components |
+| `ClaudePanel` (container) | `single/panels/claude/ClaudePanel.tsx` | Fetches agents, the session list (every 3 s) and the open session, owns the composer's choices (per-agent profile, directory), starts turns and hands everything to presentational components |
 | `useSessionLive` | `sessions/useSessionLive.ts` | Keeps one session current: its record and turns plus the timeline entries after the last id it holds (no gap, no repeat). About every 0.8 s while a turn runs, every 4 s otherwise. It polls instead of using SSE: sessions have their own id sequence and one session is a few rows; the run stream stays SSE |
-| `SessionList`, `SessionRow` | `organisms/`, `molecules/` | Every session, most recent first: agent logo, title, relative time or "Running", turns and tokens. Buttons with `aria-current` on the open one |
+| `SessionList`, `SessionRow` | `organisms/`, `molecules/` | Not used by the panel any more (its header uses a picker). Every session, most recent first: agent logo, title, relative time or "Running", turns and tokens. Buttons with `aria-current` on the open one |
 | `SessionHeader`, `NewSessionHeader` | `organisms/` | Title, agent and directory plus the "Continue in terminal" command with a copy button (only when the server sent `continueCommand`); or one radio per agent the server lists and the directory field |
 | `UsagePanel`, `UsageMeter` | `organisms/`, `molecules/` | Session tokens (summed over its turns) and one bar per plan window in `meta.planUsage`, with the percentage written out and the reset time. An agent whose `planUsage` capability is false gets "This agent does not report plan usage." instead of bars. Toggled by the Usage button or `/usage` |
 | `Timeline`, `TimelineEntry` | `organisms/`, `molecules/` | The shared timeline: prompt, messages, reasoning, tool calls (arguments and result, paired by call id), the closing result with duration and tokens, and a working marker. Reasoning is shown when present and as "Reasoning not shared by the agent" otherwise (S8). Output is only ever text. `sessions/timeline.ts` builds the items from turns and events (pure, unit tested) |
@@ -312,7 +312,7 @@ Built in task T12: the sessions of any agent in one place (S10, S13, S16, D5, D8
 
 The app has one screen and no page navigation (the Runs, Workspace and Configuration tabs and their `#/runs`, `#/workspace`, `#/config` page routes are gone). It opens on three blocks, Claude on the left, Knit in the middle and Cursor on the right, each styled from the agent identity module (the monogram stays when a logo file is missing).
 
-**Which run it shows.** `#/runs/<id>` or `?run=<id>` picks a run; without either, the most recent run. `?fixture=<name>` and `?demo=1` show a built-in sample instead (used for screenshots). The hashes `#/runs/<id>` and `#/workspace/<id>` remain only as the selection the existing panel bodies make (`web/src/route.ts`); they open no page.
+**Which run it shows.** `#/runs/<id>` or `?run=<id>` picks a run; without either, the most recent run. `?fixture=<name>` and `?demo=1` show a built-in sample instead (used for screenshots). The hash `#/runs/<id>` remains only as the run selection the panels make (`web/src/route.ts`); it opens no page. Claude's open session is not in the URL: it is panel state, defaulting to the most recent session.
 
 **Blocks.** Each block is a large card in its agent's brand style (Claude warm, Cursor monochrome, Knit teal), with a spine that breathes while it works and turns red on failure. It shows a status badge, the current action ("Now") and the latest few actions as a short list, newest first, clipped at a word boundary (the full text is in the `title`). Claude reads from the latest session (its last timeline entries), Knit from the run's board (`useBoard`), Cursor from the board's active task and attempt. Derived by `deriveBlocks` in `web/src/single/pipeline.ts`.
 
@@ -321,6 +321,16 @@ The app has one screen and no page navigation (the Runs, Workspace and Configura
 **Side panel.** Clicking a block, or pressing Enter on it, opens a non-modal dialog next to the pipeline, which stays visible and animated. Focus moves into the panel, Escape or the Close button closes it, and focus returns to the block. The header button Configuration opens the `config` slot the same way. On windows under 900 px the panel is a sheet over the right side.
 
 **Panel contract** (`web/src/single/panels/registry.ts`). `PANELS` maps `PanelId` (`"claude" | "knit" | "cursor" | "config"`) to `{ title, Component }`; every component receives `PanelProps` (`board`, `runId`, `live`, `renderDetail`, `selectRun`). Each panel lives in `web/src/single/panels/<name>/<Name>Panel.tsx` and can be replaced without touching the shell or the registry. Today the bodies wrap the existing containers: Claude = `WorkspaceView`, Knit = run control plus `RunsView`, Cursor = the active task's detail plus `FilesView`, config = `ConfigView`.
+
+### Claude panel
+
+`single/panels/claude/ClaudePanel.tsx` (S3): a compact side panel in the spirit of an IDE extension panel, built from the workspace pieces above.
+
+- **Header** (`ClaudePanelHeader`): a session picker (native select, most recent first), a New session button, and chips for the agent, the session status, the model and profile values chosen in the composer, and the working directory.
+- **Body** (scrolls): the compact usage meter (`UsagePanel compact`: session tokens and plan windows when the agent declares `planUsage`), the timeline, the detected plan drafts, and the "Continue in terminal" command when the server sent one.
+- **Send plan to Knit:** each draft plan has a prominent "Send plan to Knit" button that posts the existing launch (`POST /api/runs`). It never fires by itself; for an invalid plan it stays disabled and says "Fix N issues first." A Claude turn never starts a run.
+- **Composer** pinned at the bottom with the command palette. `/usage` sends a turn, as before (S7).
+- Everything renders from the agent's capabilities and output is text only.
 
 ## HTTP API
 
