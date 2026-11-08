@@ -1,3 +1,5 @@
+> **Historical document.** This is the original planning handoff (2026-11-08), kept for context. Much of it is outdated: the project is now called Knit, the spike was done and its risks were resolved, and the plan format changed. For the current state read [../status.md](../status.md).
+
 # Orchestrator: project context
 
 Handoff from a planning conversation held on 2026-11-08. Copy this file into `~/orchestrator/` (or `~/orquestador/`) and start a fresh Claude Code session there.
