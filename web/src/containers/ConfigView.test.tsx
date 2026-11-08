@@ -1,6 +1,8 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { EditorView } from "@codemirror/view";
+import { undo } from "@codemirror/commands";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/client";
 import * as api from "../config/api";
 import type { ConfigFileEntry } from "../config/api";
@@ -26,6 +28,14 @@ const FILES: ConfigFileEntry[] = [
   entry({ id: "cursor:project:mcp", agent: "cursor", label: "mcp.json", displayPath: ".cursor/mcp.json", exists: false }),
 ];
 
+// jsdom has no layout: CodeMirror measures text through Range rects, so give it empty ones.
+beforeAll(async () => {
+  const empty = { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, toJSON: () => ({}) };
+  Range.prototype.getClientRects = () => ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList;
+  Range.prototype.getBoundingClientRect = () => empty as DOMRect;
+  await import("../config/CodeEditor"); // the editor is lazy: load it once, outside any test timeout
+}, 60_000);
+
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(api.listConfigFiles).mockResolvedValue(FILES);
@@ -37,6 +47,21 @@ beforeEach(() => {
     json: id.endsWith("settings") || id.endsWith("mcp"),
   }));
 });
+
+const editorEl = (): HTMLElement => screen.getByRole("textbox", { name: /contents of/i });
+const viewOf = (el: HTMLElement): EditorView => {
+  const view = EditorView.findFromDOM(el.closest<HTMLElement>(".cm-editor")!);
+  if (!view) throw new Error("no editor view");
+  return view;
+};
+const textOf = (el: HTMLElement): string => viewOf(el).state.doc.toString();
+/** Types through the editor state the way the browser input does, so edits group for undo like typed text. */
+const typeInto = (el: HTMLElement, insert: string, replaceAll = false): void => {
+  const view = viewOf(el);
+  act(() => {
+    view.dispatch({ changes: { from: replaceAll ? 0 : view.state.doc.length, to: view.state.doc.length, insert }, userEvent: "input.type" });
+  });
+};
 
 async function open(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
   render(<ConfigView />);
@@ -56,8 +81,8 @@ describe("config view", () => {
 
   it("loads the selected file into the editor", async () => {
     const user = userEvent.setup();
-    const box = (await open(user, /CLAUDE\.md/)) as HTMLTextAreaElement;
-    expect(box.value).toBe("line one\nline two");
+    const field = await open(user, /CLAUDE\.md/);
+    expect(textOf(field)).toBe("line one\nline two");
     expect(api.readConfigFile).toHaveBeenCalledWith("claude:project:claude-md");
   });
 
@@ -65,7 +90,7 @@ describe("config view", () => {
     const user = userEvent.setup();
     const box = await open(user, /CLAUDE\.md/);
     expect((screen.getByRole("button", { name: /review changes/i }) as HTMLButtonElement).disabled).toBe(true);
-    await user.type(box, "!");
+    typeInto(box, "!");
     expect((screen.getByRole("button", { name: /review changes/i }) as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -74,8 +99,7 @@ describe("config view", () => {
     const user = userEvent.setup();
     const box = await open(user, /CLAUDE\.md/);
     expect(screen.queryByRole("button", { name: /^save/i })).toBeNull();
-    await user.clear(box);
-    await user.type(box, "line one\nline 2");
+    typeInto(box, "line one\nline 2", true);
     await user.click(screen.getByRole("button", { name: /review changes/i }));
 
     const diff = screen.getByRole("region", { name: /changes/i });
@@ -92,16 +116,16 @@ describe("config view", () => {
   it("can go back from the review to keep editing", async () => {
     const user = userEvent.setup();
     const box = await open(user, /CLAUDE\.md/);
-    await user.type(box, "x");
+    typeInto(box, "x");
     await user.click(screen.getByRole("button", { name: /review changes/i }));
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
-    expect((screen.getByRole("textbox", { name: /contents of/i }) as HTMLTextAreaElement).value).toBe("line one\nline twox");
+    expect(textOf(screen.getByRole("textbox", { name: /contents of/i }))).toBe("line one\nline twox");
   });
 
   it("blocks the review of invalid JSON and says why", async () => {
     const user = userEvent.setup();
     const box = await open(user, /settings\.json/);
-    await user.type(box, "{{");
+    typeInto(box, "{");
     expect((screen.getByRole("button", { name: /review changes/i }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole("alert").textContent).toMatch(/valid JSON/i);
   });
@@ -110,13 +134,13 @@ describe("config view", () => {
     vi.mocked(api.saveConfigFile).mockRejectedValue(new ApiError(409, "The file changed since it was read."));
     const user = userEvent.setup();
     const box = await open(user, /CLAUDE\.md/);
-    await user.type(box, "x");
+    typeInto(box, "x");
     await user.click(screen.getByRole("button", { name: /review changes/i }));
     await user.click(screen.getByRole("button", { name: /^save/i }));
     expect((await screen.findByRole("alert")).textContent).toContain("changed since");
     vi.mocked(api.readConfigFile).mockResolvedValue({ id: "claude:project:claude-md", exists: true, content: "fresh", hash: "h2", json: false });
     await user.click(screen.getByRole("button", { name: /reload/i }));
-    await waitFor(() => expect((screen.getByRole("textbox", { name: /contents of/i }) as HTMLTextAreaElement).value).toBe("fresh"));
+    await waitFor(() => expect(textOf(editorEl())).toBe("fresh"));
   });
 
   it("shows a load failure instead of an empty editor", async () => {
@@ -139,19 +163,60 @@ describe("config view", () => {
     await user.click(await screen.findByRole("button", { name: /ui\.mdc/ }));
     const content = (id: string, text: string): api.ConfigFileContent => ({ id, exists: true, content: text, hash: `h-${id}`, json: false });
     pending.get("cursor:project:rules/ui.mdc")!(content("cursor:project:rules/ui.mdc", "ui rules"));
-    expect(((await screen.findByRole("textbox", { name: /contents of/i })) as HTMLTextAreaElement).value).toBe("ui rules");
+    expect(textOf(await screen.findByRole("textbox", { name: /contents of/i }))).toBe("ui rules");
     await act(async () => {
       pending.get("claude:project:claude-md")!(content("claude:project:claude-md", "claude notes"));
     });
-    expect((screen.getByRole("textbox", { name: /contents of/i }) as HTMLTextAreaElement).value).toBe("ui rules");
+    expect(textOf(editorEl())).toBe("ui rules");
   });
 
   it("does not show the previous file's text while the next file is loading", async () => {
     const user = userEvent.setup();
-    const box = await open(user, /^CLAUDE\.md/);
-    expect((box as HTMLTextAreaElement).value).toBe("line one\nline two");
+    const field2 = await open(user, /^CLAUDE\.md/);
+    expect(textOf(field2)).toBe("line one\nline two");
     vi.mocked(api.readConfigFile).mockImplementation(() => new Promise(() => {}));
     await user.click(screen.getByRole("button", { name: /ui\.mdc/ }));
     expect(screen.queryByRole("textbox", { name: /contents of/i })).toBeNull();
+  });
+
+  it("keeps one editor and its undo history across a round trip to the review", async () => {
+    const user = userEvent.setup();
+    const field = await open(user, /CLAUDE\.md/);
+    const view = viewOf(field);
+    typeInto(field, " one");
+    await user.click(screen.getByRole("button", { name: /review changes/i }));
+    expect(screen.getByRole("region", { name: /changes/i })).toBeTruthy();
+    expect(viewOf(editorEl())).toBe(view);
+    expect(view.state.readOnly).toBe(true);
+    await user.click(screen.getByRole("button", { name: /keep editing/i }));
+    expect(viewOf(editorEl())).toBe(view);
+    expect(view.state.readOnly).toBe(false);
+    expect(textOf(editorEl())).toBe("line one\nline two one");
+    act(() => {
+      undo(view);
+    });
+    expect(textOf(editorEl())).toBe("line one\nline two");
+    expect((screen.getByRole("button", { name: /review changes/i }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("undoes with Ctrl+Z from the keyboard", async () => {
+    const user = userEvent.setup();
+    const field = await open(user, /CLAUDE\.md/);
+    typeInto(field, "!");
+    field.focus();
+    await user.keyboard("{Control>}z{/Control}");
+    expect(textOf(field)).toBe("line one\nline two");
+  });
+
+  it("starts a fresh history for another file", async () => {
+    const user = userEvent.setup();
+    const field = await open(user, /^CLAUDE\.md/);
+    typeInto(field, "!");
+    await user.click(screen.getByRole("button", { name: /ui\.mdc/ }));
+    await screen.findByRole("textbox", { name: /contents of/i });
+    act(() => {
+      undo(viewOf(editorEl()));
+    });
+    expect(textOf(editorEl())).toBe("line one\nline two");
   });
 });

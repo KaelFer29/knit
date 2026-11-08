@@ -22,17 +22,17 @@ export function ConfigFileList({ files, selectedId, onSelect }: Props) {
       {agents.map((agent) => {
         const identity: AgentIdentity | undefined = AGENTS[agent];
         return (
-          <section key={agent} className="config-list__agent" style={identity ? { ["--accent" as string]: identity.accent } : undefined}>
-            <h2 className="config-list__agent-name">
+          <section key={agent} className="config-list__agent" style={identity ? { ["--accent" as string]: identity.accent, ["--accent-soft" as string]: identity.accentSoft } : undefined}>
+            <h3 className="config-list__agent-name">
               {identity ? <Logo identity={identity} size={20} /> : null}
               {identity?.label ?? agent}
-            </h2>
+            </h3>
             {SCOPES.map(({ scope, title }) => {
               const group = files.filter((f) => f.agent === agent && f.scope === scope);
               if (group.length === 0) return null;
               return (
                 <div key={scope} className="config-list__scope">
-                  <h3 className="config-list__scope-name">{title}</h3>
+                  <h4 className="config-list__scope-name">{title}</h4>
                   <ul className="config-list__files">
                     {group.map((file) => (
                       <li key={file.id}>
