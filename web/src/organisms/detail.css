@@ -264,3 +264,15 @@
 .task-detail__status[data-status="failed"] {
   color: var(--status-failed);
 }
+
+.task-detail__model {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.task-detail__model .detail-label {
+  margin: 0;
+}

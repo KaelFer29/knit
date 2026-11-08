@@ -278,7 +278,9 @@ Built in task T6 on top of the flow canvas: the `renderDetail` slot of every dis
 | Claude | the plan text (plain text; a run recorded before schema 4 says it stored none) and the specs of every task |
 | Knit | per task and attempt: the setup command, the verdicts on checks, scope and the commit history, the feedback sent to the agent for the next attempt (derived from the failed attempt before it) and the last lines of the recorded output |
 | a task (queue, active task, or a delivered task opened from the delivery lane) | its goal, every attempt with its verdicts, the agent timeline and the files it touched (loaded when the attempt opens), "Changes": the diff from `GET /api/runs/:id/tasks/:task/diff`, one expandable section per file, and "Worktree changes": what the worktree's git status lists now (from `GET /api/runs/:id/tasks/:task/activity`) |
-| Cursor | none of its own: its work is opened task by task |
+| Cursor | the side panel (`single/panels/cursor/CursorPanel.tsx`), see below |
+
+**Cursor panel (built, U5).** Two tabs. *Agent*: the active task first (the latest task when none is active), as a card with its goal and attempts; the running or verifying attempt opens by itself and its timeline reloads every 3 s while it is open (a failed refresh keeps what was shown). Each attempt shows the model the agent reported in its session entry (when there is none, no model is shown), the agent timeline with tool calls and messages, the files it touched, and the task's "Changes" (diff, one expandable section per file) and "Worktree changes". The other tasks follow as collapsed rows with their state; opening one loads its detail. *Files*: the explorer of the repository and the task worktrees (live run) or the demo tree (fixtures). Everything is drawn from the detail source and the board, never from the agent's name, and agent output renders as text.
 
 Gaps: Knit stores only the failed check's command, not its output, so the "check output" is shown for the setup command only; the retry feedback is rebuilt from the verdicts, not read from a stored prompt. The agent output, the plan and the patch always render as text (never as markup).
 
