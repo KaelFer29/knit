@@ -9,7 +9,7 @@ src/
     plan/            parse and validate a plan file
     prompt/          render the implementer prompt (and retry feedback)
     verification/    acceptance rules: scope of changed files, git hygiene
-    timeline/        normalize the agent's raw stream into a readable timeline
+    timeline/        normalize each agent's raw stream (Cursor, Claude) into one readable timeline
     run/             the run loop and pull request text
   adapters/        implementations of the ports
     agents/cursor/   AgentRunner for the Cursor CLI
