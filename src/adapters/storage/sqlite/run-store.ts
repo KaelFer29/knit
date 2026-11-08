@@ -105,10 +105,10 @@ const COLUMNS_SINCE_V4: Record<string, [name: string, definition: string][]> = {
   agent_events: [["agent", "TEXT NOT NULL DEFAULT 'cursor'"]],
 };
 
-type Row = Record<string, unknown>;
+export type Row = Record<string, unknown>;
 
 /** Drops null/undefined keys so optional fields stay absent on the returned objects. */
-function compact<T extends object>(obj: Record<string, unknown>): T {
+export function compact<T extends object>(obj: Record<string, unknown>): T {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== null && v !== undefined)) as T;
 }
 
@@ -319,7 +319,7 @@ export class SqliteRunStore implements RunStore {
   }
 }
 
-function toTask(t: Row): TaskRecord {
+export function toTask(t: Row): TaskRecord {
   return compact<TaskRecord>({
     runId: t.run_id,
     taskId: t.task_id,
@@ -337,7 +337,7 @@ function toTask(t: Row): TaskRecord {
   });
 }
 
-function toRun(r: Row): StoredRun {
+export function toRun(r: Row): StoredRun {
   return compact<StoredRun>({
     id: r.id,
     planName: r.plan_name,
