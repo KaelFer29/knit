@@ -1,5 +1,5 @@
 /**
- * Typed client for the `knit ui` HTTP API. No real calls yet: the routes arrive with the server.
+ * Typed client for the `knit ui` HTTP API.
  * Same-origin credentials only; the page and the API are served from the same 127.0.0.1 origin.
  */
 
@@ -41,4 +41,9 @@ export async function apiSend<T>(method: "PUT" | "POST", path: string, body: unk
   });
   if (!response.ok) throw await failure(response);
   return (await response.json()) as T;
+}
+
+/** POST with a JSON body. The browser adds the `Origin` header the server checks on every mutating request. */
+export function apiPost<T>(path: string, body: unknown): Promise<T> {
+  return apiSend<T>("POST", path, body);
 }

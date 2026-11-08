@@ -21,7 +21,7 @@ export function Logo({ identity, size }: Props) {
   const [outcome, setOutcome] = useState<{ url: string; state: "ready" | "fallback" } | undefined>();
   const settled = outcome !== undefined && outcome.url === url ? outcome.state : undefined;
 
-  const state: LogoState = url === undefined ? "mark" : (settled ?? "loading");
+  const state: LogoState = identity.monogramOnly ? "fallback" : url === undefined ? "mark" : (settled ?? "loading");
   const style = {
     "--logo-accent": identity.accent,
     "--logo-accent-soft": identity.accentSoft,

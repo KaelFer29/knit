@@ -22,6 +22,8 @@ export interface AgentIdentity {
   monochrome?: boolean;
   /** One or two letters shown when the logo file is missing. */
   monogram: string;
+  /** Never draws a mark or loads a file: only the monogram (an agent the interface has no brand for). */
+  monogramOnly?: boolean;
 }
 
 const tokens = (id: AgentId) => ({ accent: `var(--agent-${id})`, accentSoft: `var(--agent-${id}-soft)` });
@@ -41,4 +43,23 @@ export const BRAND_DIR = "/brand";
 /** URL of the official logo file, or `undefined` when the identity draws its own mark. */
 export function logoUrl(identity: AgentIdentity): string | undefined {
   return identity.logoFile === undefined ? undefined : `${BRAND_DIR}/${identity.logoFile}`;
+}
+
+/**
+ * The identity for an agent id taken from the API. An agent the interface has no brand for gets a neutral monogram
+ * identity, so a new adapter shows up without a code change here.
+ */
+export function identityOf(id: string, label?: string): AgentIdentity {
+  const known = (AGENTS as Partial<Record<string, AgentIdentity>>)[id];
+  if (known !== undefined) return known;
+  const name = label ?? id;
+  return {
+    id: "knit",
+    label: name,
+    role: "builder",
+    accent: "var(--text-muted)",
+    accentSoft: "var(--surface-2)",
+    monogram: name.slice(0, 1).toUpperCase() || "?",
+    monogramOnly: true,
+  };
 }
