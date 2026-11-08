@@ -33,11 +33,11 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 
 | Port | Role | Adapter |
 | --- | --- | --- |
-| `AgentRunner` | run one agent attempt in a directory, streaming events | `agents/cursor` |
+| `AgentRunner` | run one agent attempt in a directory, streaming events; may name itself (`name`), which labels its timeline entries | `agents/cursor` |
 | `CheckRunner` | run a shell check or setup command | `checks/shell` |
 | `Workspace` | worktree and branch per task, inspection, push | `vcs/git` |
 | `PullRequests` | open pull requests | `vcs/github` |
-| `RunStore` | persist runs, tasks, attempts, events | `storage/sqlite` |
+| `RunStore` | persist runs (with a snapshot of the plan and the pid executing them), tasks, attempts, events | `storage/sqlite` |
 | `TranscriptStore` | keep the raw agent stream | `storage/files` |
 
 ## Extending
