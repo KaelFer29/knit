@@ -202,3 +202,50 @@ describe("WorkspaceView: a new session", () => {
     expect(screen.getByRole("combobox", { name: /message beta/i })).toBeTruthy();
   });
 });
+
+describe("WorkspaceView: plan handoff", () => {
+  const draft = (over: Record<string, unknown> = {}) => ({
+    path: "/repo/docs/plans/login.md",
+    file: "login.md",
+    modifiedAt: NOW_ISO,
+    name: "Add login",
+    valid: true,
+    issues: [],
+    tasks: [{ id: "T1", title: "Form", branch: "feat/form" }],
+    runs: [],
+    ...over,
+  });
+
+  function withPlans(plans: unknown[]): void {
+    const base = globalThis.fetch as unknown as (input: string, init?: { method?: string; body?: string }) => Promise<Response>;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string, init?: { method?: string; body?: string }) => {
+        if (String(input) === "/api/sessions/a1/plans") return new Response(JSON.stringify({ dir: "docs/plans", plans }), { status: 200 });
+        if (init?.method === "POST" && String(input) === "/api/runs") {
+          posted.push({ url: String(input), body: JSON.parse(init.body ?? "null") });
+          return new Response(JSON.stringify({ runId: "run-1" }), { status: 202 });
+        }
+        return base(input, init);
+      }),
+    );
+  }
+
+  it("shows the draft with its validation result and starts nothing until Launch is clicked", async () => {
+    const user = userEvent.setup();
+    withPlans([draft()]);
+    render(<WorkspaceView sessionId="a1" />);
+    await screen.findByText("Add login");
+    expect(screen.getByText("Valid")).toBeTruthy();
+    expect(posted).toEqual([]);
+    await user.click(screen.getByRole("button", { name: "Launch run" }));
+    await waitFor(() => expect(posted).toEqual([{ url: "/api/runs", body: { planPath: "/repo/docs/plans/login.md" } }]));
+  });
+
+  it("shows the issues of an invalid draft and cannot launch it", async () => {
+    withPlans([draft({ valid: false, issues: ["T1 has no goal"], tasks: [] })]);
+    render(<WorkspaceView sessionId="a1" />);
+    await screen.findByText("T1 has no goal");
+    expect(screen.queryByRole("button", { name: "Launch run" })).toBeNull();
+  });
+});
