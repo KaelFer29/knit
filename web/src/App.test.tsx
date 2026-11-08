@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
 beforeEach(() => {
@@ -66,9 +66,34 @@ describe("theme toggle", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.tab(); // skip link
+    await user.tab(); // Runs
+    await user.tab(); // Workspace
+    await user.tab(); // Configuration
     await user.tab(); // the checked radio of the group
     expect(document.activeElement).toBe(screen.getByRole("radio", { name: /system/i }));
     await user.keyboard("{ArrowLeft}");
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+  });
+});
+
+describe("navigation", () => {
+  it("shows the run canvas by default and marks Runs as the current page", () => {
+    window.location.hash = "";
+    render(<App />);
+    expect(screen.getByRole("link", { name: "Runs" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("main").getAttribute("aria-label")).toBe("Run canvas");
+  });
+
+  it("opens the workspace from its route and follows the link", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ agents: [], sessions: [] }), { status: 200 })));
+    const user = userEvent.setup();
+    window.location.hash = "";
+    render(<App />);
+    await user.click(screen.getByRole("link", { name: "Workspace" }));
+    expect(await screen.findByRole("region", { name: "Sessions" })).toBeTruthy();
+    expect(screen.getByRole("main").getAttribute("aria-label")).toBe("Workspace");
+    expect(screen.getByRole("link", { name: "Workspace" }).getAttribute("aria-current")).toBe("page");
+    vi.unstubAllGlobals();
+    window.location.hash = "";
   });
 });

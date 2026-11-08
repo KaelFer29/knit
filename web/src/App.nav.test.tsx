@@ -11,17 +11,17 @@ beforeEach(() => {
   vi.mocked(api.listConfigFiles).mockResolvedValue([]);
 });
 
-describe("view tabs", () => {
-  it("shows the flow first and switches to the configuration editor and back, keeping the URL in sync", async () => {
+describe("navigation to the configuration editor", () => {
+  it("switches to the configuration editor and back, keeping the URL in sync", async () => {
     const user = userEvent.setup();
     render(<App />);
-    expect(screen.getByRole("button", { name: "Flow" }).getAttribute("aria-current")).toBe("page");
-    await user.click(screen.getByRole("button", { name: "Configuration" }));
+    expect(screen.getByRole("link", { name: "Runs" }).getAttribute("aria-current")).toBe("page");
+    await user.click(screen.getByRole("link", { name: "Configuration" }));
     expect(window.location.hash).toBe("#/config");
-    expect(screen.getByRole("button", { name: "Configuration" }).getAttribute("aria-current")).toBe("page");
     expect(await screen.findByText(/pick a file to edit/i)).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Flow" }));
-    expect(window.location.hash).toBe("");
+    expect(screen.getByRole("link", { name: "Configuration" }).getAttribute("aria-current")).toBe("page");
+    await user.click(screen.getByRole("link", { name: "Runs" }));
+    expect(window.location.hash).toBe("#/runs");
     expect(screen.queryByText(/pick a file to edit/i)).toBeNull();
   });
 

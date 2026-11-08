@@ -38,6 +38,11 @@
   gap: var(--space-3);
 }
 
+.shell__header > .nav-tabs {
+  margin-right: auto;
+  margin-left: var(--space-4);
+}
+
 .shell__name {
   font-size: var(--text-lg);
   font-weight: 650;

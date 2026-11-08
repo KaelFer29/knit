@@ -1,0 +1,51 @@
+.usage-meter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.usage-meter__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.usage-meter__name {
+  font-weight: 550;
+  text-transform: capitalize;
+}
+
+.usage-meter__value {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-meter__track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+
+.usage-meter__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--text-muted);
+  transition: width var(--duration-slow) var(--ease-out);
+}
+
+.usage-meter[data-tone="warning"] .usage-meter__fill {
+  background: var(--status-retrying);
+}
+
+.usage-meter[data-tone="critical"] .usage-meter__fill {
+  background: var(--status-failed);
+}
+
+.usage-meter__resets {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
