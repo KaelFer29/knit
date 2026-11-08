@@ -26,7 +26,7 @@ Project-wide rules (language, commits, where to look) live in `CLAUDE.md`, which
 
 ### Done
 
-- The web interface, tasks T1 to T17: the read side, `knit ui`, the canvas with live data, detail panels, runs and run control, the workspace and plan handoff, the configuration editor, the file explorer, and live file activity for task attempts. Known limits are in [web-interface.md](web-interface.md#known-limits-and-follow-ups).
+- The web interface, tasks T1 to T17: the read side, `knit ui`, the canvas with live data, detail panels, runs and run control, the workspace and plan handoff, the configuration editor, the file explorer, and live file activity for task attempts. Then the single view (feature `odd/tasks/web-single-view.md`): one screen with the Claude, Knit and Cursor blocks joined by an animated pipeline, side panels for each, the configuration as a preview with an editor that keeps its undo history, and `/usage` sent as a turn. Known limits are in [web-interface.md](web-interface.md#known-limits-and-follow-ups).
 - The `knit-plan` skill (T13): Claude writes a valid plan and runs `knit validate`.
 
 ### Pending

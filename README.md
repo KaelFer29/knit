@@ -41,12 +41,11 @@ Exit codes: `0` run passed, `1` a task failed, `2` usage or plan error.
 
 ### Web interface
 
-`knit ui` serves the web app on `127.0.0.1` and prints its address with a launch token; it never opens a browser. It only reads the database, and starts Knit commands (runs, chat turns) as child processes. Pages, reached from the tabs at the top:
+`knit ui` serves the web app on `127.0.0.1` and prints its address with a launch token; it never opens a browser. It only reads the database, and starts Knit commands (runs, chat turns) as child processes. It is one interactive view:
 
-- **Runs:** the list of runs with their status and token totals, a start form for a plan, and one run on a canvas (Claude, Knit and Cursor, live) with abort, resume and retry, expandable blocks for attempts, checks and diffs.
-- **Workspace:** chat sessions with Claude or Cursor, a per-turn profile, a usage panel, and the plan drafts of a session, which can be launched as runs.
-- **Configuration:** the Claude and Cursor configuration files (project and global), edited with a diff before saving and a backup of the previous version.
-- **Files:** a read-only explorer of a run's repository and task worktrees, at `/?view=files&run=<run-id>` (it has no tab yet).
+- **Three blocks and a pipeline:** Claude (planner), Knit (orchestrator) and Cursor (builder), each showing its live state and latest actions, joined by animated wires that show the stage of each hop and short log lines of what travels on them.
+- **Side panels:** clicking a block opens its panel next to the pipeline. Claude: sessions, model, chat with command palette and usage, the detected plan and an explicit "Send plan to Knit". Knit: run summary, task queue with checks and verdicts, run control (start, abort, resume, retry) and the runs picker. Cursor: the active task's live timeline, attempts, diffs, files touched and a file explorer.
+- **Configuration:** the Claude and Cursor configuration files (project and global), opened from the header as a preview, edited with undo history and a diff before saving, with a backup of the previous version.
 
 Requirements for the web app: Node 20.19 or newer to build it (Vite 7). Details and known limits in [docs/web-interface.md](docs/web-interface.md).
 

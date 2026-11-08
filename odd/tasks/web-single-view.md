@@ -19,12 +19,12 @@ Objective: replace the page-per-view layout of `knit ui` with one interactive vi
 | --- | --- | --- | --- | --- | --- |
 | U1 | S7 | `/usage` sent as a turn with its answer shown; unsupported agents say so | inline | done (RED seen: 4 tests) | `fix/usage-command`, c95f87e |
 | U2 | S1, S2 | Single-view shell: three blocks with live state, pipeline wires with stage and mini logs, side-panel frame, remove page navigation | delegated (base for U3-U6) | done, PR #24 | `feat/single-view-shell` |
-| U2b | S2 | Visual polish of the canvas: curved animated connectors, mini logs readable on the wires, blocks filling the view, brand styling (parent review of U2's screenshot: plain straight lines, logs cut mid-word, half the screen empty) | delegated, parallel | pending | — |
-| U3 | S3 | Claude side panel (moves the workspace into it), send-plan-to-Knit control | delegated, parallel | pending | — |
-| U4 | S4 | Knit side panel (runs list, queue, checks, control) | delegated, parallel | pending | — |
-| U5 | S5 | Cursor side panel (tasks, attempts, timeline, diff, files, explorer) | delegated, parallel | pending | — |
-| U6 | S6, S8 | Configuration preview rebuilt over the view, editor with undo history (new dependency: risk item 5) | delegated, parallel | pending | — |
-| U7 | all | Docs: `docs/web-interface.md`, `README.md`, `docs/status.md` | inline | pending | — |
+| U2b | S2 | Visual polish of the canvas: curved animated connectors, mini logs readable on the wires, blocks filling the view, brand styling (parent review of U2's screenshot: plain straight lines, logs cut mid-word, half the screen empty) | delegated, parallel | done, PR #25 | `feat/single-view-polish` |
+| U3 | S3 | Claude side panel (moves the workspace into it), send-plan-to-Knit control | delegated, parallel | done, PR #29 | `feat/claude-panel` |
+| U4 | S4 | Knit side panel (runs list, queue, checks, control) | delegated, parallel | done, PR #26 | `feat/knit-panel` |
+| U5 | S5 | Cursor side panel (tasks, attempts, timeline, diff, files, explorer) | delegated, parallel | done, PR #27 | `feat/cursor-panel` |
+| U6 | S6, S8 | Configuration preview rebuilt over the view, editor with undo history (new dependency: risk item 5) | delegated, parallel | done, PR #28 (risk item 5: new dependencies) | `feat/config-preview` |
+| U7 | all | Docs: `docs/web-interface.md`, `README.md`, `docs/status.md` | inline | done, PR #30 | `docs/single-view-close` |
 
 Route evidence: U3 to U6 are independent units with disjoint surfaces (one panel folder each) built on U2's shell, launched together (Writer trigger, parallelism). U1 and U7 are small and stay inline.
 
@@ -34,4 +34,5 @@ Route evidence: U3 to U6 are independent units with disjoint surfaces (one panel
 - **L2** (2026-11-08) Evidence. `/usage`: `WorkspaceView.onKnitCommand("usage")` only sets `usageOpen` to true, its default. Undo: driven in Chromium with Playwright against a live `knit ui` on a scratch HOME: typing " mundo" then Ctrl+Z left " mund" (one character per undo); the editor textarea remounts between edit and review, losing its history.
 - **L3** (2026-11-08, user choice): detail of a block opens as a "Panel lateral": a side panel like Cursor's extension panel, with the pipeline visible and animated behind it.
 - **L4** (2026-11-08) U2 delivered (PR #24). Parent looked at `running-1280-light.png`: structure right, visuals too plain for S2 ("conexiones visuales muy lindas"); added U2b on the shell files, disjoint from the panel folders.
-- **Next**: U2b and U3 to U6 in parallel, then U7.
+- **L5** (2026-11-08) U2b, U3 to U6 delivered in parallel and stacked as PRs #25 to #29; U7 (#30) removes the components left unused (`SessionList`, `SessionRow`, `SessionHeader`, `WorkspaceLayout`) and brings README, `docs/web-interface.md` and `docs/status.md` to the single view. Gates on the tip: 974 tests (5 fewer: the removed `SessionList` tests), typecheck and build pass. Undo verified in Chromium by U6: one Ctrl+Z reverts a typed group after a review round trip.
+- **Next**: native review of U6 (new dependencies), then the user's visual review.
