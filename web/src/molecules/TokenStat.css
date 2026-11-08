@@ -24,6 +24,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.token-stat__value[data-empty="true"] {
+  color: var(--text-faint);
+}
+
 .token-stat__split {
   margin: 0;
   color: var(--text-muted);

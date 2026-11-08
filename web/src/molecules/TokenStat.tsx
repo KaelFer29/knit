@@ -9,7 +9,7 @@ export function TokenStat({ tokens }: { tokens: TokenTotals }) {
   return (
     <dl className="token-stat" title={total === 0 ? undefined : split}>
       <dt className="token-stat__label">Tokens</dt>
-      <dd className="token-stat__value">{total === 0 ? "—" : formatTokens(total)}</dd>
+      <dd className="token-stat__value" data-empty={total === 0 ? "true" : undefined}>{total === 0 ? "—" : formatTokens(total)}</dd>
       <dd className="token-stat__split">{total === 0 ? "none recorded" : `${formatTokens(tokens.input)} in · ${formatTokens(tokens.output)} out`}</dd>
     </dl>
   );

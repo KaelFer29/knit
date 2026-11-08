@@ -1,5 +1,7 @@
 .agent-block {
   --block-border: var(--border);
+  /* The header rearranges itself by the block's own width, whatever the canvas layout around it. */
+  container-type: inline-size;
   position: relative;
   z-index: 1;
   display: flex;
@@ -93,6 +95,31 @@
 
 .agent-block__body:empty {
   display: none;
+}
+
+/* A wider block (Knit, or any block in the vertical flow) puts its identity on one row. */
+@container (min-width: 340px) {
+  .agent-block__trigger {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "logo label badge chevron"
+      "logo role badge chevron";
+    column-gap: var(--space-4);
+    row-gap: 0;
+    padding: var(--space-5) var(--space-5) var(--space-3);
+  }
+
+  .agent-block__logo {
+    margin-bottom: 0;
+  }
+
+  .agent-block__badge {
+    align-self: center;
+  }
+
+  .agent-block__body {
+    padding: var(--space-2) var(--space-5) var(--space-5);
+  }
 }
 
 .agent-block__summary {
