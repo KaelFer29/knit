@@ -22,7 +22,7 @@ src/
     storage/sqlite/  RunStore and SessionStore (read-write), RunReader (read-only); one shared schema and migration (`schema.ts`)
     storage/files/   TranscriptStore (raw JSONL)
     system/          process spawning with timeouts and group kill; ProcessControl (inspect and signal processes)
-  server/          driving adapter: HTTP API, live stream (SSE), static files and the security guard of `knit ui`; receives a `RunReader`, knows nothing about SQLite
+  server/          driving adapter: HTTP API, live stream (SSE), run control, static files and the security guard of `knit ui`; receives a `RunReader` and a spawner for Knit child processes, knows nothing about SQLite or adapters
   cli/             command line: wires adapters into the core
     commands/        one module per command
     support/         argument parsing, paths, formatting
@@ -62,7 +62,7 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 
 ### Server
 
-`src/server` is a driving adapter, like the CLI: it turns HTTP requests into calls on the `RunReader` port. It is built from small parts: `security.ts` (the guard every request passes), `router.ts` (method and path matching), `routes/<name>.ts` (one module per group of routes, each a function from the server's dependencies to a list of routes), `static.ts` (built app and SPA fallback) and `server.ts` (wires them on `127.0.0.1`). `lazy-reader.ts` wraps any `RunReader` for a database that does not exist yet. Details in [web-interface.md](web-interface.md#http-api).
+`src/server` is a driving adapter, like the CLI: it turns HTTP requests into calls on the `RunReader` port. It is built from small parts: `security.ts` (the guard every request passes), `router.ts` (method and path matching), `routes/<name>.ts` (one module per group of routes, each a function from the server's dependencies to a list of routes), `static.ts` (built app and SPA fallback) and `server.ts` (wires them on `127.0.0.1`). `routes/control.ts` holds the run control routes, which start Knit commands through a `Spawner` injected by `cli/commands/ui.ts` (the server never spawns, imports an adapter or touches signals itself; `knit abort` uses the `ProcessControl` port). `lazy-reader.ts` wraps any `RunReader` for a database that does not exist yet. Details in [web-interface.md](web-interface.md#http-api).
 
 ## The web app
 
