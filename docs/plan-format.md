@@ -33,4 +33,5 @@ Checks:
 - `Allowed files` is mandatory and non-empty. No `.`, no repo root, no `..`, no absolute paths, no wildcard-only globs. `dir/` allows everything under `dir`; `*`, `**` and `?` are supported.
 - `Checks` may be empty: the task is then accepted on a clean run plus the scope and git checks.
 - `Setup` is optional. A fresh worktree has no `node_modules` or other ignored files, so checks that need them require a setup command. A failing setup fails the task without calling the agent (recorded as attempt 0).
+- Plans written from a Claude session live in `docs/plans/<slug>.md` of the target repository; the `knit-plan` skill writes them there and the web interface lists them as drafts.
 - Parsing errors stop the run before anything is created; all issues are reported together. `knit validate <plan>` checks a file without running anything.

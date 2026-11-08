@@ -3,6 +3,7 @@ import { configRoutes } from "./config.js";
 import { controlRoutes } from "./control.js";
 import { filesRoutes } from "./files.js";
 import { diffRoutes } from "./diff.js";
+import { plansRoutes } from "./plans.js";
 import { runsRoutes } from "./runs.js";
 import { sessionsRoutes } from "./sessions.js";
 import { streamRoutes } from "./stream.js";
@@ -19,4 +20,5 @@ export const routeModules: RouteModule[] = [
   diffRoutes,
   configRoutes,
   sessionsRoutes,
+  plansRoutes,
 ];
