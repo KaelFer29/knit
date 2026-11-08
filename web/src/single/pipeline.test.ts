@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deliveredRun, failedRun, retryingRun, runningRun, verifyingRun } from "../fixtures/boards";
-import { deriveBlocks, deriveHops, type SessionGlimpse } from "./pipeline";
+import { clipLine, deriveBlocks, deriveHops, hopProgress, type SessionGlimpse } from "./pipeline";
 
 const hop = (hops: ReturnType<typeof deriveHops>, id: string) => hops.find((h) => h.id === id)!;
 const claudeBusy: SessionGlimpse = { status: "running", title: "Plan billing", lastPrompt: "Write the plan for webhooks", lines: ["Reading the repo"] };
@@ -88,5 +88,23 @@ describe("deriveBlocks", () => {
     expect(idle.claude).toMatchObject({ status: "idle", headline: "No session yet" });
     expect(idle.knit).toMatchObject({ status: "idle", headline: "No run yet" });
     expect(idle.cursor).toMatchObject({ status: "idle", headline: "Nothing to build" });
+  });
+});
+
+describe("clipLine and hopProgress", () => {
+  it("cuts long lines at a word boundary with an ellipsis", () => {
+    const out = clipLine("Reading the repository structure before drafting the billing webhook plan for the team", 40);
+    expect(out.endsWith("…")).toBe(true);
+    expect(out.length).toBeLessThanOrEqual(40);
+    expect(out).toBe("Reading the repository structure…");
+  });
+  it("keeps short lines and cuts a single long word", () => {
+    expect(clipLine("short  line", 40)).toBe("short line");
+    expect(clipLine("x".repeat(50), 10)).toBe(`${"x".repeat(9)}…`);
+  });
+  it("reports how many stages a hop has reached", () => {
+    expect(hopProgress({ stages: ["a", "b", "c", "d"], stageIndex: -1 })).toBe(0);
+    expect(hopProgress({ stages: ["a", "b", "c", "d"], stageIndex: 1 })).toBe(0.5);
+    expect(hopProgress({ stages: ["a", "b"], stageIndex: 5 })).toBe(1);
   });
 });
