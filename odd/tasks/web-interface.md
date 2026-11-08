@@ -1,7 +1,7 @@
 # Feature: Knit web interface (`knit ui`)
 
 Objective: a local web app that joins Claude and Cursor into one workflow (plan with Claude → orchestrate with Knit → implement with Cursor), saves tokens, and is the single place to review everything. Design: [docs/web-interface.md](../../docs/web-interface.md).
-Branches: one per slice, stacked (see D12) · Phases: A (live view + run control) → B (Claude workspace and plan handoff) → C (Cursor follow-ups) → D (agent configuration) → E (file explorer, later) · Delivery: ask-on-risk, chain strategy `stacked-to-main` (chosen L15) · Tests: vitest (`pnpm test`), plus typecheck.
+Branches: one per slice, stacked (see D12) · Phases: A (live view + run control) → B (Claude workspace and plan handoff) → C (Cursor follow-ups) → D (agent configuration) → E (file explorer, later) · Delivery: ask-on-risk, chain strategy `stacked-to-main` (L15), executed in parallel waves (D13) · Tests: vitest (`pnpm test`), plus typecheck.
 
 ## Specs
 
@@ -52,6 +52,7 @@ User's words are quoted verbatim (Spanish, as written). Everything else is marke
 - **D5 (Q2, accepted L9)** Agent configuration in two levels. Level 1: a per-turn profile (model, effort, permission mode) passed as CLI flags, next to the prompt composer. Level 2 (phase D): an editor for the files the CLIs read (Claude: `CLAUDE.md`, `.claude/rules/`, `settings.json`; Cursor: `.cursor/rules/`, `~/.cursor/cli-config.json`, `mcp.json`), project and global, always showing a diff before saving. Because Knit edits the same files, a `claude` or `agent` session opened in a terminal sees the same configuration.
 - **D6** Claude sessions run with the user's normal Claude configuration (S14). Cursor runs keep MCP disabled and self-contained prompts (S13).
 - **D12 (accepted L15)** Delivery as stacked PRs to `main`, in order. Each slice is about 400 authored changed lines or less, with its tests and docs; each PR targets the previous slice's branch until its parent merges, then is retargeted to `main`. A task whose Risk line names an item (T1, T3, T4, T8, T10, T11, T15, T16) gets its own commit. Slice 0 is the foundations already written (`CLAUDE.md` router, `.claude/rules/`, `docs/web-interface.md`, this document, `.gitignore`); later slices follow the task order and are recorded in the Tasks table as commits land. Push, PR creation and merge stay the user's decisions.
+- **D13 (accepted L18)** Parallel delivery. Tasks run in waves, one subagent per task, each in its own git worktree and branch; a task that depends on another is based on that task's branch (see the delivery plan under Tasks). Agents commit but never push. At the end of a wave the parent linearizes sibling branches (rebases the later one onto the earlier one, before anything is pushed), pushes them and opens one PR per branch: the base is the previous branch of the stack and is retargeted to `main` as parents merge (D12). Commits and PR bodies carry no Claude author or co-author (no `Co-Authored-By`, no "Generated with" footer); they are authored by the repository's git user. The parent owns this document. The native review, the independent verifier and the visual review of the interface run once, after everything is implemented, not per branch.
 - **D7** The handoff contract is the existing plan format (`docs/plan-format.md`). A `knit-plan` skill teaches Claude to write a valid plan and run `knit validate`; the interface detects the plan, shows it as a draft with its validation result, and the user launches it.
 - **D8 (Q3.1, accepted L13)** One agent-agnostic model for sessions, turns and timelines. Each agent adapter declares its capabilities (resume, models, command list, visible reasoning, plan usage) and the interface renders from them, never from the agent's name. A new agent is an adapter plus an identity.
 - **D9 (Q3.2)** The command palette is fed by the agent's own list (Claude: `system/init.slash_commands`, minus `terminal_slash_commands`). Session commands are Knit-native: `/clear` starts a new session, switching chats uses the session list, `/model` sets the turn profile, `/usage` opens a panel built from `rate_limit_event` and `result.usage`. Other commands are sent to the agent as the prompt.
@@ -59,20 +60,47 @@ User's words are quoted verbatim (Spanish, as written). Everything else is marke
 - **D11 (Q3.4)** Files are staged: task diff in phase A, live file activity in phases B and C (paths from tool calls plus `git status` of the worktree), file explorer in phase E.
 ## Tasks
 
+### Delivery plan (D13)
+
+| Wave | Task | Branch | Based on |
+| --- | --- | --- | --- |
+| 0 | foundations | `docs/web-interface-foundations` | `main` |
+| 0 | T1 | `feat/run-plan-snapshot` | foundations |
+| 0 | this plan | `docs/web-delivery-plan` | T1 |
+| 1 | T2 | `feat/run-reader-board` | this plan |
+| 1 | T10 | `feat/claude-agent-adapter` | this plan |
+| 2 | T3 | `feat/knit-ui-server` | T2 |
+| 2 | T4 | `feat/web-scaffold` | T2 |
+| 2 | T11 | `feat/agent-sessions` | T10 |
+| 3 | T5 | `feat/web-flow-canvas` | T4 |
+| 3 | T8 | `feat/run-control` | T3 |
+| 3 | T15 | `feat/cursor-sessions` | T11 |
+| 4 | T6 | `feat/web-task-detail` | T3, T5 |
+| 4 | T7 | `feat/web-live-stream` | T3, T5 |
+| 4 | T12 | `feat/web-workspace` | T3, T5, T11 |
+| 4 | T16 | `feat/config-editor` | T3, T5 |
+| 4 | T17 | `feat/file-explorer` | T3, T5 |
+| 5 | T9 | `feat/web-runs-and-control` | T5, T8 |
+| 5 | T13 | `feat/plan-handoff` | T12 |
+| 5 | T14 | `feat/live-file-activity` | T7, T11 |
+| 6 | T18 | `docs/web-interface-close` | all |
+
+Waves 1 to 5 branch from the linearized tip of the stack, which contains every earlier wave, so a task that needs several parents has them all.
+
 | ID | Phase | Task | Specs | Route | Risk | Status | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | T1 | A | Schema v4: plan text and run pid on `runs`; goal, depends, position, specs on `tasks`; `agent` on `agent_events`; in-place idempotent migration; `knit run` records them. The planned `author` column is dropped: the run-to-session link (S15, T13) replaces it | S3, S4, S9, A1 | inline | item 1 (persisted format change) | done: RED 9 failing and 200 passing, GREEN 209; differential check against `043b74a` identical; review approved (1 advisory fixed); independent verifier: no blockers | `8741cd5`, `3613755` |
 | T2 | A | Read side: `RunReader` port, readonly SQLite implementation, pure `core/board` view model | S3–S6, S11 | inline | none | pending | — |
 | T3 | A | `src/server`: HTTP routes, SSE with `Last-Event-ID`, static files, token, `Origin`/`Host` checks; `knit ui`; usage and docs | S11, S12 | inline | item 2 (local server that launches agents) | pending | — |
 | T4 | A | `web/` scaffold: Vite + React, design tokens, light/dark, identity module, git-ignored brand folder with fallback, fixtures from real runs | S2, S6, S7 | inline | item 5 (new dependencies and build) | pending | — |
-| T5 | A | Flow canvas on fixtures: blocks, wires, queue, delivery lane. **Visual approval gate with the user before T6** | S2–S4, S6, S7 | inline | none | pending | — |
+| T5 | A | Flow canvas on fixtures: Claude, Knit and Cursor blocks, wires, queue, delivery lane. The visual approval gate moves to the end of the delivery (L18); until then screenshots taken with the installed Chromium are the check | S2–S4, S6, S7 | inline | none | pending | — |
 | T6 | A | Expandable blocks: task → attempts → timeline; Knit checks, scope, git, retries; Claude plan and specs; task diff view | S5, S17, D11 | inline | none | pending | — |
 | T7 | A | Live: SSE client, wire pulses, reconnection without gaps, reduced motion | S4, S11 | inline | none | pending | — |
-| T8 | A | Run control: start plan, abort, resume, retry task (D3) | S9, S12 | inline | item 4 (process lifecycle and signals) | pending | — |
-| T9 | A | Runs list with token totals per agent, empty and error states, keyboard navigation, responsive checks | S2, S5, S13 | inline | none | pending | — |
+| T8 | A | Run control, server side: process manager that starts `knit run` and `knit resume` as detached children, aborts a run by process group after checking that its pid is alive, retries a task; command routes | S9, S12 | inline | item 4 (process lifecycle and signals) | pending | — |
+| T9 | A | Runs list with token totals per agent, run control UI (start, abort, resume, retry), empty and error states, keyboard navigation, responsive checks | S2, S5, S13 | inline | none | pending | — |
 | T10 | B | Agent capabilities in the `AgentRunner` port; Claude adapter over `claude -p` stream-json with `--resume`, normalized into the shared timeline (`agent = claude`), run in the target repo with the user's config; capture command list and plan usage. Verify: a slash command sent through `-p`, interactive resume of a `-p` session | S8, S14, S16, D4, D6, D8, D9 | inline | item 3 (port contract change) and item 5 (new external CLI integration) | pending | — |
-| T11 | B | Agent-agnostic sessions: schema v5 (sessions, turns, agent); `knit chat` command that runs one turn of any agent and records it, spawned by the server; session routes | S10, S14, S16, D8 | inline | item 1 (persisted format change) | pending | — |
-| T12 | B | Workspace UI, agent-agnostic: session list and switching, new session, composer with level 1 profile, command palette, usage panel, "continue in terminal", live timeline, tokens per turn; rendered from capabilities | S3, S8, S10, S13, S16, D5, D8–D10 | inline | none | pending | — |
+| T11 | B | Agent-agnostic sessions: schema v5 (sessions, turns, agent); `knit chat` command that runs one turn of any agent and records it | S10, S14, S16, D8 | inline | item 1 (persisted format change) | pending | — |
+| T12 | B | Session routes in `src/server` (list, create, turn, resume); Workspace UI, agent-agnostic: session list and switching, new session, composer with level 1 profile, command palette, usage panel, "continue in terminal", live timeline, tokens per turn; rendered from capabilities | S3, S8, S10, S13, S16, D5, D8–D10 | inline | none | pending | — |
 | T13 | B | Plan handoff: `knit-plan` skill, draft plan detection, validation result, launch from the interface, run linked to its session | S3, S15, D7 | inline | none | pending | — |
 | T14 | B | Live file activity: files touched during a turn or attempt, from tool-call paths and the worktree's `git status` | S17, D11 | inline | none | pending | — |
 | T15 | C | Cursor sessions through the same model: follow-ups on a task's chat (`--resume`) inside its worktree, re-verified by Knit; Cursor capabilities (verify command list and usage) | S10, S16, D5, D8 | inline | item 4 (process lifecycle on a live worktree) | pending | — |
@@ -102,4 +130,6 @@ Routes are inline: no unit has a writer reason yet. T2/T3 and T4 have disjoint s
 - **L15** (2026-11-08, user, verbatim): "Me parece, vamos con PRs ecandenados a main." Chain strategy `stacked-to-main` recorded as D12.
 - **L16** (2026-11-08, user, verbatim): "OK. Hazlo." (commit slice 0 and start T1). Slice 0: `48432b5`, `839c338` on `docs/web-interface-foundations`. Slice 1: T1 on `feat/run-plan-snapshot`, stacked on slice 0: `8741cd5` (feat) and `3613755` (fix).
 - **L17** (2026-11-08) T1 evidence. Risk: item 1 (persisted format change). The `author` column of the original T1 row is dropped (S15 and T13 link a run to the session that wrote its plan). Checks: `pnpm typecheck` and `pnpm test` 209/209. Differential check: a v3 database written by the baseline code and migrated by the new code gives identical stdout and exit code for `runs`, `show` and `logs`; the baseline binary still works on the migrated database. Native review (RDD): assessed high, consent granted by the user, lenses risk and resilience, approved and acknowledged; one advisory (concurrent first opens of a v3 database fail with SQLITE_BUSY) reproduced as 76 of 320 failed opens and fixed with an immediate transaction (0 of 320, no committed test because a concurrency test would be flaky). Independent verifier: no blockers; S3, S4, S9, A1 and D3 pass on the data side. Advisories: migration also runs on read-only commands (`show`, `runs`), and a SIGKILLed run keeps a stale pid (documented in `docs/data-model.md`; T8 must check that the process is alive).
-- **Next**: T2 (`RunReader` port, read-only SQLite implementation, pure `core/board` view model) on a new stacked branch, once the user decides whether to review or push slices 0 and 1 first.
+- **L18** (2026-11-08, user, verbatim): "Perfecto, tengo un mejor plan. Quiero que realices todas las tareas en paralelo o en secuencial las que correspondan, las que dependan de otras, cada una en su propia rama. Esto con subagentes en lo posible para que cada uno tenga su propio espacio de contexto y trabaje sin problemas. No quiero que nos detengamos por cada rama implementada, sino que sigamos un desarrollo ágil y al final cuando esten todas implementadas, podemos correr el verificador y demás. Si algunas funcionalidades dependen de otras, creamos las ramas a partir de estas funcionalidades. La idea es que cuando cada rama este finalizada se levante una PR a main, con el cuerpo sin ti como autor o coautor, lo mismo con los commits, mucho ojo con esto. Si te parece, podemos comenzar."
+- **L19** (2026-11-08) Decision D13 and the delivery plan. Scope changes derived from L18: the visual approval gate of T5 moves to the end; verification and native review run once at the end; session routes move from T11 to T12; run control UI moves from T8 to T9 (T8 keeps the server side). Wave 1 starts from `docs/web-delivery-plan`. Evidence for the plan: the network is available for dependency installs, Chromium for Playwright is installed in `~/.cache/ms-playwright`, the remote is `origin` (`KaelFer29/knit`).
+- **Next**: wave 1 (T2 and T10 in parallel).
