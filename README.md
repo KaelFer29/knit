@@ -25,6 +25,8 @@ node dist/cli/index.js show <run-id>             # tasks, attempts, tokens, bran
 node dist/cli/index.js logs <run-id> --follow    # watch what the agent is doing, live
 node dist/cli/index.js clean <run-id>            # remove the run's worktrees
 node dist/cli/index.js ui [--port 4317]          # serve the web interface on 127.0.0.1 (read-only view of the runs)
+node dist/cli/index.js chat "Plan the board" --cwd ~/code/app    # one turn with Claude, recorded as a session
+node dist/cli/index.js chat "Split it in tasks" --session <id>   # next turn: Claude resumes the same conversation
 ```
 
 Optionally run `pnpm link --global` to get a `knit` command instead of `node dist/cli/index.js`.
@@ -34,6 +36,14 @@ Run it from inside the project you want to change: if the plan has no `Repo:`, t
 Exit codes: `0` run passed, `1` a task failed, `2` usage or plan error.
 
 `run` and `resume` are one-shot commands, not servers: they start, run the plan, write the history to SQLite and exit. Nothing listens in the background. The only long-lived command is `ui`, which you start yourself: it serves the web interface on `127.0.0.1` (see [docs/web-interface.md](docs/web-interface.md#knit-ui)).
+
+### Chat sessions
+
+`knit chat <prompt>` runs ONE turn of an agent and records it, outside any plan. Options: `--agent claude|cursor` (default `claude`), `--session <id>`, `--cwd <dir>`, `--model`, `--effort`, `--permission-mode` (Claude only), `--agent-command`, `--data-dir`. Without `--session` it starts a new session titled after the prompt, working in `--cwd` (default: the current directory, which is the repository Claude plans in). The turn streams as it happens in the same format as `logs`, then prints the answer and the session id; the exit code is `0` when the turn passed and `1` when it failed. With `--session <id>` the agent resumes its own conversation, so a plan can be built over several turns.
+
+Claude runs through `claude -p` with your normal Claude configuration (CLAUDE.md, rules, skills, MCP servers) and your subscription; no API key is involved. Sessions, turns and their timelines go to the same SQLite database as runs (see [docs/data-model.md](docs/data-model.md#chat-sessions)). The Cursor adapter cannot resume yet, so a Cursor session accepts one turn and a second one fails with a clear error.
+
+It is a one-shot command, not a server: it starts, runs the plan, writes the history to SQLite and exits. Nothing listens in the background.
 
 ## What a run does
 
@@ -50,7 +60,7 @@ A failed task stops the run and the remaining tasks are skipped; fix the cause a
 ## Layout
 
 ```
-src/core/        pure logic (plan, prompt, verification, timeline, run loop) and the ports
+src/core/        pure logic (plan, prompt, verification, timeline, run loop, chat turn) and the ports
 src/adapters/    implementations of the ports: agents, vcs, checks, storage, system
 src/server/      local HTTP server of the web interface (routes, live stream, security guard)
 src/cli/         command line: one module per command

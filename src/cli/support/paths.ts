@@ -61,6 +61,13 @@ export function loadPlan(
   return { plan: { ...plan, repo }, path, text };
 }
 
+/** Id of a new chat session, for example `chat-20261108-135523-a1b2c3`. */
+export function makeSessionId(now: Date): string {
+  const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\..*/, "").replace("T", "-");
+  const rand = Math.random().toString(16).slice(2, 8).padEnd(6, "0");
+  return `chat-${stamp}-${rand}`;
+}
+
 export function makeRunId(planName: string, now: Date): string {
   const slug = planName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "plan";
   const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\..*/, "").replace("T", "-");
