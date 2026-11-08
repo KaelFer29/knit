@@ -17,7 +17,7 @@ Objective: replace the page-per-view layout of `knit ui` with one interactive vi
 
 | ID | Specs | What | Route | Status | Branch / commit |
 | --- | --- | --- | --- | --- | --- |
-| U1 | S7 | `/usage` sent as a turn with its answer shown; unsupported agents say so | inline | pending | — |
+| U1 | S7 | `/usage` sent as a turn with its answer shown; unsupported agents say so | inline | done (RED seen: 4 tests) | `fix/usage-command`, c95f87e |
 | U2 | S1, S2 | Single-view shell: three blocks with live state, pipeline wires with stage and mini logs, side-panel frame, remove page navigation | delegated (base for U3-U6) | pending | — |
 | U3 | S3 | Claude side panel (moves the workspace into it), send-plan-to-Knit control | delegated, parallel | pending | — |
 | U4 | S4 | Knit side panel (runs list, queue, checks, control) | delegated, parallel | pending | — |
