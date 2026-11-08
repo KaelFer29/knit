@@ -1,8 +1,15 @@
-.claude-panel {
+/* The panel fills the frame's body and scrolls only its middle, so the composer stays in view. */
+.side-panel__body:has(> .claude-panel) {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.claude-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   gap: var(--space-3);
-  height: 100%;
   min-height: 0;
 }
 
