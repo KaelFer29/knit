@@ -91,7 +91,7 @@ export function FlowCanvas({ board, pulses = [], onPulseEnd, renderDetail }: Pro
           <QueueLane ref={refs.input} items={queue} renderDetail={renderDetail} />
           <ActiveTask ref={refs.core} task={focus} runStatus={board.runStatus} renderDetail={renderDetail} />
         </div>
-        <DeliveryLane items={board.delivery} />
+        <DeliveryLane items={board.delivery} renderDetail={renderDetail} />
       </AgentBlock>
     ),
     cursor: (

@@ -1,6 +1,10 @@
+import { useMemo } from "react";
 import { ALL_FIXTURES } from "../fixtures/boards";
+import { fixtureDetailSource } from "../fixtures/detail";
+import { createRenderDetail } from "./detailRenderer";
 import { parseFlowParams } from "../flow/params";
 import { useDemoPulses } from "../flow/useDemoPulses";
+import { createApiDetailSource } from "../detail/apiSource";
 import { useBoard } from "../live/useBoard";
 import { LiveStatus } from "../molecules/LiveStatus";
 import { FixtureSwitcher } from "../molecules/FixtureSwitcher";
@@ -24,6 +28,11 @@ export function FlowView({ search = window.location.search }: Props) {
   const board = params.run === undefined ? fixture : live.board;
   const demo = useDemoPulses(fixture, params.run === undefined && params.demo);
   const { pulses, onPulseEnd } = params.run === undefined ? demo : live;
+  const renderDetail = useMemo(() => {
+    if (board === undefined) return undefined;
+    if (params.run === undefined) return createRenderDetail(board, fixtureDetailSource(board));
+    return live.snapshot ? createRenderDetail(board, createApiDetailSource(live.snapshot)) : undefined;
+  }, [board, params.run, live.snapshot]);
   return (
     <>
       {params.switcher ? <FixtureSwitcher current={params.fixture} demo={params.demo} /> : null}
@@ -31,7 +40,7 @@ export function FlowView({ search = window.location.search }: Props) {
       {board === undefined ? null : (
         <>
           <RunHeader board={board} />
-          <FlowCanvas board={board} pulses={pulses} onPulseEnd={onPulseEnd} />
+          <FlowCanvas board={board} pulses={pulses} onPulseEnd={onPulseEnd} {...(renderDetail ? { renderDetail } : {})} />
         </>
       )}
     </>

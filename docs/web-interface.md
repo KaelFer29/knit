@@ -256,6 +256,18 @@ Built in task T7. `?run=<id>` draws a real run; with no `run` the page keeps sho
 | `LiveStatus` | `web/src/molecules/LiveStatus.tsx` | One quiet line: loading, "reconnecting", or the load error. Silent while everything works |
 
 Reduced motion is handled by the canvas (static highlight instead of a travelling dot), so live pulses need nothing extra. `RunReader` gained `getRun(runId)` (the run row alone, used by the stream for its status check instead of a full snapshot) and `getLatestAgentEvents(runId, limit, { taskId?, attempt? })` (the newest rows, oldest first; `GET /api/runs/:id` reads 20 of them for the live line instead of the whole attempt).
+## Detail panels (built)
+
+Built in task T6 on top of the flow canvas: the `renderDetail` slot of every disclosure widget is filled by `containers/detailRenderer.tsx`. What a panel needs beyond the board comes from a `DetailSource` (`web/src/detail/types.ts`): `createApiDetailSource` reads the attempts' notes from the run snapshot and fetches the timeline and the diff lazily; `fixtures/detail.ts` supplies samples for the fixtures. A panel is mounted only while open, so nothing is fetched for a closed block.
+
+| Block | Panel |
+| --- | --- |
+| Claude | the plan text (plain text; a run recorded before schema 4 says it stored none) and the specs of every task |
+| Knit | per task and attempt: the setup command, the verdicts on checks, scope and the commit history, the feedback sent to the agent for the next attempt (derived from the failed attempt before it) and the last lines of the recorded output |
+| a task (queue, active task, or a delivered task opened from the delivery lane) | its goal, every attempt with its verdicts and the agent timeline (loaded when the attempt opens), and "Changes": the diff from `GET /api/runs/:id/tasks/:task/diff`, one expandable section per file |
+| Cursor | none of its own: its work is opened task by task |
+
+Gaps: Knit stores only the failed check's command, not its output, so the "check output" is shown for the setup command only; the retry feedback is rebuilt from the verdicts, not read from a stored prompt. The agent output, the plan and the patch always render as text (never as markup).
 
 ## HTTP API
 

@@ -1,0 +1,40 @@
+.disclosure {
+  border-top: 1px solid var(--border);
+}
+
+.disclosure:first-child {
+  border-top: 0;
+}
+
+.disclosure__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.disclosure__title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.disclosure__meta {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.disclosure__body {
+  padding: 0 0 var(--space-3);
+  min-width: 0;
+}

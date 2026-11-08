@@ -22,6 +22,8 @@ function readerOf(tasks: TaskRecord[]): RunReader {
   return {
     listRuns: () => [],
     getRunSnapshot: (id) => (id === "r1" ? snapshot : undefined),
+    getRun: (id) => (id === "r1" ? snapshot.run : undefined),
+    getLatestAgentEvents: () => [],
     getEventsAfter: () => [],
     getAgentEventsAfter: () => [],
     close: () => undefined,
