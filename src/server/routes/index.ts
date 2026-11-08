@@ -1,4 +1,5 @@
 import type { RouteModule } from "../types.js";
+import { configRoutes } from "./config.js";
 import { controlRoutes } from "./control.js";
 import { filesRoutes } from "./files.js";
 import { diffRoutes } from "./diff.js";
@@ -15,4 +16,5 @@ export const routeModules: RouteModule[] = [
   streamRoutes,
   filesRoutes,
   diffRoutes,
+  configRoutes,
 ];

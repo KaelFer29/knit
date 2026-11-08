@@ -1,10 +1,13 @@
 import { spawn } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { FsFileTree } from "../../adapters/system/file-tree.js";
 import { GitTaskDiff } from "../../adapters/vcs/git/task-diff.js";
 import { SqliteRunReader } from "../../adapters/storage/sqlite/run-reader.js";
+import { FileConfigFiles } from "../../adapters/system/config-files.js";
+import { useConfigFiles } from "../../server/routes/config.js";
 import { lazyRunReader, PortInUseError, startServer, type ControlDeps, type Spawner } from "../../server/index.js";
 import { UsageError } from "../errors.js";
 import { parse } from "../support/args.js";
@@ -100,6 +103,14 @@ export async function uiCommand(args: string[], io: CliIo, deps: CliDeps, env: N
   const dataDir = dataDirOf({ "data-dir": values["data-dir"] }, env);
   const dbPath = join(dataDir, DB_FILENAME);
   const control = controlFor(dataDir, env, deps.spawnKnit);
+  // The configuration editor edits the project `knit ui` was started in and the user's home; backups go to the data dir.
+  useConfigFiles(
+    new FileConfigFiles({
+      projectDir: resolve(deps.cwd ?? process.cwd()),
+      homeDir: env.HOME ?? homedir(),
+      backupDir: join(dataDir, "config-backups"),
+    }),
+  );
   const reader = lazyRunReader(() => (existsSync(dbPath) ? new SqliteRunReader(dbPath) : undefined));
 
   let server;
@@ -113,6 +124,7 @@ export async function uiCommand(args: string[], io: CliIo, deps: CliDeps, env: N
     });
   } catch (err) {
     reader.close();
+    useConfigFiles(undefined);
     if (err instanceof PortInUseError) {
       io.err(`Port ${err.port} is already in use. Stop the other process, pick another with --port <n>, or use --port 0 for a free one.\n`);
       return 1;
@@ -125,5 +137,6 @@ export async function uiCommand(args: string[], io: CliIo, deps: CliDeps, env: N
   await waitForStop(deps.stopSignal);
   await server.close();
   reader.close();
+  useConfigFiles(undefined);
   return 0;
 }
