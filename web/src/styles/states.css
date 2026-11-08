@@ -1,0 +1,33 @@
+/*
+ * Task state palette. Anything that carries `data-state` gets `--state` and `--state-soft`, so badges,
+ * cards and wires share one mapping from state to status token.
+ */
+[data-state="queued"] {
+  --state: var(--status-queued);
+  --state-soft: var(--status-queued-soft);
+}
+
+[data-state="running"] {
+  --state: var(--status-running);
+  --state-soft: var(--status-running-soft);
+}
+
+[data-state="retrying"] {
+  --state: var(--status-retrying);
+  --state-soft: var(--status-retrying-soft);
+}
+
+[data-state="verifying"] {
+  --state: var(--status-verifying);
+  --state-soft: var(--status-verifying-soft);
+}
+
+[data-state="delivered"] {
+  --state: var(--status-delivered);
+  --state-soft: var(--status-delivered-soft);
+}
+
+[data-state="failed"] {
+  --state: var(--status-failed);
+  --state-soft: var(--status-failed-soft);
+}
