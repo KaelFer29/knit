@@ -256,6 +256,16 @@ Built in task T7. `?run=<id>` draws a real run; with no `run` the page keeps sho
 | `LiveStatus` | `web/src/molecules/LiveStatus.tsx` | One quiet line: loading, "reconnecting", or the load error. Silent while everything works |
 
 Reduced motion is handled by the canvas (static highlight instead of a travelling dot), so live pulses need nothing extra. `RunReader` gained `getRun(runId)` (the run row alone, used by the stream for its status check instead of a full snapshot) and `getLatestAgentEvents(runId, limit, { taskId?, attempt? })` (the newest rows, oldest first; `GET /api/runs/:id` reads 20 of them for the live line instead of the whole attempt).
+## Runs list and run control (built)
+
+Routes of the Runs tab: `#/runs` is the list, `#/runs/<id>` is one run on the canvas (live, as with `?run=<id>`, which still works next to `?fixture=` and `?demo=` for fixtures and screenshots). `parseRoute` and `runsHash` in `web/src/route.ts` own them; there is no second routing system.
+
+- **List** (`RunsView`, `RunsList`, `RunRow`): from `GET /api/runs`, reread every 3 s. A row is a link with the plan, run id, status, `passed of total tasks` and the token total per block (Claude, Knit, Cursor, same identity colors). The list only has the attempt tokens, which belong to the builder, so the other blocks show a dash, as the board's totals do. No server change was needed. Empty list, loading and load error (with "Try again") have their own states; a failed refresh keeps the last list and says so.
+- **Keyboard.** Tab reaches every row; Up, Down, Home and End move between rows; Enter opens one.
+- **Picker.** The canvas of a run has "All runs" and a native select to jump to another run (`RunPicker`).
+- **Start.** The form above the list posts `POST /api/runs` (absolute plan path, `Push`, `Open PRs`, max attempts). The server's reason (including the plan issues) is shown on error; on success the new run opens on the canvas.
+- **Control** (`RunControlBar`, `RunControls`): on a running run, "Abort" asks for confirmation first; on a failed run, "Resume" and one "Retry <task>" per failed task. Passed runs show nothing. A refused command (409, 502, 504, 503 without a build) shows the server's message; accepted ones show a short note, and the board follows through the stream.
+
 ## Detail panels (built)
 
 Built in task T6 on top of the flow canvas: the `renderDetail` slot of every disclosure widget is filled by `containers/detailRenderer.tsx`. What a panel needs beyond the board comes from a `DetailSource` (`web/src/detail/types.ts`): `createApiDetailSource` reads the attempts' notes from the run snapshot and fetches the timeline and the diff lazily; `fixtures/detail.ts` supplies samples for the fixtures. A panel is mounted only while open, so nothing is fetched for a closed block. With `?run=<id>` the page uses the API source, fed by the snapshot that `useBoard` keeps current; without it, the fixture source.

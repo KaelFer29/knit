@@ -1,6 +1,8 @@
 import { ConfigView } from "./containers/ConfigView";
 import { FilesView } from "./containers/FilesView";
 import { FlowView } from "./containers/FlowView";
+import { RunCanvasView } from "./containers/RunCanvasView";
+import { RunsView } from "./containers/RunsView";
 import { demoFilesApi } from "./files/demo";
 import { httpFilesApi } from "./files/api";
 import { WorkspaceView } from "./containers/WorkspaceView";
@@ -19,7 +21,10 @@ function filesApiFor(search: string) {
   return httpFilesApi(run);
 }
 
-const LABELS = { runs: "Run canvas", workspace: "Workspace", config: "Configuration" } as const;
+const LABELS = { runs: "Runs", workspace: "Workspace", config: "Configuration" } as const;
+
+/** The canvas still opens from the query (`?run=`, `?fixture=`, `?demo=`): fixtures and screenshots use it. */
+const queryOpensCanvas = (search: string): boolean => ["run", "fixture", "demo"].some((k) => new URLSearchParams(search).has(k));
 
 /** Container: owns the theme and the route, and wires them to the presentational shell. */
 export function App() {
@@ -27,8 +32,20 @@ export function App() {
   const route = useRoute();
   const filesApi = filesApiFor(window.location.search);
   return (
-    <AppShell nav={<NavTabs current={route.view} />} label={filesApi ? "Files" : LABELS[route.view]} actions={<ThemeToggle value={theme} onChange={setTheme} />}>
-      {filesApi ? <FilesView api={filesApi} /> : route.view === "workspace" ? <WorkspaceView sessionId={route.sessionId} /> : route.view === "config" ? <ConfigView /> : <FlowView />}
+    <AppShell nav={<NavTabs current={route.view} />} label={filesApi ? "Files" : route.runId ? "Run canvas" : LABELS[route.view]} actions={<ThemeToggle value={theme} onChange={setTheme} />}>
+      {filesApi ? (
+        <FilesView api={filesApi} />
+      ) : route.view === "workspace" ? (
+        <WorkspaceView sessionId={route.sessionId} />
+      ) : route.view === "config" ? (
+        <ConfigView />
+      ) : route.runId !== undefined ? (
+        <RunCanvasView runId={route.runId} />
+      ) : queryOpensCanvas(window.location.search) ? (
+        <FlowView />
+      ) : (
+        <RunsView />
+      )}
     </AppShell>
   );
 }

@@ -5,6 +5,7 @@ import { App } from "./App";
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.history.replaceState(null, "", "/");
   document.documentElement.removeAttribute("data-theme");
 });
 
@@ -17,7 +18,8 @@ describe("app shell", () => {
     expect(main.id).toBe("canvas");
   });
 
-  it("introduces the three identities in the empty state", () => {
+  it("introduces the three identities on a fixture canvas", () => {
+    window.history.replaceState(null, "", "/?fixture=runningRun");
     render(<App />);
     const main = screen.getByRole("main");
     for (const text of ["Claude", "planner", "Knit", "orchestrator", "Cursor", "builder"]) {
@@ -77,11 +79,13 @@ describe("theme toggle", () => {
 });
 
 describe("navigation", () => {
-  it("shows the run canvas by default and marks Runs as the current page", () => {
+  it("shows the runs list by default and marks Runs as the current page", () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ runs: [] }), { status: 200 })));
     window.location.hash = "";
     render(<App />);
     expect(screen.getByRole("link", { name: "Runs" }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("main").getAttribute("aria-label")).toBe("Run canvas");
+    expect(screen.getByRole("main").getAttribute("aria-label")).toBe("Runs");
+    vi.unstubAllGlobals();
   });
 
   it("opens the workspace from its route and follows the link", async () => {

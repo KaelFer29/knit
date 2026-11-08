@@ -5,24 +5,30 @@ export interface Route {
   view: View;
   /** `new` for the new-session form, an id for an open session, absent for neither. */
   sessionId?: string;
+  /** `#/runs/<id>`: the run drawn on the canvas. Absent for the runs list. */
+  runId?: string;
 }
 
 export const NEW_SESSION = "new";
 
-/** `#/runs`, `#/workspace`, `#/workspace/<id>`, `#/config`. Anything else is the runs view. */
+const decode = (id: string): string | undefined => {
+  try {
+    return decodeURIComponent(id);
+  } catch {
+    return undefined;
+  }
+};
+
+/** `#/runs`, `#/runs/<id>`, `#/workspace`, `#/workspace/<id>`, `#/config`. Anything else is the runs list. */
 export function parseRoute(hash: string): Route {
   const [, view, id] = /^#\/(runs|workspace|config)(?:\/([^/]+))?$/.exec(hash) ?? [];
-  if (view === "workspace") {
-    if (id === undefined) return { view };
-    try {
-      return { view, sessionId: decodeURIComponent(id) };
-    } catch {
-      return { view };
-    }
-  }
+  const decoded = id === undefined ? undefined : decode(id);
+  if (view === "workspace") return decoded === undefined ? { view } : { view, sessionId: decoded };
   if (view === "config") return { view };
-  return { view: "runs" };
+  return decoded === undefined ? { view: "runs" } : { view: "runs", runId: decoded };
 }
+
+export const runsHash = (runId?: string): string => (runId === undefined ? "#/runs" : `#/runs/${encodeURIComponent(runId)}`);
 
 export const workspaceHash = (sessionId?: string): string => (sessionId === undefined ? "#/workspace" : `#/workspace/${encodeURIComponent(sessionId)}`);
 

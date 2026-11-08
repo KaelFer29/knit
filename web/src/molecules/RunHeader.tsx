@@ -3,7 +3,7 @@ import { StatusBadge } from "../atoms/StatusBadge";
 import { formatDuration } from "../flow/format";
 import "./RunHeader.css";
 
-const RUN_TONE: Record<BoardModel["runStatus"], { state: TaskState; label: string }> = {
+export const RUN_TONE: Record<BoardModel["runStatus"], { state: TaskState; label: string }> = {
   running: { state: "running", label: "Running" },
   passed: { state: "delivered", label: "Passed" },
   failed: { state: "failed", label: "Failed" },
