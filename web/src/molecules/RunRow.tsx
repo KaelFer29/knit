@@ -1,19 +1,18 @@
 import { StatusBadge } from "../atoms/StatusBadge";
 import { formatTokens, totalTokens } from "../flow/format";
 import { AGENTS, AGENT_ORDER } from "../identity/agents";
-import { runsHash } from "../route";
 import { tokensByAgent } from "../runs/tokens";
 import type { RunListItem } from "../runs/types";
 import { RUN_TONE } from "./RunHeader";
 import "./RunRow.css";
 
-/** One run in the list: a link to its canvas with status, task progress and tokens per agent. */
-export function RunRow({ item }: { item: RunListItem }) {
+/** One run in the picker: a button that makes it the run the view shows, with status, task progress and tokens. */
+export function RunRow({ item, active = false, onSelect }: { item: RunListItem; active?: boolean; onSelect?: (runId: string) => void }) {
   const { run, taskCounts } = item;
   const tone = RUN_TONE[run.status];
   const tokens = tokensByAgent(item);
   return (
-    <a className="run-row" href={runsHash(run.id)} data-run-link>
+    <button type="button" className="run-row" aria-current={active ? "true" : undefined} onClick={() => onSelect?.(run.id)} data-run-link>
       <span className="run-row__main">
         <span className="run-row__plan">{run.planName}</span>
         <span className="run-row__id">{run.id}</span>
@@ -35,6 +34,6 @@ export function RunRow({ item }: { item: RunListItem }) {
           );
         })}
       </ul>
-    </a>
+    </button>
   );
 }
