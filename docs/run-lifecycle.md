@@ -63,6 +63,18 @@ Off by default. `--push` pushes each passed branch to `origin`. `--pr` also open
 - `resume <run-id>`: reads the plan from the path stored in the run. Tasks that passed are reused (not executed again). A failed task re-attaches to its kept worktree and the agent is told the previous run did not finish; if the worktree is gone, a fresh one is prepared. Attempt numbers continue.
 - `clean <run-id>`: removes the run's worktrees. `--delete-branches` deletes only merged branches (`git branch -d`); unmerged work is never deleted. A run still marked as running needs `--force`.
 
+## Abort
+
+`abort <run-id> [--grace-seconds <n>] [--data-dir <dir>]` stops a run that is `running`, from any terminal (the web interface calls the same command). The run's process id is read from the database and checked before anything is signalled:
+
+1. The run is not found: exit 1. It is not `running`: nothing to do, exit 0.
+2. The pid is gone (crash, `kill -9`, reboot): the run is marked `failed`, its pid cleared and a `run.aborted` event recorded with reason `stale-pid`. Exit 0. Tasks keep the state they had; `resume` re-runs whatever did not pass.
+3. The pid is alive but its command line is not a Knit `run` or a `resume` of this run id: the pid was reused by an unrelated process. **Nothing is signalled and nothing is changed**, exit 1. The same happens when two running runs record the same pid, or when a running run has no recorded pid (it predates schema 4).
+4. Otherwise `SIGINT` is sent to that one process. The run's own handler kills the agent's process groups, marks the run `failed`, records `run.aborted` (no reason) and exits 130. Exit 0.
+5. If the process is still alive after the grace period (default 10 s), the descendants' process groups are collected, then the run's process group (only when the run leads its own group, which is the case when the web interface started it) or just its pid, and every collected group, are sent `SIGKILL`. The run is marked `failed` with reason `killed-after-grace`. Exit 0, or 1 if the process survives `SIGKILL`.
+
+A terminal-started run is not a group leader, so its group is never signalled: that group also holds the user's shell. Agents run in their own groups, which is why the escalation signals them explicitly.
+
 ## Open items
 
 - Parallel tasks and multiple dependencies are out of scope: one task depends on at most one earlier task, and tasks run one at a time.

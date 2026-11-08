@@ -1,3 +1,4 @@
+import { abortCommand } from "./commands/abort.js";
 import { chatCommand } from "./commands/chat.js";
 import { cleanCommand } from "./commands/clean.js";
 import { logsCommand } from "./commands/logs.js";
@@ -39,6 +40,8 @@ export async function main(argv: string[], io: CliIo, deps: CliDeps = {}): Promi
         return await chatCommand(rest, io, deps, env, cwd);
       case "clean":
         return cleanCommand(rest, io, deps, env);
+      case "abort":
+        return await abortCommand(rest, io, deps, env);
       case "ui":
         return await uiCommand(rest, io, deps, env);
       case undefined:

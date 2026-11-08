@@ -7,6 +7,7 @@ export const USAGE = `Usage:
   ${PROGRAM_NAME} validate <plan.md>          Check a plan file without running anything
   ${PROGRAM_NAME} runs                        List past runs
   ${PROGRAM_NAME} show <run-id>               Show tasks, attempts, tokens, branches and PRs of a run
+  ${PROGRAM_NAME} abort <run-id> [options]    Stop a running run (SIGINT, then SIGKILL after a grace period); a run whose process is gone is marked failed
   ${PROGRAM_NAME} logs <run-id> [options]     Show what the agent did: thinking, messages, tool calls and results
   ${PROGRAM_NAME} chat <prompt> [options]     Run one turn of an agent (Claude by default) and record it as a resumable session
   ${PROGRAM_NAME} clean <run-id> [options]    Remove the worktrees of a run (branches are kept)
@@ -22,6 +23,10 @@ Options for run and resume:
   --model <name>             Model passed to the agent (--model)
   --agent-command <bin>      Agent binary (default: agent)
   --data-dir <dir>           Database and worktrees location (default: ~/.knit, or $KNIT_HOME)
+
+Options for abort:
+  --grace-seconds <n>        Wait this long after SIGINT before killing the process group (default 10)
+  --data-dir <dir>
 
 Options for logs:
   --task <id>                Only one task (e.g. T1)
