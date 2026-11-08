@@ -1,4 +1,4 @@
-import type { RunListItem, RunReader, RunSnapshot, StoredAgentEvent, StoredEvent } from "../core/ports/run-reader.js";
+import type { RunListItem, RunReader, RunSnapshot, StoredAgentEvent, StoredEvent, StoredRun } from "../core/ports/run-reader.js";
 
 /**
  * A `RunReader` for a database that may not exist yet. `open` returns a reader once the database is there (and
@@ -32,6 +32,9 @@ export function lazyRunReader(open: () => RunReader | undefined): RunReader {
 
   return {
     listRuns: (): RunListItem[] => use([], (r) => r.listRuns()),
+    getRun: (runId): StoredRun | undefined => use(undefined, (r) => r.getRun(runId)),
+    getLatestAgentEvents: (runId, limit, filter): StoredAgentEvent[] =>
+      use([], (r) => r.getLatestAgentEvents(runId, limit, filter)),
     getRunSnapshot: (runId): RunSnapshot | undefined => use(undefined, (r) => r.getRunSnapshot(runId)),
     getEventsAfter: (runId, afterId, limit): StoredEvent[] => use([], (r) => r.getEventsAfter(runId, afterId, limit)),
     getAgentEventsAfter: (runId, afterId, filter): StoredAgentEvent[] =>

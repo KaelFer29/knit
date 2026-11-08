@@ -602,6 +602,8 @@ describe("live stream (SSE)", () => {
       ...inner,
       listRuns: () => inner.listRuns(),
       getRunSnapshot: (id) => inner.getRunSnapshot(id),
+      getRun: (id) => inner.getRun(id),
+      getLatestAgentEvents: (...args) => inner.getLatestAgentEvents(...args),
       getEventsAfter: (...args) => {
         polls++;
         return inner.getEventsAfter(...args);
@@ -629,6 +631,8 @@ describe("live stream (SSE)", () => {
     const flaky: RunReader = {
       listRuns: () => inner.listRuns(),
       getRunSnapshot: (id) => inner.getRunSnapshot(id),
+      getRun: (id) => inner.getRun(id),
+      getLatestAgentEvents: (...args) => inner.getLatestAgentEvents(...args),
       getEventsAfter: (...args) => {
         if (fail-- > 0) throw new Error("database is locked");
         return inner.getEventsAfter(...args);

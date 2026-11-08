@@ -63,10 +63,14 @@ export interface AgentEventFilter {
 export interface RunReader {
   /** Runs, newest first. */
   listRuns(): RunListItem[];
+  /** One run alone, without its tasks or events: the cheap read for a status check. */
+  getRun(runId: string): StoredRun | undefined;
   getRunSnapshot(runId: string): RunSnapshot | undefined;
   /** Lifecycle events of a run with `id > afterId`, oldest first. */
   getEventsAfter(runId: string, afterId: number, limit?: number): StoredEvent[];
   /** Agent timeline entries of a run with `id > afterId`, oldest first, optionally for one task or attempt. */
   getAgentEventsAfter(runId: string, afterId: number, filter?: AgentEventFilter): StoredAgentEvent[];
+  /** The newest `limit` agent timeline entries of a run, oldest first, optionally for one task or attempt. */
+  getLatestAgentEvents(runId: string, limit: number, filter?: Omit<AgentEventFilter, "limit">): StoredAgentEvent[];
   close(): void;
 }

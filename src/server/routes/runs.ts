@@ -10,6 +10,9 @@ export function requireSnapshot(reader: RunReader, runId: string): RunSnapshot {
   return snapshot;
 }
 
+/** Newest timeline entries read for the live line: it only shows the last one. */
+const LIVE_WINDOW = 20;
+
 /** Latest `attempt.started` of the task that is running, to read its timeline for the board's live line. */
 function openAttemptWindow(snapshot: RunSnapshot): { taskId: string; attempt: number } | undefined {
   if (snapshot.run.status !== "running") return undefined;
@@ -33,7 +36,7 @@ export const runsRoutes: RouteModule = ({ reader, now }) => [
     handler: ({ res, params }) => {
       const snapshot = requireSnapshot(reader, params.id!);
       const window = openAttemptWindow(snapshot);
-      const agentEvents = window ? reader.getAgentEventsAfter(snapshot.run.id, 0, window) : [];
+      const agentEvents = window ? reader.getLatestAgentEvents(snapshot.run.id, LIVE_WINDOW, window) : [];
       const board = buildBoard({
         run: snapshot.run,
         tasks: snapshot.tasks,
