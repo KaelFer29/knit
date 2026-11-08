@@ -1,0 +1,13 @@
+{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/path/to/worktree","session_id":"chat-0001","model":"Composer 2.5 Fast","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Remember the secret word PINEAPPLE. Reply with the single word ok and use no tools."}]},"session_id":"chat-0001"}
+{"type":"thinking","subtype":"delta","text":"I","session_id":"chat-0001","timestamp_ms":1700000000002}
+{"type":"thinking","subtype":"delta","text":" will reply with \"ok","session_id":"chat-0001","timestamp_ms":1700000000003}
+{"type":"thinking","subtype":"delta","text":"\" and use no tools.","session_id":"chat-0001","timestamp_ms":1700000000004}
+{"type":"thinking","subtype":"completed","session_id":"chat-0001","timestamp_ms":1700000000005}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]},"session_id":"chat-0001"}
+{"type":"result","subtype":"success","duration_ms":2000,"duration_api_ms":2000,"is_error":false,"result":"ok","session_id":"chat-0001","request_id":"request-0001","usage":{"inputTokens":12199,"outputTokens":127,"cacheReadTokens":0,"cacheWriteTokens":0}}
+{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/path/to/worktree","session_id":"chat-0001","model":"Composer 2.5 Fast","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What was the secret word I told you? Reply with only that word and use no tools."}]},"session_id":"chat-0001"}
+{"type":"thinking","subtype":"completed","session_id":"chat-0001","timestamp_ms":1700000000010}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"PINEAPPLE"}]},"session_id":"chat-0001"}
+{"type":"result","subtype":"success","duration_ms":2000,"duration_api_ms":2000,"is_error":false,"result":"PINEAPPLE","session_id":"chat-0001","request_id":"request-0002","usage":{"inputTokens":93,"outputTokens":77,"cacheReadTokens":12288,"cacheWriteTokens":0}}

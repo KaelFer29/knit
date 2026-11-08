@@ -42,7 +42,7 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 
 | Port | Role | Adapter |
 | --- | --- | --- |
-| `AgentRunner` | run one agent attempt or turn in a directory, streaming events; may name itself (`name`), which labels its timeline entries; may declare `capabilities`; a request may resume a session (`resumeSessionId`) and carry a per-turn `profile`; a result may carry `meta` (command list, plan usage, model) | `agents/cursor`, `agents/claude` |
+| `AgentRunner` | run one agent attempt or turn in a directory, streaming events; may name itself (`name`), which labels its timeline entries; may declare `capabilities`; a request may resume a session (`resumeSessionId`) and carry a per-turn `profile`; a result may carry `meta` (command list, plan usage, model); may offer `listModels()` for a model picker | `agents/cursor`, `agents/claude` |
 | `CheckRunner` | run a shell check or setup command | `checks/shell` |
 | `Workspace` | worktree and branch per task, inspection, push | `vcs/git` |
 | `PullRequests` | open pull requests | `vcs/github` |

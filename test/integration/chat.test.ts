@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { CursorAgentRunner } from "../../src/adapters/agents/cursor/cursor-runner.js";
 import { ClaudeAgentRunner } from "../../src/adapters/agents/claude/claude-runner.js";
 import { SqliteSessionStore } from "../../src/adapters/storage/sqlite/session-store.js";
 import { main, type CliDeps } from "../../src/cli/main.js";
@@ -10,6 +11,7 @@ import type { AgentOptions } from "../../src/cli/types.js";
 import type { AgentCapabilities, AgentRunRequest, AgentRunner } from "../../src/core/ports/agent-runner.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const fakeCursor = resolve(here, "../../src/adapters/agents/cursor/__fixtures__/fake-agent.mjs");
 const fakeClaude = resolve(here, "../../src/adapters/agents/claude/__fixtures__/fake-claude.mjs");
 
 let scratch: string;
@@ -310,7 +312,7 @@ describe("knit chat argument checks", () => {
   });
 });
 
-/** A runner standing in for an agent that cannot resume (Cursor today). */
+/** A runner standing in for an agent that cannot resume. */
 function cursorLike(seen: AgentRunRequest[]): AgentRunner {
   const capabilities: AgentCapabilities = { resume: false, chooseModel: true, commandList: false, visibleReasoning: true, planUsage: false };
   return {
@@ -327,6 +329,51 @@ function cursorLike(seen: AgentRunRequest[]): AgentRunner {
 }
 
 describe("knit chat with Cursor", () => {
+  it("resumes the Cursor chat on a second turn through the real adapter, and keeps the chat id", async () => {
+    const calls: { argv: string[]; cwd: string }[] = [];
+    const deps: CliDeps = {
+      cwd: scratch,
+      env: { KNIT_HOME: dataDir },
+      agent: (options) => {
+        const real = new CursorAgentRunner({
+          command: process.execPath,
+          prefixArgs: [fakeCursor],
+          killGraceMs: 200,
+          ...(options.model ? { model: options.model } : {}),
+        });
+        return {
+          name: real.name,
+          capabilities: real.capabilities,
+          run: (request, onEvent) =>
+            real.run(request, (e) => {
+              const raw = e.raw as { type?: string; argv?: string[]; cwd?: string };
+              if (raw.type === "system") calls.push({ argv: raw.argv ?? [], cwd: raw.cwd ?? "" });
+              onEvent?.(e);
+            }),
+        };
+      },
+    };
+    const first = capture();
+    expect(await main(["chat", "one MODE:ok", "--agent", "cursor", "--cwd", repo], first.io, deps)).toBe(0);
+    const id = sessionIdOf(first.out());
+
+    const second = capture();
+    expect(await main(["chat", "two MODE:ok", "--session", id, "--model", "auto"], second.io, deps)).toBe(0);
+
+    expect(calls[0]!.argv).not.toContain("--resume");
+    const argv = calls[1]!.argv;
+    expect(argv.slice(argv.indexOf("--resume"), argv.indexOf("--resume") + 2)).toEqual(["--resume", "sess-1"]);
+    expect(argv.slice(argv.indexOf("--model"), argv.indexOf("--model") + 2)).toEqual(["--model", "auto"]);
+    expect(realpathSync(calls[1]!.cwd)).toBe(realpathSync(repo));
+    const store = openStore();
+    try {
+      expect(store.getSession(id)).toMatchObject({ agent: "cursor", agentSessionId: "sess-1", status: "idle" });
+      expect(store.listTurns(id).map((t) => [t.seq, t.status, t.profile?.model])).toEqual([[1, "passed", undefined], [2, "passed", "auto"]]);
+    } finally {
+      store.close();
+    }
+  });
+
   it("records a Cursor turn through the same tables, labelled cursor", async () => {
     const requests: AgentRunRequest[] = [];
     const options: AgentOptions[] = [];
@@ -353,7 +400,7 @@ describe("knit chat with Cursor", () => {
     }
   });
 
-  it("refuses a second turn clearly, because the Cursor adapter cannot resume, and records nothing", async () => {
+  it("refuses a second turn clearly when the agent cannot resume, and records nothing", async () => {
     const requests: AgentRunRequest[] = [];
     const deps: CliDeps = { cwd: scratch, env: { KNIT_HOME: dataDir }, agent: () => cursorLike(requests) };
     const first = capture();

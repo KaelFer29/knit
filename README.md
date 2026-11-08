@@ -42,7 +42,7 @@ Exit codes: `0` run passed, `1` a task failed, `2` usage or plan error.
 
 `knit chat <prompt>` runs ONE turn of an agent and records it, outside any plan. Options: `--agent claude|cursor` (default `claude`), `--session <id>`, `--cwd <dir>`, `--model`, `--effort`, `--permission-mode` (Claude only), `--agent-command`, `--data-dir`. Without `--session` it starts a new session titled after the prompt, working in `--cwd` (default: the current directory, which is the repository Claude plans in). The turn streams as it happens in the same format as `logs`, then prints the answer and the session id; the exit code is `0` when the turn passed and `1` when it failed. With `--session <id>` the agent resumes its own conversation, so a plan can be built over several turns.
 
-Claude runs through `claude -p` with your normal Claude configuration (CLAUDE.md, rules, skills, MCP servers) and your subscription; no API key is involved. Sessions, turns and their timelines go to the same SQLite database as runs (see [docs/data-model.md](docs/data-model.md#chat-sessions)). The Cursor adapter cannot resume yet, so a Cursor session accepts one turn and a second one fails with a clear error.
+Claude runs through `claude -p` with your normal Claude configuration (CLAUDE.md, rules, skills, MCP servers) and your subscription; no API key is involved. Sessions, turns and their timelines go to the same SQLite database as runs (see [docs/data-model.md](docs/data-model.md#chat-sessions)). Cursor sessions resume too (`agent --resume <chatId>`), and `--model` sets the model of a turn for either agent.
 
 It is a one-shot command, not a server: it starts, runs the plan, writes the history to SQLite and exits. Nothing listens in the background.
 

@@ -181,3 +181,13 @@ describe("ClaudeAgentRunner", () => {
     expect(r.resultText).toContain("definitely-not-a-real-binary-xyz");
   });
 });
+
+describe("ClaudeAgentRunner listModels", () => {
+  it("offers the aliases `claude --help` documents, plus full ids seen in real streams, without calling the CLI", async () => {
+    // The binary does not exist: a real call would fail, so this also proves the list is static.
+    const models = await new ClaudeAgentRunner({ command: "definitely-not-a-real-binary-xyz" }).listModels();
+    expect(models).toEqual(expect.arrayContaining(["sonnet", "opus", "haiku"]));
+    expect(models).toContain("claude-sonnet-5-5");
+    expect(new Set(models).size).toBe(models.length);
+  });
+});
