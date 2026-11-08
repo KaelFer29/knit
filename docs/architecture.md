@@ -22,13 +22,13 @@ src/
     storage/sqlite/  RunStore and SessionStore (read-write), RunReader and SessionReader (read-only); one shared schema and migration (`schema.ts`)
     storage/files/   TranscriptStore (raw JSONL)
     system/          process spawning with timeouts and group kill; ProcessControl (inspect and signal processes)
-  server/          driving adapter: HTTP API, live stream (SSE), run control, static files and the security guard of `knit ui`; receives a `RunReader`, a `TaskDiff`, a `FileActivity` and a spawner for Knit child processes, knows nothing about SQLite or adapters
+  server/          driving adapter: HTTP API, live stream (SSE), run control, sessions, configuration, files, static files and the security guard of `knit ui`; receives its read ports (`RunReader`, `SessionReader`, `TaskDiff`, `FileActivity`, `FileTree`, `PlanDrafts`) and a spawner for Knit child processes, knows nothing about SQLite or adapters
   cli/             command line: wires adapters into the core
     commands/        one module per command
     support/         argument parsing, paths, formatting
 web/               browser app (Vite + React + TypeScript), built to dist/web; talks only to the HTTP API
   src/identity/      agent identities: label, role, brand tokens, logo file
-  src/fixtures/      typed BoardModel samples the canvas is drawn from until it has live data
+  src/fixtures/      typed BoardModel samples for the fixture pages and the demo (`?fixture=`, `?demo=1`)
   src/atoms, molecules, organisms/   presentational components; containers (App) own state
   src/styles/        design tokens (light and dark) and base styles
 test/integration/  tests that cross layers (CLI against real git and SQLite)
@@ -53,6 +53,8 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 | `SessionReader` | read side of the chat sessions for the web interface: sessions with turn counts and token totals, turns, timeline entries after an id; read-only, a database without session tables has none | `storage/sqlite` |
 | `RunReader` | read side for the web interface: runs list, snapshot of a run, events and agent events after an id, over a read-only connection that never writes or migrates | `storage/sqlite` |
 | `PlanDrafts` | read-only detection of the draft plans in `docs/plans/` of a repository (`PLAN_DIR`), each validated with the plan parser; used by the web interface | `system` |
+| `FileTree` | read-only listing and text of files under a root (the repository or a task worktree), confined to that root | `system` |
+| `ConfigFiles` | read and write the allow-listed Claude and Cursor configuration files by opaque id, with a hash check and a backup of the replaced version; used by the configuration editor | `system` |
 | `TranscriptStore` | keep the raw agent stream | `storage/files` |
 | `ProcessControl` | inspect and signal processes: is a pid alive, what is its command line, which process group it leads or contains, send a signal to a process or a group. Used by `knit abort`; every method is total (a gone process gives `false`/`undefined`) and pids 0 and 1 and the caller's own group are never signalled | `system` |
 
@@ -68,7 +70,7 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 
 ### Server
 
-`src/server` is a driving adapter, like the CLI: it turns HTTP requests into calls on the `RunReader` port. It is built from small parts: `security.ts` (the guard every request passes), `router.ts` (method and path matching), `routes/<name>.ts` (one module per group of routes, each a function from the server's dependencies to a list of routes), `static.ts` (built app and SPA fallback) and `server.ts` (wires them on `127.0.0.1`). `routes/control.ts` holds the run control routes, which start Knit commands through a `Spawner` injected by `cli/commands/ui.ts` (the server never spawns, imports an adapter or touches signals itself; `knit abort` uses the `ProcessControl` port). `routes/sessions.ts` serves chat sessions from a `SessionReader` and starts turns by spawning `knit chat` (the agents' capabilities arrive as `AgentInfo` from the composition root). `lazy-reader.ts` wraps any `RunReader` for a database that does not exist yet. Details in [web-interface.md](web-interface.md#http-api).
+`src/server` is a driving adapter, like the CLI: it turns HTTP requests into calls on the `RunReader` port. It is built from small parts: `security.ts` (the guard every request passes), `router.ts` (method and path matching), `routes/<name>.ts` (one module per group of routes, each a function from the server's dependencies to a list of routes), `static.ts` (built app and SPA fallback) and `server.ts` (wires them on `127.0.0.1`). `routes/control.ts` holds the run control routes, which start Knit commands through a `Spawner` injected by `cli/commands/ui.ts` (the server never spawns, imports an adapter or touches signals itself; `knit abort` uses the `ProcessControl` port). `routes/sessions.ts` serves chat sessions from a `SessionReader` and starts turns by spawning `knit chat` (the agents' capabilities arrive as `AgentInfo` from the composition root). `routes/config.ts` receives the `ConfigFiles` port through `useConfigFiles`, and `routes/files.ts`, `diff.ts`, `activity.ts` and `plans.ts` serve their ports the same way. `lazy-reader.ts` wraps any `RunReader` for a database that does not exist yet. Details in [web-interface.md](web-interface.md#http-api).
 
 ## The web app
 

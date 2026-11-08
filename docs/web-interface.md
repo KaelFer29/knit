@@ -1,8 +1,6 @@
 # Web interface
 
-> **Partly built.** This is the agreed design for `knit ui`. Built so far: the read side and board view model (T2), the server with `knit ui` (T3: read routes, live stream, static files, security) the app scaffold (T4, see [Web app scaffold](#web-app-scaffold)) and the flow canvas on fixtures (T5, see [Flow canvas](#flow-canvas-built)). Not built yet: live data in the canvas, the detail inside the expandable blocks, run control and everything from phase B on. Progress and open decisions are tracked in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md). Sections say "built" when they are.
-
-A local web app that joins Claude and Cursor into one workflow and is the single place to review everything.
+`knit ui` is a local web app on `127.0.0.1` that joins Claude and Cursor into one workflow and is the single place to review everything. It is built: runs (live canvas, run control, task diffs), a workspace for chat sessions with Claude and Cursor, a configuration editor and a read-only file explorer. Known limits are listed at the end. Progress is tracked in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md).
 
 ## Workflow
 
@@ -16,15 +14,15 @@ A local web app that joins Claude and Cursor into one workflow and is the single
 - **The handoff is explicit.** Only development with a finished plan moves on. Claude writes a plan in the [plan format](plan-format.md) and validates it; the interface shows it as a draft and the user launches it. A Claude turn never starts a run by itself.
 - **Tokens go where they pay off.** Claude reasons and plans; Cursor implements from self-contained prompts with no memory MCP; Knit's checks are deterministic and never call a model. Token usage is shown per agent for every turn, attempt, session and run.
 
-It is built in five phases:
+The work is organised in five phases. Status of each:
 
-| Phase | Adds |
-| --- | --- |
-| A | live view of runs, run control (start a plan, abort, resume, retry a task) and each task's diff |
-| B | workspace: persistent sessions with live timeline, per-turn profile (model, effort, permissions), command palette, usage panel, live file activity, and the plan handoff |
-| C | Cursor sessions on the same model: follow-ups on a task's chat inside its worktree, verified again by Knit |
-| D | configuration editor for the files both CLIs read, with a diff before saving |
-| E | file explorer (later) |
+| Phase | Adds | Status |
+| --- | --- | --- |
+| A | live view of runs, run control (start a plan, abort, resume, retry a task) and each task's diff | built |
+| B | workspace: persistent sessions with live timeline, per-turn profile, command palette, usage panel, plan handoff; live file activity for task attempts | built, except file activity in the workspace |
+| C | Cursor sessions: follow-ups on a task's chat inside its worktree, verified again by Knit | built in the CLI (`knit followup`); not started from the interface |
+| D | configuration editor for the files both CLIs read, with a diff before saving | built |
+| E | read-only file explorer for the repository and task worktrees | built |
 
 ## Agents and sessions
 
@@ -57,15 +55,15 @@ The port declares these as `AgentCapabilities` on each runner (`src/core/ports/a
 - **Models.** `agent models` (also `agent --list-models`) prints a title line, one `<id> - <label>` line per model (274 lines in this account, including a current default marked `auto - Auto (current, default)`), a blank line and a tip. Some labels end in zero-width spaces. `listModels()` keeps the ids only. Ids are account-specific and change often, so the list is read when the picker opens, never hard-coded.
 - **Tokens.** On a resumed turn most of the prompt is served from cache: the second turn reported `inputTokens: 93` and `cacheReadTokens: 12288`. The adapter records `inputTokens` and `outputTokens` only, so a turn's cached input is not counted for Cursor, unlike Claude's (see Tokens above). Not changed here; it is an open point for the token views (S13).
 
-- **Follow-ups on a task (phase C).** `knit followup <run-id> <task-id> "<prompt>"` resumes the Cursor chat of the task's latest attempt inside the task's own worktree and has Knit verify the result again against the plan snapshot of the run (`runs.plan_text`), exactly as for an attempt of the run loop. The turn lands in a session (one per chat, in the worktree, titled after the run and task) and the outcome is the task's next attempt, with the lifecycle events a live view follows (`followup.started`, `attempt.started`, `check.started`, `attempt.finished`, `task.passed` or `task.failed`, `followup.finished`). It refuses while the run's process is alive. The interface's server (T12) starts it like the other commands and reads the session and the attempt back. Details in [run-lifecycle.md](run-lifecycle.md#follow-ups).
+- **Follow-ups on a task (phase C).** `knit followup <run-id> <task-id> "<prompt>"` resumes the Cursor chat of the task's latest attempt inside the task's own worktree and has Knit verify the result again against the plan snapshot of the run (`runs.plan_text`), exactly as for an attempt of the run loop. The turn lands in a session (one per chat, in the worktree, titled after the run and task) and the outcome is the task's next attempt, with the lifecycle events (`followup.started`, `attempt.started`, `check.started`, `attempt.finished`, `followup.finished`). It refuses while the run's process is alive. It is a CLI command only: no HTTP route starts it, so the interface shows its results (the attempt and the session) but cannot trigger one. Details in [run-lifecycle.md](run-lifecycle.md#follow-ups).
 - **Command palette.** Built from the agent's own list, so it follows every CLI update. Session commands are handled by Knit: `/clear` starts a new session, switching chats uses the session list, `/model` sets the turn profile, `/usage` opens the usage panel. Any other command is sent to the agent as the prompt.
 - **Continue in a terminal.** Every session shows the command that continues it (`claude --resume <id>`, `agent --resume <chatId>`). Knit does not try to match each agent's own interface; whatever it lacks stays one copy away.
 
 ## Files
 
-- **Phase A:** each task's diff, from its start commit to its last commit.
-- **Built (T14), task attempts:** the files each attempt touched, from the paths of its timeline's file tool calls (`Read`, `Edit`, `Write`, `NotebookEdit` and Cursor's `args.path`; search and listing tools are skipped), plus the task worktree's `git status`. The derivation is the pure `touchedPaths` in `src/core/timeline/file-activity.ts`, confined to the worktree (`confinePath`: relative, no `..`, no backslash or NUL, absolute paths only inside the worktree). The worktree list comes from the `FileActivity` port (`GitFileActivity`, which reuses the scope check's `listChangedPaths`). The task detail panel shows both. The workspace (sessions, phases B and C) does not show them yet.
-- **Phase E (built):** a read-only file explorer for the repository and the task worktrees (`FileTree` port, `FsFileTree` adapter, routes above). The root directory always comes from the run record, never from the request. Every path is confined to its root: `..`, absolute paths, NUL, backslashes, `.git` and symlinks that resolve outside the root are `403`; the `.git` directory is not listed. The page (`web/src/containers/FilesView.tsx`, `organisms/FileExplorer.tsx`) opens at `/?view=files&run=<run-id>` (add `&demo=1`, or omit `run`, for built-in sample files): a root switcher, a lazily loaded tree and a text viewer that renders contents as plain text, with a note for binary and oversized files.
+- **Task diff (built, T6):** each task's diff, from its start commit to its last commit (or to the worktree while it has none).
+- **Task attempts (built, T14):** the files each attempt touched, from the paths of its timeline's file tool calls (`Read`, `Edit`, `Write`, `NotebookEdit` and Cursor's `args.path`; search and listing tools are skipped), plus the task worktree's `git status`. The derivation is the pure `touchedPaths` in `src/core/timeline/file-activity.ts`, confined to the worktree (`confinePath`: relative, no `..`, no backslash or NUL, absolute paths only inside the worktree). The worktree list comes from the `FileActivity` port (`GitFileActivity`, which reuses the scope check's `listChangedPaths`). The task detail panel shows both. The workspace does not show them: session-level file activity is not done.
+- **File explorer (built, T17):** a read-only explorer for the repository and the task worktrees (`FileTree` port, `FsFileTree` adapter, routes above). The root directory always comes from the run record, never from the request. Every path is confined to its root: `..`, absolute paths, NUL, backslashes, `.git` and symlinks that resolve outside the root are `403`; the `.git` directory is not listed. The page (`web/src/containers/FilesView.tsx`, `organisms/FileExplorer.tsx`) opens at `/?view=files&run=<run-id>` (add `&demo=1`, or omit `run`, for built-in sample files): a root switcher, a lazily loaded tree and a text viewer that renders contents as plain text, with a note for binary and oversized files. It has no tab in the navigation; it is reached by its URL.
 
 ## Process model
 
@@ -92,12 +90,15 @@ The interface follows the same hexagonal rule as the rest of Knit.
 ```
 src/
   core/
-    ports/run-reader.ts     read-side port: runs, tasks, attempts, events, agent events after an id
+    ports/                  read side: run-reader, session-reader, task-diff, file-activity, file-tree,
+                            config-files, plan-drafts (process-control is used by `knit abort`, not the server)
     board/                  pure: records → board view model (nodes, wires, queue, task blocks)
   adapters/
-    storage/sqlite/         RunReader implementation (readonly connection)
-  server/                   driving adapter: HTTP routes, SSE stream, static files, security guard (built)
-  cli/commands/ui.ts        wires the SQLite reader into the server; the only place adapters are chosen
+    storage/sqlite/         RunReader and SessionReader (readonly connections)
+    vcs/git/                TaskDiff and FileActivity
+    system/                 FileTree, ConfigFiles, PlanDrafts, ProcessControl
+  server/                   driving adapter: HTTP routes, SSE stream, static files, security guard
+  cli/commands/ui.ts        wires the adapters into the server; the only place adapters are chosen
 web/                        browser app (Vite + React + TypeScript), built to dist/web
 ```
 
@@ -180,7 +181,7 @@ It prints one line, `http://127.0.0.1:<port>/?token=<token>`, and keeps running 
 
 ## Web app scaffold
 
-Built in task T4: the skeleton of the browser app with its look and its identities, and no live data yet.
+Built in task T4: the skeleton of the browser app with its look and its identities. The pages above it are built on it.
 
 | Piece | Where | Notes |
 | --- | --- | --- |
@@ -190,7 +191,7 @@ Built in task T4: the skeleton of the browser app with its look and its identiti
 | Identities | `web/src/identity/agents.ts` | Claude (planner), Knit (orchestrator) and Cursor (builder): label, role, brand color tokens, logo file, monogram. Components receive an identity and never branch on the agent's name |
 | Logo | `web/src/atoms/Logo.tsx` | Loads `/brand/<file>`; shows the monogram while it loads and keeps it when the file is missing or fails. Knit's own mark (`atoms/KnitMark.tsx`, two interlocked threads) is drawn in code |
 | Shell | `web/src/App.tsx`, `organisms/AppShell.tsx` | Header with the Knit mark and name and the theme toggle; skip link; `main#canvas`, which hosts the flow canvas through the `FlowView` container |
-| API client | `web/src/api/client.ts` | `apiGet` with same-origin credentials and `ApiError`; no routes are called yet |
+| API client | `web/src/api/client.ts` | `apiGet` with same-origin credentials and `ApiError`, used by every container that fetches |
 | Fixtures | `web/src/fixtures/boards.ts` | Typed `BoardModel` samples (running, retrying, verifying, failed, delivered, a long queue, and a run from before schema 4) that the canvas is drawn from until it is wired to live data |
 
 Scripts (all from the repository root):
@@ -220,7 +221,7 @@ The app asks for exactly these files and never commits them:
 
 ## Flow canvas (built)
 
-Built in task T5, on the fixtures: the circuit described in [Visual model](#visual-model) as a working picture. Task T7 connects it to live data (see [Live data in the page](#live-data-in-the-page)).
+Built in task T5 on fixtures, then connected to live data in T7 (see [Live data in the page](#live-data-in-the-page)): the circuit described in [Visual model](#visual-model).
 
 | Piece | Where | Notes |
 | --- | --- | --- |
@@ -238,7 +239,7 @@ Built in task T5, on the fixtures: the circuit described in [Visual model](#visu
 
 **States.** Each task state has its own icon and text label, so color is never the only signal: queued (dashed ring), running (turning arc, the only state with life: a soft halo on the running card), retrying (circular arrow), verifying (checklist), delivered (check) and failed (cross). Blocks borrow the same look for their node status (idle, working, done, failed).
 
-**Expandable blocks.** Blocks, task cards and the running task are disclosure widgets: a focusable `<button>` with `aria-expanded` and `aria-controls`, toggled by Enter and Space. The open panel is the `renderDetail(target)` slot, with `target` either `{ kind: "agent", id }` or `{ kind: "task", taskId }`; it is called only while open. With nothing to render the panel shows a tidy empty state. The detail content (attempts, timelines, checks, plan) belongs to later tasks.
+**Expandable blocks.** Blocks, task cards and the running task are disclosure widgets: a focusable `<button>` with `aria-expanded` and `aria-controls`, toggled by Enter and Space. The open panel is the `renderDetail(target)` slot, with `target` either `{ kind: "agent", id }` or `{ kind: "task", taskId }`; it is called only while open. With nothing to render the panel shows a tidy empty state. The detail content is described in [Detail panels](#detail-panels-built).
 
 **Layout.** From a canvas width of 1120 px (a 1280 px window) the three blocks sit side by side; below it the same flow runs top to bottom (Claude, Knit, Cursor) with the wires recomputed, and nothing scrolls horizontally down to 768 px. The orientation is chosen in one place from the measured width and written to `data-layout`. Tab order follows the reading order: Claude, Knit, its queue, the running task, the delivered links, Cursor.
 
@@ -278,6 +279,7 @@ Built in task T6 on top of the flow canvas: the `renderDetail` slot of every dis
 | Cursor | none of its own: its work is opened task by task |
 
 Gaps: Knit stores only the failed check's command, not its output, so the "check output" is shown for the setup command only; the retry feedback is rebuilt from the verdicts, not read from a stored prompt. The agent output, the plan and the patch always render as text (never as markup).
+
 ## Workspace (built)
 
 Built in task T12: the sessions of any agent in one place (S10, S13, S16, D5, D8 to D10). The page is at `#/workspace` (a header link next to Runs); `#/workspace/<id>` opens a session and `#/workspace/new` the new-session form. Everything it shows comes from the [session routes](#sessions); nothing in `web/` checks an agent's name. An agent the interface has no brand for gets a neutral monogram identity (`identityOf`), so a new adapter appears without a change to the components.
@@ -300,7 +302,7 @@ Built in task T12: the sessions of any agent in one place (S10, S13, S16, D5, D8
 
 **Plan handoff (T13, S15, D7).** `skills/knit-plan` (`.claude/skills/knit-plan/SKILL.md`) teaches Claude to write a plan in the [plan format](plan-format.md) to `docs/plans/<slug>.md` of the repository the session runs in and to run `knit validate` until it passes. The directory is the constant `PLAN_DIR` in `src/core/ports/plan-drafts.ts`. The session view lists the drafts it finds there (`GET /api/sessions/:id/plans`) as a card above the composer: name, validation result (every issue when invalid), the tasks and their branches. **Launch** is an explicit button that posts `{ planPath }` to the run-control start route (`POST /api/runs`); a Claude turn never starts a run, and an invalid plan cannot be launched. The run is linked to its session by its plan file: the runs list of a draft is every run whose recorded `planPath` is that file, and each links to the run view. The link is derived, not stored, so the server still writes nothing and the schema is unchanged; two sessions in the same directory share their drafts.
 
-**Shared timeline components.** The timeline components of T6 and T7 were not on this branch's base, so the workspace has its own `Timeline` and `TimelineEntry` over the same normalized entry kinds. When those tasks land, replacing `TimelineEntry` with the shared one is a change in one molecule.
+**Two timeline components.** The workspace renders its turns with `Timeline` and `TimelineEntry` (`sessions/timeline.ts`). The run's task panels render their attempts with `TimelineList` (`web/src/detail/describe.ts`). Both read the same normalized entry kinds, but they are separate components; merging them is open (see Known limits).
 
 ## HTTP API
 
@@ -340,7 +342,7 @@ Errors are JSON, `{ "error": "<message>" }`, with the right status: `404` for an
 
 ### Run control
 
-Phase A commands. Phase B adds sessions, turns and plan launch; phase D adds configuration. Every one is a `POST` with `Content-Type: application/json` (`415` otherwise) and a body of at most 64 KB (`413`); an empty body counts as `{}`, anything that is not a JSON object is a `400`. The routes never write the database: each one starts a Knit command through the **spawner** that the composition root injects (`ServerOptions.control`: the data directory and a function that starts a child). Without it (a source checkout with no build, so no `dist/cli/index.js` to start) they answer `503` and the rest of the server is unaffected.
+Every one is a `POST` with `Content-Type: application/json` (`415` otherwise) and a body of at most 64 KB (`413`); an empty body counts as `{}`, anything that is not a JSON object is a `400`. The routes never write the database: each one starts a Knit command through the **spawner** that the composition root injects (`ServerOptions.control`: the data directory and a function that starts a child). Without it (a source checkout with no build, so no `dist/cli/index.js` to start) they answer `503` and the rest of the server is unaffected.
 
 | Route | Body | Does | Answers |
 | --- | --- | --- | --- |
@@ -359,7 +361,7 @@ Every child gets `--data-dir <the server's data directory>`, runs in its own pro
 
 **Stale pids.** `runs.pid` is set while a run is `running` and cleared when it finishes or is aborted. A run killed with `SIGKILL`, or whose machine rebooted, keeps its stale pid and stays `running`. The interface shows it as running until someone runs `abort`, which notices that the process is gone, marks the run `failed` (`run.aborted`, reason `stale-pid`) and clears the pid; `resume` then works. Because pids are reused, `knit abort` signals a process only when its command line is a Knit `run`, or a `resume` of that same run id, and no other running run records the same pid; anything else is refused with nothing signalled.
 
-### Configuration editor (T16, phase D)
+### Configuration editor (T16)
 
 Edits the files the CLIs read, so a terminal `claude` or `agent` session sees the same configuration (D5). Routes in `src/server/routes/config.ts`, port `ConfigFiles`, adapter `FileConfigFiles` (`src/adapters/system/config-files.ts`).
 
@@ -389,7 +391,7 @@ Rules files may be created (`expectedHash: "absent"`); names are checked per seg
 **In the app** (`#/config`, tab "Configuration"): files are grouped by agent and scope; the editor is a plain text area; "Review changes" (enabled only when the text changed and, for JSON files, still parses) shows a line diff (`web/src/config/diff.ts`), and only that step offers "Save". A `409` offers "Reload the file".
 ### Sessions
 
-Phase B (`src/server/routes/sessions.ts`). Reads go through the `SessionReader` port (a read-only SQLite connection that never writes or migrates; a database from before schema 5 reads as having no sessions). A turn starts by spawning `knit chat` through the same spawner as run control, so the server never writes the database. The session dependencies (`SessionsDeps`: the reader and one `AgentInfo` per agent) travel inside `ControlDeps.sessions`: without control (no build) the read routes answer empty lists and the POSTs `503`.
+Built in task T12 (`src/server/routes/sessions.ts`). Reads go through the `SessionReader` port (a read-only SQLite connection that never writes or migrates; a database from before schema 5 reads as having no sessions). A turn starts by spawning `knit chat` through the same spawner as run control, so the server never writes the database. The session dependencies (`SessionsDeps`: the reader and one `AgentInfo` per agent) travel inside `ControlDeps.sessions`: without control (no build) the read routes answer empty lists and the POSTs `503`.
 
 `AgentInfo` is built in `cli/commands/ui.ts`, the one place that knows the adapters: id, label, the adapter's declared `capabilities`, the `profileFields` it takes (`model`, `effort`, `permissionMode`), `listModels` and the terminal command that resumes its own session. The page renders from that, never from an agent's name.
 
@@ -425,7 +427,7 @@ One canvas per run, read left to right as a circuit:
 ```
 
 - **Three identity blocks.** Claude, Knit and Cursor each keep their own icon, accent color and label. Surfaces stay neutral; color belongs to identity and status, nothing else.
-- **Claude block (the brain).** Shows what Claude handed over: the plan, its author and its tasks. Its outgoing wires carry one strand per task. From phase B it also shows Claude's live timeline with the same components as Cursor's. Headless Claude sends its reasoning blocks empty, so the block shows messages and tool calls, and marks reasoning as not shared.
+- **Claude block (the brain).** Shows what Claude handed over: the plan, its author and its tasks. Its outgoing wires carry one strand per task. Its detail panel shows the plan text and each task's specs. Claude's live timeline is in the [Workspace](#workspace-built), not on the canvas: the canvas shows no timeline for Claude. Headless Claude sends its reasoning blocks empty, and the workspace marks reasoning as not shared.
 - **Wires.** SVG paths between blocks. When something travels (a task leaves the queue, a prompt is sent, a result comes back) a pulse runs along the wire. Animations respect `prefers-reduced-motion`.
 - **Queue.** Pending tasks wait as stacked cards on Knit's input side, in execution order. A `Depends` link shows as a small connector between cards. The running task sits in Knit's center; finished tasks move to the delivery lane as PR chips.
 - **Cursor block.** While an attempt runs, it shows a single live line: the current thought, message or tool call.
@@ -454,6 +456,17 @@ Built in task T3 (`src/server/security.ts`, applied to every request before rout
 - The database connection is read-only; the server changes state only by starting Knit or agent processes.
 - **Run control is the dangerous part.** It starts agents that have no sandbox, so it relies on every check above: a cross-site page cannot get past the `Origin` check, and one that tried a simple form post is stopped by the JSON-only content type (`415`) before any command is started. The routes accept no executable, no agent command and no free-form argument: the command line is built by the server from a validated absolute plan path, two booleans and a bounded integer, or from a run id that must already exist in the database. Arguments are passed as an array, never through a shell. The server never signals a process itself; `knit abort` does, and only after verifying the target.
 - Agent output is untrusted. Render it as text; any Markdown rendering is sanitized. Never inject agent strings as HTML.
+
+## Known limits and follow-ups
+
+- **No durable run-to-session link.** A run belongs to a session when its `planPath` is that session's draft file; the link is derived, never stored.
+- **Check output not stored.** Knit keeps only the failed check's command, so the output shown is the setup command's (see [Detail panels](#detail-panels-built)).
+- **Session-level file activity not done.** File activity is shown for task attempts only, not in the workspace.
+- **Configuration editor.** A directory swapped for a symlink between the check and the rename is not defended (same-user local race). `.claude/settings.local.json` is not in the allow-list.
+- **Polling for sessions.** The workspace polls (about every 0.8 s while a turn runs, 4 s otherwise) instead of using SSE.
+- **Not on the canvas.** Claude's live timeline; the run's and the workspace's timeline components are separate.
+- **Follow-ups from the interface.** `knit followup` has no HTTP route; it runs from the CLI only.
+- **Interactive resume unverified.** `claude --resume` of a `-p` session has not been tried by hand (see [Agents and sessions](#agents-and-sessions)).
 
 ## Brand assets
 

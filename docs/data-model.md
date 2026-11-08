@@ -1,12 +1,14 @@
 # Data model
 
-Everything a run does is recorded, so a run can be inspected, resumed and, later, shown in a UI. Nothing is stored inside the target repository: data lives in `~/.knit` (or `--data-dir`, or `$KNIT_HOME`).
+Everything a run does is recorded, so a run can be inspected, resumed and shown in the web interface. Nothing is stored inside the target repository by Knit's own records: data lives in `~/.knit` (or `--data-dir`, or `$KNIT_HOME`). The configuration editor is the one exception: it writes the files the CLIs read, in the repository and the home directory.
 
 ```
 <data dir>/
   knit.db                              SQLite: runs, tasks, attempts, events, agent timeline, chat sessions
   worktrees/<run>/<task>/repo                  one git worktree per task (kept until `clean`)
   logs/<run>/<task>-attempt-<n>.jsonl          raw agent stream, one JSON object per line
+  logs/_ui/<command>-<timestamp>-<random>.log  stdout and stderr of commands started by `knit ui`
+  config-backups/<id>/<timestamp>-<hash>.bak   the previous version of each file saved in the configuration editor
 ```
 
 ## SQLite
