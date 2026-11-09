@@ -6,9 +6,20 @@ export interface CliIo {
   err: (text: string) => void;
 }
 
+export interface AgentOptions {
+  command?: string;
+  model?: string;
+  effort?: string;
+  permissionMode?: string;
+  agent?: string;
+}
+
 export interface CliDeps {
-  /** Builds the agent runner (override in tests). */
-  agent?: (options: { command?: string; model?: string }) => AgentRunner;
+  /**
+   * Builds the agent runner (override in tests). `agent` names the agent (`claude` or `cursor`) and is set by `chat`
+   * only; `effort` and `permissionMode` are set by `chat` for Claude only. Plan runs always use Cursor.
+   */
+  agent?: (options: AgentOptions) => AgentRunner;
   /** Pull request adapter (override in tests). Default: GitHub CLI. */
   pullRequests?: PullRequests;
   /** Extra git args for every git call (tests disable hooks with this). */

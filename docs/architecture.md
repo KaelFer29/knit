@@ -5,20 +5,21 @@ Hexagonal: Knit's logic does not know which agent, git host or database it talks
 ```
 src/
   core/            pure logic, no I/O
-    ports/           interfaces the core needs (AgentRunner, Workspace, RunStore, RunReader, ...)
+    ports/           interfaces the core needs (AgentRunner, Workspace, RunStore, SessionStore, RunReader, ...)
     plan/            parse and validate a plan file
     prompt/          render the implementer prompt (and retry feedback)
     verification/    acceptance rules: scope of changed files, git hygiene
     timeline/        normalize each agent's raw stream (Cursor, Claude) into one readable timeline
     board/           pure view model of a run for the web interface (task states, queue, wires, totals)
     run/             the run loop and pull request text
+    chat/            run one turn of any agent in a session and record it (`runTurn`), agent-agnostic
   adapters/        implementations of the ports
     agents/cursor/   AgentRunner for the Cursor CLI
-    agents/claude/   AgentRunner for Claude Code headless (`claude -p`, stream-json, resumable sessions); not chosen by any command yet
+    agents/claude/   AgentRunner for Claude Code headless (`claude -p`, stream-json, resumable sessions); chosen by `knit chat`
     vcs/git/         Workspace (worktrees, branches, inspection, push)
     vcs/github/      PullRequests through the gh CLI
     checks/shell/    CheckRunner (bash)
-    storage/sqlite/  RunStore (read-write) and RunReader (read-only)
+    storage/sqlite/  RunStore and SessionStore (read-write), RunReader (read-only); one shared schema and migration (`schema.ts`)
     storage/files/   TranscriptStore (raw JSONL)
     system/          process spawning with timeouts and group kill
   server/          driving adapter: HTTP API, live stream (SSE), static files and the security guard of `knit ui`; receives a `RunReader`, knows nothing about SQLite
@@ -46,12 +47,15 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 | `Workspace` | worktree and branch per task, inspection, push | `vcs/git` |
 | `PullRequests` | open pull requests | `vcs/github` |
 | `RunStore` | persist runs (with a snapshot of the plan and the pid executing them), tasks, attempts, events | `storage/sqlite` |
+| `SessionStore` | persist chat sessions (agent-agnostic), their turns (prompt, answer, tokens, profile, meta, pid) and each turn's timeline; list sessions newest first, events after an id | `storage/sqlite` |
 | `RunReader` | read side for the web interface: runs list, snapshot of a run, events and agent events after an id, over a read-only connection that never writes or migrates | `storage/sqlite` |
 | `TranscriptStore` | keep the raw agent stream | `storage/files` |
 
 ### Agent capabilities
 
 `AgentRunner.capabilities` (`resume`, `chooseModel`, `commandList`, `visibleReasoning`, `planUsage`, all booleans) states what an adapter supports, so a caller asks the runner and never branches on its name. It is optional: `capabilitiesOf(runner)` returns all-false for a runner that declares none, which keeps simple runners and test fakes unchanged. A runner ignores request fields its capabilities do not cover.
+
+`core/chat` runs one turn over the ports `AgentRunner`, `SessionStore` and a clock: it records the turn, runs the agent (passing `resumeSessionId` when the session has an agent session id and the runner's capabilities say it can resume; resuming with a runner that cannot is a `ChatError`, never silent), normalizes each raw event with the session's agent's normalizer (`ClaudeEventNormalizer` for `claude`, `AgentEventNormalizer` otherwise), stores each entry in `session_events` labelled with the agent, and stores the answer, tokens, exit code and `meta`, remembering the agent's own session id for the next turn. It flushes the normalizer and closes the turn even when the agent throws. `knit chat` is its only caller today.
 
 `core/board` is data in, view model out: it takes the records a `RunReader` returns and builds what the page draws (see [web-interface.md](web-interface.md#read-side-and-board-view-model)). It imports only port types, so `web/` can `import type` it.
 
