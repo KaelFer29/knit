@@ -325,6 +325,35 @@ Every child gets `--data-dir <the server's data directory>`, runs in its own pro
 
 **Stale pids.** `runs.pid` is set while a run is `running` and cleared when it finishes or is aborted. A run killed with `SIGKILL`, or whose machine rebooted, keeps its stale pid and stays `running`. The interface shows it as running until someone runs `abort`, which notices that the process is gone, marks the run `failed` (`run.aborted`, reason `stale-pid`) and clears the pid; `resume` then works. Because pids are reused, `knit abort` signals a process only when its command line is a Knit `run`, or a `resume` of that same run id, and no other running run records the same pid; anything else is refused with nothing signalled.
 
+### Configuration editor (T16, phase D)
+
+Edits the files the CLIs read, so a terminal `claude` or `agent` session sees the same configuration (D5). Routes in `src/server/routes/config.ts`, port `ConfigFiles`, adapter `FileConfigFiles` (`src/adapters/system/config-files.ts`).
+
+| Route | Does |
+| --- | --- |
+| `GET /api/config/files` | `{ files }`: every allowed file (`id`, `agent`, `scope`, `label`, `displayPath`, `isRule`, `exists`) |
+| `GET /api/config/file?id=<id>` | `{ id, exists, content, hash, json }`; an absent file is empty with hash `"absent"` |
+| `PUT /api/config/file` | body `{ id, content, expectedHash }`; copies the current version to the backup folder, writes the new one, answers `{ hash, backupPath? }` |
+
+**Allow-list.** Files are named by opaque ids (`<agent>:<scope>:<slot>`), never by a path. Project scope is the directory `knit ui` was started in; global scope is the home directory.
+
+| Agent | Project | Global |
+| --- | --- | --- |
+| Claude | `CLAUDE.md`, `.claude/settings.json`, `.claude/rules/**/*.md` | `~/.claude/CLAUDE.md`, `~/.claude/settings.json`, `~/.claude/rules/**/*.md` |
+| Cursor | `.cursor/rules/**/*.mdc` and `.md`, `.cursor/mcp.json` | `~/.cursor/cli-config.json`, `~/.cursor/mcp.json` |
+
+Rules files may be created (`expectedHash: "absent"`); names are checked per segment (letters, digits, `.`, `_`, `-`, no leading dot, at most three levels, known extension).
+
+**Guards** (this edits permission and settings files):
+
+- A symlink is followed only when its real target stays inside the scope's root; a link out of it, or a broken one, is `403`. Traversal, absolute paths and separators in an id are `403`.
+- `expectedHash` must be the hash the editor read, otherwise `409`: a file changed elsewhere is never overwritten silently. The web app shows a diff of the edit against the version it read before it enables Save.
+- JSON files (`settings.json`, `mcp.json`, `cli-config.json`) must stay a valid JSON object (`400`); content is UTF-8 text without NUL, at most 256 KB (`413`). Bodies are limited to 2 MB.
+- The replaced version is copied first to `<data-dir>/config-backups/<id>/<timestamp>-<hash>.bak` (folder `0700`, files `0600`); if the backup fails nothing is written. The new version goes to a temporary file that is renamed into place, keeping the file's mode.
+- Known limit: a directory swapped for a symlink between the check and the rename is not defended against (same-user local race). The files are shown as they are, so secrets inside `cli-config.json` are visible to whoever holds the launch token.
+
+**In the app** (`#/config`, tab "Configuration"): files are grouped by agent and scope; the editor is a plain text area; "Review changes" (enabled only when the text changed and, for JSON files, still parses) shows a line diff (`web/src/config/diff.ts`), and only that step offers "Save". A `409` offers "Reload the file".
+
 ### Adding routes
 
 A route module lives in `src/server/routes/<name>.ts` and exports a function from the server's dependencies (`ServerDeps`: the reader, timings and, when present, `control`) to a list of `{ method, pattern, handler }` (patterns use `:name` segments, decoded for the handler; a handler throws `HttpError(status, message)` to answer an error). It is registered with one line in `src/server/routes/index.ts`. The guard runs before routing, so a new route, whatever its method, cannot skip it.

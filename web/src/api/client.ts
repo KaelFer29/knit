@@ -30,3 +30,15 @@ export async function apiGet<T>(path: string): Promise<T> {
   if (!response.ok) throw await failure(response);
   return (await response.json()) as T;
 }
+
+/** Sends a JSON body with a mutating method. The server also needs the page's own Origin, which the browser adds. */
+export async function apiSend<T>(method: "PUT" | "POST", path: string, body: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method,
+    credentials: "same-origin",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw await failure(response);
+  return (await response.json()) as T;
+}

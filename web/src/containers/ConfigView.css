@@ -1,0 +1,37 @@
+.config-view {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.config-view__side {
+  position: sticky;
+  top: var(--space-4);
+}
+
+.config-view__main {
+  min-width: 0;
+}
+
+.config-view__muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.config-view__error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--status-failed-soft);
+  color: var(--status-failed);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 840px) {
+  .config-view {
+    grid-template-columns: minmax(10rem, 12rem) minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+}
