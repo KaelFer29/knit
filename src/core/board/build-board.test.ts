@@ -522,3 +522,24 @@ Checks:
   });
 });
 
+describe("which chat each attempt ran in", () => {
+  it("carries what attempt.started recorded: a new chat, the one before resumed, or a fresh one because the last was full", () => {
+    const b = board({
+      tasks: [task("T1", { status: "passed" })],
+      attempts: [attempt("T1", 1), attempt("T1", 2), attempt("T1", 3), attempt("T1", 4)],
+      events: [
+        ev("attempt.started", "T1", 1, { payload: { chat: "new" } }),
+        ev("attempt.started", "T1", 2, { payload: { chat: "resumed", contextTokens: 10_000 } }, 1),
+        ev("attempt.started", "T1", 3, { payload: { chat: "switched", contextTokens: 150_000 } }, 2),
+        ev("attempt.started", "T1", 4, {}, 3),
+      ],
+    });
+    expect(b.tasks[0]!.attempts.map((a) => a.chat)).toEqual(["new", "resumed", "switched", undefined]);
+  });
+
+  it("ignores a chat mode it does not know", () => {
+    const b = board({ tasks: [task("T1", { status: "passed" })], attempts: [attempt("T1", 1)], events: [ev("attempt.started", "T1", 1, { payload: { chat: "bogus" } })] });
+    expect(b.tasks[0]!.attempts[0]!.chat).toBeUndefined();
+  });
+});
+

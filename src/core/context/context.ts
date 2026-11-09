@@ -40,3 +40,10 @@ export const windowIsStated = (model: string | undefined): boolean => statedWind
 export function contextShare(tokens: number, window: number): number {
   return window <= 0 ? 0 : Math.min(1, Math.max(0, tokens / window));
 }
+
+/** The share of its window at which a chat is no longer reused: a fresh one is opened with what the next turn needs. */
+export const CONTEXT_SWITCH_SHARE = 0.7;
+
+/** Whether a chat that carries `tokens` of a window of `window` has reached the point of being replaced. */
+export const shouldSwitchChat = (tokens: number, window: number): boolean => contextShare(tokens, window) >= CONTEXT_SWITCH_SHARE;
+

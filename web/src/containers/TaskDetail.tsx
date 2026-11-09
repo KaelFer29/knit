@@ -55,6 +55,7 @@ export function TaskDetail({ task, source }: Props) {
             attempt.durationMs === undefined ? undefined : formatDuration(attempt.durationMs),
             attempt.outputTokens === undefined ? undefined : `${formatTokens((attempt.inputTokens ?? 0) + attempt.outputTokens)} tokens`,
             attempt.contextTokens === undefined ? undefined : `${formatTokens(attempt.contextTokens)} context`,
+            attempt.chat === "resumed" ? "resumed chat" : attempt.chat === "switched" ? "new chat (previous full)" : undefined,
           ]
             .filter((x) => x !== undefined)
             .join(" · ")}

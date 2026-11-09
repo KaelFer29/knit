@@ -142,6 +142,14 @@ describe("CursorPanel", () => {
       expect(screen.getByText("Context").getAttribute("title")).toMatch(/not recorded/i);
     });
 
+    it("says which chat each attempt ran in: the one before resumed, or a fresh one because the last was full", async () => {
+      const attempts = runningRun.tasks.find((t) => t.taskId === "T2")!.attempts;
+      const history = runningRun.tasks.map((t) => (t.taskId === "T2" ? { ...t, attempts: attempts.map((a, i) => ({ ...a, chat: i % 2 === 0 ? ("resumed" as const) : ("switched" as const) })) } : t));
+      render(<CursorPanel {...props({ ...runningRun, tasks: history })} />);
+      await userEvent.setup().click(screen.getByRole("button", { name: /^T2/ }));
+      expect((await screen.findAllByText(/resumed chat|new chat/)).length).toBeGreaterThan(0);
+    });
+
     it("shows the context each attempt's chat carried, next to its time and tokens", async () => {
       const history = runningRun.tasks.map((t) => (t.taskId === "T2" ? { ...t, attempts: t.attempts.map((a) => ({ ...a, contextTokens: 12_381 })) } : t));
       render(<CursorPanel {...props({ ...runningRun, tasks: history })} />);

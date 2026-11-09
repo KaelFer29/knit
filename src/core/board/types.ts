@@ -31,6 +31,8 @@ export interface AttemptView {
   durationMs?: number;
   inputTokens?: number;
   outputTokens?: number;
+  /** Which chat the attempt ran in: a new one, the previous attempt's resumed, or a fresh one because the previous was full. Absent when not recorded. */
+  chat?: "new" | "resumed" | "switched";
   /** How much context the agent's chat carried after this attempt (fresh input plus cache); absent when it was not recorded. */
   contextTokens?: number;
   /** The check command that failed, or the setup command. */

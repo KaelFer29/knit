@@ -65,3 +65,16 @@ export function renderPrompt(task: Task, retry?: RetryContext): string {
   if (retry) sections.push(renderRetryBlock(retry));
   return sections.join("\n\n") + "\n";
 }
+
+/**
+ * What a resumed chat is told after a failed attempt: only what went wrong. The chat already holds the task, its specs,
+ * the allowed files and the rules, so none of that is sent again.
+ */
+export function renderContinuationPrompt(retry: RetryContext): string {
+  return [
+    "Your previous attempt did not pass Knit's verification. The task, its specs, the allowed files and the rules are unchanged.",
+    renderRetryBlock(retry),
+    "Fix exactly these problems, commit your work as before and reply as before: files changed, and which spec IDs you covered.",
+  ].join("\n\n") + "\n";
+}
+

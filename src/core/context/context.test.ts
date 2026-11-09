@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_WINDOW, contextShare, contextTokensOf, contextWindowOf, windowIsStated } from "./context.js";
+import { CONTEXT_SWITCH_SHARE, DEFAULT_WINDOW, contextShare, contextTokensOf, contextWindowOf, shouldSwitchChat, windowIsStated } from "./context.js";
 
 describe("contextTokensOf", () => {
   it("adds what the chat sent fresh to what it read from and wrote to the cache", () => {
@@ -50,6 +50,16 @@ describe("windowIsStated", () => {
     expect(windowIsStated("composer-2.5-fast")).toBe(false);
     expect(windowIsStated(undefined)).toBe(false);
     expect(windowIsStated("m[context=lots]")).toBe(false);
+  });
+});
+
+describe("shouldSwitchChat", () => {
+  it("switches once the chat reaches the share of the window set for it, and not before", () => {
+    expect(CONTEXT_SWITCH_SHARE).toBe(0.7);
+    expect(shouldSwitchChat(139_999, 200_000)).toBe(false);
+    expect(shouldSwitchChat(140_000, 200_000)).toBe(true);
+    expect(shouldSwitchChat(900_000, 1_000_000)).toBe(true);
+    expect(shouldSwitchChat(600_000, 1_000_000)).toBe(false);
   });
 });
 
