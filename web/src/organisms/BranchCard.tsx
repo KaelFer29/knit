@@ -133,7 +133,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
       const done = await actions.open(b.taskId, draft.title.trim(), draft.body, target === recommended ? undefined : target);
       setPanel(undefined);
       forgetDraft(key);
-      setResult({ text: `Opened ${done.url}`, url: done.url });
+      setResult({ text: "", url: done.url });
       onChanged();
     } catch (err) {
       setError(messageOf(err));
@@ -160,6 +160,15 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
           <span aria-hidden="true">⎇ </span>
           {b.branch}
         </span>
+        {b.prState?.state === "merged" ? (
+          <span className="branch__pr" data-state="merged">
+            Merged into {b.prState.base}
+          </span>
+        ) : b.prState?.state === "closed" ? (
+          <span className="branch__pr" data-state="closed">
+            Closed without merging
+          </span>
+        ) : null}
         <StatusBadge state={b.status === "passed" ? "delivered" : b.status === "failed" ? "failed" : "running"} />
         <Chevron />
       </button>
@@ -354,12 +363,9 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
       {result ? (
         <p className="branch__result" role="status">
           {result.url ? (
-            <>
-              Opened{" "}
-              <a href={result.url} target="_blank" rel="noopener noreferrer">
-                {result.url}
-              </a>
-            </>
+            <a href={result.url} target="_blank" rel="noopener noreferrer">
+              Pull request ↗
+            </a>
           ) : (
             result.text
           )}

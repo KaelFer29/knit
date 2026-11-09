@@ -34,6 +34,9 @@
   --status-delivered-soft: #e0f3e8;
   --status-failed: #c22a2a;
   --status-failed-soft: #fae4e4;
+  /* A merged pull request: GitHub's purple. */
+  --status-merged: #8250df;
+  --status-merged-soft: #f3edfd;
 
   /* Agent identity: Claude's terracotta, Cursor's monochrome, the orchestrator's faint green */
   --agent-claude: #d97757;

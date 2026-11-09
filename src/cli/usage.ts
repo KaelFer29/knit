@@ -74,7 +74,7 @@ Options for branch undo:
   --yes                      Do it; without it the command only prints what it would do and changes nothing
   --json                     Print one JSON line (used by the web interface)
   --data-dir <dir>
-  pr-draft: --template builds the text from the task's goal, specs, commits and changed files, with no model and no tokens
+  pr-draft: --template builds the text from the task's goal and specs, with no model and no tokens (the commits and files are on the pull request)
   (the same sections every time; it cannot be combined with --model). Without it, --model <id> picks the model (default composer-2.5-fast, see 'agent models'). It writes text only, in an empty
   scratch directory, from the task, its commits and a cut of its diff.
   pr: pushes the branch to origin (never forced) and opens the pull request into the run's base branch, or into the parent

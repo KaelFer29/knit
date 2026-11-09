@@ -70,6 +70,30 @@ describe("BranchesView", () => {
     expect((within(card).getByRole("button", { name: "Open pull request" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  describe("pull request state", () => {
+    const PR = "https://github.com/acme/demo/pull/7";
+
+    it("shows a merged pull request in purple, and into which branch it was merged", async () => {
+      listing = { branches: [branch({ prUrl: PR, prState: { state: "merged", base: "release/1.2" }, state: { ...branch().state, pushed: true } })] };
+      show();
+      const card = await screen.findByRole("region", { name: "Branch docs/one" });
+      const pill = within(card).getByText("Merged into release/1.2");
+      expect(pill.getAttribute("data-state")).toBe("merged");
+      expect(within(card).getByRole("link", { name: "Pull request ↗" }).getAttribute("href")).toBe(PR);
+    });
+
+    it("says when a pull request was closed without merging, and when it is still open", async () => {
+      listing = { branches: [branch({ prUrl: PR, prState: { state: "closed", base: "main" }, state: { ...branch().state, pushed: true } })] };
+      const first = show();
+      expect(await screen.findByText("Closed without merging")).toBeTruthy();
+      first.unmount();
+      listing = { branches: [branch({ prUrl: PR, prState: { state: "open", base: "main" }, state: { ...branch().state, pushed: true } })] };
+      show();
+      expect(await screen.findByRole("link", { name: "Pull request ↗" })).toBeTruthy();
+      expect(screen.queryByText(/Merged into/)).toBeNull();
+    });
+  });
+
   describe("with many branches", () => {
     const many = (n: number) => Array.from({ length: n }, (_, i) => branch({ taskId: `T${i + 1}`, title: `Task number ${i + 1}`, branch: `feat/b${i + 1}` }));
 
@@ -282,7 +306,9 @@ describe("BranchesView", () => {
       await user.type(title, "Create prueba.md");
       await user.click(within(form).getByRole("button", { name: "Push and open pull request" }));
       await waitFor(() => expect(posts().at(-1)).toEqual({ method: "POST", url: "/api/runs/run-1/tasks/T1/pr", body: { title: "Create prueba.md", body: "## Summary\n- adds it" } }));
-      expect((await screen.findByRole("status")).textContent).toContain("https://example.test/pull/7");
+      const done = await screen.findByRole("link", { name: "Pull request ↗" });
+      expect(done.getAttribute("href")).toBe("https://example.test/pull/7");
+      expect(screen.getByRole("status").textContent).not.toMatch(/opened/i);
     });
 
     it("builds the description from the task when the form opens, without asking a model", async () => {

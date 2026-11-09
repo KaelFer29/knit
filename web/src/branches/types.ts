@@ -22,6 +22,8 @@ export interface BranchView {
   branch: string;
   startSha: string;
   prUrl?: string;
+  /** Read from GitHub when the list is built: absent when GitHub cannot be asked right now. */
+  prState?: { state: "open" | "merged" | "closed"; base: string };
   state: BranchState;
   undo: Record<UndoMode, Decision>;
   pr: PrDecision;
