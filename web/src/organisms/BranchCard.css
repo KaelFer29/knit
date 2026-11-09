@@ -274,3 +274,62 @@
   font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
+
+/* While the model writes: a turning ring beside the text, and fields that wait. */
+.branch__writing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+.branch__spinner {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--cursor-bg);
+  border-radius: 50%;
+  animation: branch-spin 0.8s linear infinite;
+}
+
+.branch__field:disabled {
+  background: var(--surface-2);
+  color: var(--text-faint);
+  cursor: progress;
+}
+
+.branch__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.branch__link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.branch__link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@keyframes branch-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .branch__spinner {
+    animation: none;
+    border-top-color: var(--border-strong);
+    border-right-color: var(--cursor-bg);
+  }
+}

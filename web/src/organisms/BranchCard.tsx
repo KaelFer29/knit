@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { ApiError } from "../api/client";
 import { StatusBadge } from "../atoms/StatusBadge";
 import type { BranchView, PrDraft, PrResult, UndoMode, UndoResult } from "../branches/types";
+import { draftKey, draftOnce, forgetDraft, loadDraft, saveDraft } from "../branches/draftCache";
 import { Popover } from "../molecules/Popover";
 import "./BranchCard.css";
 
@@ -46,12 +47,13 @@ type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | undefined;
  * exactly what it will do; a pull request is drafted by a cheap model and edited before anything is pushed. The card
  * only renders and holds the state of its own forms; the actions come from the container.
  */
-export function BranchCard({ branch: b, actions, onChanged }: { branch: BranchView; actions: BranchActions; onChanged: () => void }) {
+export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: string; branch: BranchView; actions: BranchActions; onChanged: () => void }) {
   const [panel, setPanel] = useState<Panel>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [result, setResult] = useState<{ text: string; url?: string }>();
-  const [draft, setDraft] = useState<{ state: "writing" | "ready" | "failed"; title: string; body: string; model: string }>({ state: "writing", title: b.title, body: "", model: DRAFT_MODEL });
+  const [draft, setDraft] = useState<{ state: "writing" | "ready" | "failed"; title: string; body: string; model: string; saved: boolean }>({ state: "writing", title: b.title, body: "", model: DRAFT_MODEL, saved: false });
+  const key = draftKey(runId, b.taskId, b.state.head);
   const titleId = useId();
   const bodyId = useId();
 
@@ -75,18 +77,33 @@ export function BranchCard({ branch: b, actions, onChanged }: { branch: BranchVi
     }
   };
 
-  const startPr = (): void => {
-    setResult(undefined);
+  /** Asks the model, or joins the call already running for this state of the branch; the answer is saved. */
+  const askModel = (): void => {
     setError(undefined);
-    setPanel({ kind: "pr" });
-    setDraft({ state: "writing", title: b.title, body: "", model: DRAFT_MODEL });
-    actions.draft(b.taskId).then(
-      (d) => setDraft({ state: "ready", title: d.title || b.title, body: d.body, model: d.model }),
+    setDraft({ state: "writing", title: b.title, body: "", model: DRAFT_MODEL, saved: false });
+    draftOnce(key, () => actions.draft(b.taskId)).then(
+      (d) => setDraft({ state: "ready", title: d.title || b.title, body: d.body, model: d.model, saved: false }),
       (err: unknown) => {
         setDraft((current) => ({ ...current, state: "failed" }));
         setError(messageOf(err));
       },
     );
+  };
+
+  /** Opens the form. A text already written for this commit (by the model or by the person) is shown as it was; the model is not asked again. */
+  const startPr = (): void => {
+    setResult(undefined);
+    setError(undefined);
+    setPanel({ kind: "pr" });
+    const saved = loadDraft(key);
+    if (saved) setDraft({ state: "ready", title: saved.title, body: saved.body, model: saved.model, saved: true });
+    else askModel();
+  };
+
+  const edit = (next: { title?: string; body?: string }): void => {
+    const updated = { ...draft, ...next };
+    setDraft(updated);
+    if (updated.state === "ready") saveDraft(key, { title: updated.title, body: updated.body, model: updated.model });
   };
 
   const sendPr = async (): Promise<void> => {
@@ -95,6 +112,7 @@ export function BranchCard({ branch: b, actions, onChanged }: { branch: BranchVi
     try {
       const done = await actions.open(b.taskId, draft.title.trim(), draft.body);
       setPanel(undefined);
+      forgetDraft(key);
       setResult({ text: `Opened ${done.url}`, url: done.url });
       onChanged();
     } catch (err) {
@@ -220,22 +238,33 @@ export function BranchCard({ branch: b, actions, onChanged }: { branch: BranchVi
         <form
           className="branch__panel"
           aria-label={`Pull request for ${b.branch}`}
+          aria-busy={draft.state === "writing"}
           onSubmit={(e) => {
             e.preventDefault();
-            if (draft.title.trim() !== "" && !busy) void sendPr();
+            if (draft.title.trim() !== "" && !busy && draft.state !== "writing") void sendPr();
           }}
         >
-          <p className="branch__panel-note" role={draft.state === "writing" ? "status" : undefined}>
-            {draft.state === "writing" ? `Writing the description with ${draft.model}…` : draft.state === "ready" ? `Description written by ${draft.model}. Edit it before sending.` : "Write the description yourself."}
-          </p>
+          {draft.state === "writing" ? (
+            <p className="branch__panel-note branch__writing" role="status">
+              <span className="branch__spinner" role="progressbar" aria-label={`Writing the description with ${draft.model}`} />
+              Writing the description with {draft.model}… this takes a few seconds.
+            </p>
+          ) : (
+            <p className="branch__panel-note">
+              {draft.state === "failed" ? "Write the description yourself, or ask the model again." : draft.saved ? `Saved description (written by ${draft.model}). Edit it, or write it again.` : `Description written by ${draft.model}. Edit it before sending.`}{" "}
+              <button type="button" className="branch__link" disabled={busy} onClick={askModel}>
+                Write it again
+              </button>
+            </p>
+          )}
           <label className="branch__label" htmlFor={titleId}>
             Title
           </label>
-          <input id={titleId} className="branch__field" value={draft.title} maxLength={200} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+          <input id={titleId} className="branch__field" value={draft.title} maxLength={200} disabled={draft.state === "writing"} onChange={(e) => edit({ title: e.target.value })} />
           <label className="branch__label" htmlFor={bodyId}>
             Description
           </label>
-          <textarea id={bodyId} className="branch__field branch__body" rows={8} value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} />
+          <textarea id={bodyId} className="branch__field branch__body" rows={8} value={draft.body} disabled={draft.state === "writing"} placeholder={draft.state === "writing" ? "…" : undefined} onChange={(e) => edit({ body: e.target.value })} />
           {b.pr.ok ? (
             <ul className="branch__effects">
               {b.pr.effects.map((e) => (

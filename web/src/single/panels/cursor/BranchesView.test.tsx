@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetDraftCache } from "../../../branches/draftCache";
 import { BranchesView } from "./BranchesView";
 
 const ok = { ok: true as const, effects: ["Adds one commit to docs/one that restores the code."] };
@@ -28,6 +29,8 @@ let listing: { branches: unknown[] };
 let replies: Record<string, { status: number; body: unknown }>;
 
 beforeEach(() => {
+  window.sessionStorage.clear();
+  resetDraftCache();
   calls = [];
   listing = { branches: [branch()] };
   replies = {};
@@ -154,6 +157,127 @@ describe("BranchesView", () => {
       await user.click(within(form).getByRole("button", { name: "Push and open pull request" }));
       await waitFor(() => expect(posts().at(-1)).toEqual({ method: "POST", url: "/api/runs/run-1/tasks/T1/pr", body: { title: "Create prueba.md", body: "## Summary\n- adds it" } }));
       expect((await screen.findByRole("status")).textContent).toContain("https://example.test/pull/7");
+    });
+
+    it("shows that it is working while the model writes: a spinner, a busy form and fields that wait", async () => {
+      const user = userEvent.setup();
+      let release: () => void = () => {};
+      const gate = new Promise<void>((r) => (release = r));
+      const original = globalThis.fetch;
+      vi.stubGlobal("fetch", async (input: string, init?: { method?: string; body?: string }) => {
+        if (String(input).endsWith("/pr-draft")) {
+          calls.push({ method: "POST", url: String(input) });
+          await gate;
+          return new Response(JSON.stringify({ ok: true, title: "Add prueba.md", body: "text", model: "composer-2.5-fast" }), { status: 200 });
+        }
+        return original(input, init as RequestInit);
+      });
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      expect(form.getAttribute("aria-busy")).toBe("true");
+      expect(within(form).getByRole("progressbar", { name: /writing the description/i })).toBeTruthy();
+      expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).disabled).toBe(true);
+      expect((within(form).getByRole("button", { name: "Push and open pull request" }) as HTMLButtonElement).disabled).toBe(true);
+      release();
+      await waitFor(() => expect(form.getAttribute("aria-busy")).toBe("false"));
+      expect(within(form).queryByRole("progressbar")).toBeNull();
+      expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).disabled).toBe(false);
+    });
+
+    it("does not pay twice when the form is closed and opened while the model is still writing", async () => {
+      const user = userEvent.setup();
+      let release: () => void = () => {};
+      const gate = new Promise<void>((r) => (release = r));
+      const original = globalThis.fetch;
+      let modelCalls = 0;
+      vi.stubGlobal("fetch", async (input: string, init?: { method?: string; body?: string }) => {
+        if (String(input).endsWith("/pr-draft")) {
+          modelCalls += 1;
+          await gate;
+          return new Response(JSON.stringify({ ok: true, title: "Add prueba.md", body: "text", model: "composer-2.5-fast" }), { status: 200 });
+        }
+        return original(input, init as RequestInit);
+      });
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      await user.click(within(await screen.findByRole("form", { name: /pull request for docs\/one/i })).getByRole("button", { name: "Cancel" }));
+      await user.click(screen.getByRole("button", { name: "Open pull request" }));
+      release();
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      await waitFor(() => expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("text"));
+      expect(modelCalls).toBe(1);
+    });
+
+    it("keeps the written text: closing the form and opening it again does not ask the model again", async () => {
+      const user = userEvent.setup();
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Add prueba.md", body: "## Summary\n- adds it", model: "composer-2.5-fast" } };
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      await waitFor(() => expect((within(form).getByRole("textbox", { name: "Title" }) as HTMLInputElement).value).toBe("Add prueba.md"));
+      await user.click(within(form).getByRole("button", { name: "Cancel" }));
+      await user.click(screen.getByRole("button", { name: "Open pull request" }));
+      const again = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      expect((within(again).getByRole("textbox", { name: "Title" }) as HTMLInputElement).value).toBe("Add prueba.md");
+      expect((within(again).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("## Summary\n- adds it");
+      expect(within(again).getByText(/saved/i)).toBeTruthy();
+      expect(posts().filter((p) => p.url.endsWith("pr-draft"))).toHaveLength(1);
+    });
+
+    it("keeps what the person edited, and keeps it after the whole view is closed and opened again", async () => {
+      const user = userEvent.setup();
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Add prueba.md", body: "first", model: "composer-2.5-fast" } };
+      const first = show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      const body = within(form).getByRole("textbox", { name: "Description" });
+      await waitFor(() => expect((body as HTMLTextAreaElement).value).toBe("first"));
+      await user.clear(body);
+      await user.type(body, "my own words");
+      await user.click(within(form).getByRole("button", { name: "Cancel" }));
+      first.unmount();
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const reopened = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      expect((within(reopened).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("my own words");
+      expect(posts().filter((p) => p.url.endsWith("pr-draft"))).toHaveLength(1);
+    });
+
+    it("asks the model again on request, and when the branch has a new commit since the text was written", async () => {
+      const user = userEvent.setup();
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Add prueba.md", body: "first", model: "composer-2.5-fast" } };
+      const view = show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      await waitFor(() => expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("first"));
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Add prueba.md", body: "second", model: "composer-2.5-fast" } };
+      await user.click(within(form).getByRole("button", { name: "Write it again" }));
+      await waitFor(() => expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("second"));
+      expect(posts().filter((p) => p.url.endsWith("pr-draft"))).toHaveLength(2);
+      view.unmount();
+      listing = { branches: [branch({ state: { ...branch().state, head: "ccccccc" } })] };
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Add prueba.md", body: "third", model: "composer-2.5-fast" } };
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const fresh = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      await waitFor(() => expect((within(fresh).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("third"));
+      expect(posts().filter((p) => p.url.endsWith("pr-draft"))).toHaveLength(3);
+    });
+
+    it("does not keep a failed draft: the next try asks the model", async () => {
+      const user = userEvent.setup();
+      replies["POST pr-draft"] = { status: 409, body: { error: "The model could not write the description: timed out" } };
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      await within(form).findByRole("alert");
+      await user.click(within(form).getByRole("button", { name: "Cancel" }));
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Add prueba.md", body: "now it works", model: "composer-2.5-fast" } };
+      await user.click(screen.getByRole("button", { name: "Open pull request" }));
+      const again = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      await waitFor(() => expect((within(again).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("now it works"));
+      expect(posts().filter((p) => p.url.endsWith("pr-draft"))).toHaveLength(2);
     });
 
     it("still lets the person write it by hand when the model fails, with the task's title as a start", async () => {

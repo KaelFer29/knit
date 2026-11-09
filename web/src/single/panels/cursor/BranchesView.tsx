@@ -41,7 +41,7 @@ export function BranchesView({ runId, pollMs }: { runId: string; pollMs?: number
         </p>
       )}
       {listing.branches.map((b) => (
-        <BranchCard key={b.taskId} branch={b} actions={actions} onChanged={reload} />
+        <BranchCard key={b.taskId} runId={runId} branch={b} actions={actions} onChanged={reload} />
       ))}
     </div>
   );
