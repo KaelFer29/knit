@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../api/client";
 import { listConfigFiles, readConfigFile, saveConfigFile, type ConfigFileContent, type ConfigFileEntry } from "../config/api";
 import { diffLines, isChanged, withContext } from "../config/diff";
+import { AGENTS } from "../identity/agents";
 import { ConfigEditor } from "../organisms/ConfigEditor";
 import { ConfigFileList } from "../organisms/ConfigFileList";
 import "./ConfigView.css";
@@ -32,6 +33,8 @@ export function ConfigView() {
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [loaded, setLoaded] = useState<ConfigFileContent | undefined>();
   const [draft, setDraft] = useState("");
+  /** Counts reads of file content: it keys the editor document, so each read starts a fresh undo history. */
+  const [docSeq, setDocSeq] = useState(0);
   const [step, setStep] = useState<"edit" | "review">("edit");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<Notice | undefined>();
@@ -62,6 +65,7 @@ export function ConfigView() {
       if (mine !== loadSeq.current) return;
       setLoaded(content);
       setDraft(content.content);
+      setDocSeq(mine);
     } catch (err) {
       if (mine !== loadSeq.current) return;
       setLoaded(undefined);
@@ -100,7 +104,7 @@ export function ConfigView() {
       <aside className="config-view__side">
         {files ? <ConfigFileList files={files} selectedId={selectedId} onSelect={(id) => void load(id)} /> : loadError ? null : <p className="config-view__muted">Loading…</p>}
       </aside>
-      <div className="config-view__main">
+      <div className="config-view__main" style={file ? { ["--accent" as string]: AGENTS[file.agent].accent, ["--accent-soft" as string]: AGENTS[file.agent].accentSoft } : undefined}>
         {loadError ? (
           <p className="config-view__error" role="alert">
             {loadError}
@@ -109,7 +113,9 @@ export function ConfigView() {
         {file && loaded ? (
           <ConfigEditor
             file={{ ...file, exists: loaded.exists }}
-            draft={draft}
+            docKey={`${file.id}#${docSeq}`}
+            initialDoc={loaded.content}
+            language={loaded.json ? "json" : "markdown"}
             step={step}
             diff={diff}
             problem={problem}

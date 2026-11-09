@@ -1,13 +1,20 @@
 .config-view {
+  container-type: inline-size;
   display: grid;
-  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
-  gap: var(--space-6);
+  grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr);
+  gap: var(--space-4);
   align-items: start;
 }
 
 .config-view__side {
   position: sticky;
-  top: var(--space-4);
+  top: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
 }
 
 .config-view__main {
@@ -29,9 +36,13 @@
   font-size: var(--text-sm);
 }
 
-@media (max-width: 840px) {
+/* A narrow panel stacks the file list above the editor. */
+@container (max-width: 34rem) {
   .config-view {
-    grid-template-columns: minmax(10rem, 12rem) minmax(0, 1fr);
-    gap: var(--space-4);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .config-view__side {
+    position: static;
   }
 }

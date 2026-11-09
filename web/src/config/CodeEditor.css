@@ -1,0 +1,99 @@
+.code-editor {
+  display: flex;
+  min-height: 14rem;
+  max-height: 55vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.code-editor:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.code-editor[data-readonly="true"] {
+  background: var(--surface-2);
+}
+
+.code-editor .cm-editor {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.code-editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.code-editor .cm-scroller {
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+.code-editor .cm-content {
+  padding: var(--space-2) 0;
+  caret-color: var(--text);
+}
+
+.code-editor .cm-gutters {
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-faint);
+}
+
+.code-editor .cm-activeLine {
+  background: var(--surface-2);
+}
+
+.code-editor .cm-activeLineGutter {
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+.code-editor .cm-selectionBackground,
+.code-editor .cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+  background: var(--status-running-soft);
+}
+
+.code-editor .cm-cursor {
+  border-left-color: var(--text);
+}
+
+/* Syntax: weight and neutral tones, with the agent's accent on names and headings. */
+.code-editor .tok-heading,
+.code-editor .tok-strong {
+  color: var(--accent, var(--text));
+  font-weight: 700;
+}
+
+.code-editor .tok-emphasis {
+  font-style: italic;
+}
+
+.code-editor .tok-propertyName,
+.code-editor .tok-link,
+.code-editor .tok-url {
+  color: var(--accent, var(--text));
+}
+
+.code-editor .tok-string,
+.code-editor .tok-number,
+.code-editor .tok-bool,
+.code-editor .tok-null,
+.code-editor .tok-monospace {
+  color: var(--status-delivered);
+}
+
+.code-editor .tok-comment,
+.code-editor .tok-meta,
+.code-editor .tok-punctuation,
+.code-editor .tok-processingInstruction,
+.code-editor .tok-quote {
+  color: var(--text-muted);
+}

@@ -56,7 +56,7 @@
 }
 
 .config-list__file[aria-current="true"] {
-  background: var(--surface-1);
+  background: var(--accent-soft, var(--surface-1));
   box-shadow: inset 2px 0 0 var(--accent, var(--border-strong)), var(--shadow-sm);
   color: var(--text);
   font-weight: 600;
