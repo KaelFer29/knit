@@ -290,3 +290,43 @@ describe("ClaudePanel: header", () => {
     expect(window.location.hash).toBe("");
   });
 });
+
+describe("ClaudePanel: routing a prompt to the orchestrator", () => {
+  const routing = () => screen.getByRole("switch", { name: /send to the orchestrator/i });
+
+  it("is off by default and sends the prompt as it is", async () => {
+    const user = userEvent.setup();
+    render(panel());
+    await screen.findByText("<b>Here is the plan</b>");
+    expect(routing().getAttribute("aria-checked")).toBe("false");
+    await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "Just chat{Enter}");
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({ body: { prompt: "Just chat" } });
+  });
+
+  it("when on, asks the agent for a plan in the Knit format and starts no run", async () => {
+    const user = userEvent.setup();
+    render(panel());
+    await screen.findByText("<b>Here is the plan</b>");
+    await user.click(routing());
+    expect(routing().getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText(/you confirm it before anything runs/i)).toBeTruthy();
+    await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "Add webhooks{Enter}");
+    await waitFor(() => expect(posted).toHaveLength(1));
+    const body = posted[0]!.body as { prompt: string };
+    expect(posted[0]!.url).toBe("/api/sessions/a1/turns");
+    expect(body.prompt).toContain("Add webhooks");
+    expect(body.prompt).toContain("docs/plans/");
+    expect(posted.some((p) => p.url === "/api/runs")).toBe(false);
+  });
+
+  it("does not wrap a Knit command such as /usage", async () => {
+    const user = userEvent.setup();
+    render(panel());
+    await screen.findByText("<b>Here is the plan</b>");
+    await user.click(routing());
+    await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "/usage{Enter}");
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({ body: { prompt: "/usage" } });
+  });
+});

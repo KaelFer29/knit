@@ -1,5 +1,5 @@
 /* The panel fills the frame's body and scrolls only its middle, so the composer stays in view. */
-.side-panel__body:has(> .claude-panel) {
+.modal__body:has(> .claude-panel) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -25,6 +25,40 @@
 .claude-panel__scroll .timeline {
   flex: 1 0 auto;
   min-height: 10rem;
+}
+
+.claude-panel__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* In the wide modal the chat takes the left and usage, plan drafts and the terminal command sit beside it. */
+@media (min-width: 900px) {
+  .claude-panel__scroll:has(> .claude-panel__side) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
+    grid-auto-rows: min-content;
+    align-items: start;
+    gap: var(--space-4);
+  }
+
+  .claude-panel__scroll > .claude-panel__error {
+    grid-column: 1 / -1;
+  }
+
+  .claude-panel__side {
+    position: sticky;
+    top: 0;
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .claude-panel__scroll > .timeline {
+    grid-column: 1;
+    grid-row: 1;
+  }
 }
 
 .claude-panel__note {

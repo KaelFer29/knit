@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { CommandPalette } from "../molecules/CommandPalette";
 import { ProfileBar } from "../molecules/ProfileBar";
+import { RouteSwitch } from "../molecules/RouteSwitch";
 import { filterCommands, knitCommandOf, paletteQuery, type PaletteCommand } from "../sessions/commands";
 import type { AgentView, Profile } from "../sessions/types";
 import "./Composer.css";
@@ -21,10 +22,12 @@ interface Props {
   busyLabel?: string;
   error?: string;
   placeholder?: string;
+  /** The "send to the orchestrator" switch; absent when the container offers no routing. */
+  routing?: { on: boolean; onChange: (on: boolean) => void };
 }
 
 /** Prompt field with the command palette and the per-turn profile. Presentational: the container sends and tracks. */
-export function Composer({ agent, models, profile, onProfileChange, commands, onSubmit, onKnitCommand, busy, busyLabel, error, placeholder }: Props) {
+export function Composer({ agent, models, profile, onProfileChange, commands, onSubmit, onKnitCommand, busy, busyLabel, error, placeholder, routing }: Props) {
   const [text, setText] = useState("");
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState(false);
@@ -100,6 +103,7 @@ export function Composer({ agent, models, profile, onProfileChange, commands, on
           {error}
         </p>
       ) : null}
+      {routing ? <RouteSwitch on={routing.on} onChange={routing.onChange} /> : null}
       <div className="composer__box">
         {open ? <CommandPalette id={paletteId} commands={matches} activeIndex={Math.min(active, matches.length - 1)} onPick={pick} /> : null}
         <textarea

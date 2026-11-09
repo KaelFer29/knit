@@ -322,10 +322,11 @@ The app has one screen and no page navigation (the Runs, Workspace and Configura
 
 ### Claude panel
 
-`single/panels/claude/ClaudePanel.tsx` (S3): a modal in the spirit of an IDE extension panel, built from the workspace pieces above.
+`single/panels/claude/ClaudePanel.tsx` (S3): a wide modal in the spirit of an IDE extension panel (chat on the left; on the right, in a column, usage, plan drafts and the terminal command), built from the workspace pieces above.
 
 - **Header** (`ClaudePanelHeader`): a session picker (native select, most recent first), a New session button, and chips for the agent, the session status, the model and profile values chosen in the composer, and the working directory.
 - **Body** (scrolls): the compact usage meter (`UsagePanel compact`: session tokens and plan windows when the agent declares `planUsage`), the timeline, the detected plan drafts, and the "Continue in terminal" command when the server sent one.
+- **Send to the orchestrator (switch):** above the composer, a switch (`role="switch"`, off by default) routes the next prompts: when on, the prompt is sent to the agent wrapped by `routedPrompt` (`web/src/sessions/route.ts`), which asks for a plan in the Knit format (`docs/plan-format.md`, or the `knit-plan` skill), saved as `docs/plans/<slug>.md` and validated, with no implementation and no run. The request goes last and verbatim; Knit commands (`/usage`, `/clear`) and any text starting with `/` are never wrapped. The wrapped text is what the timeline shows as the prompt. The plan then appears as a draft, and only the click below starts a run.
 - **Send plan to the orchestrator:** each draft plan has a prominent "Send plan to the orchestrator" button that posts the existing launch (`POST /api/runs`). It never fires by itself; for an invalid plan it stays disabled and says "Fix N issues first." A Claude turn never starts a run.
 - **Composer** pinned at the bottom with the command palette. `/usage` sends a turn, as before (S7).
 - Everything renders from the agent's capabilities and output is text only.

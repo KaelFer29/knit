@@ -10,6 +10,7 @@ import { CopyCommand } from "../../../molecules/CopyCommand";
 import { fetchAgents, fetchModels, fetchSessions, sendTurn, startSession } from "../../../sessions/api";
 import { launchPlan, type PlanDraftView } from "../../../sessions/plans";
 import { paletteCommands, usageAction } from "../../../sessions/commands";
+import { routedPrompt } from "../../../sessions/route";
 import { buildTimeline } from "../../../sessions/timeline";
 import type { AgentView, Profile, SessionListEntry } from "../../../sessions/types";
 import { usePlanDrafts } from "../../../sessions/usePlanDrafts";
@@ -42,7 +43,7 @@ function rememberCwd(cwd: string): void {
 const messageOf = (err: unknown): string => (err instanceof ApiError || err instanceof Error ? err.message : String(err));
 
 /**
- * Container: Claude's side panel. It fetches agents, the session list and the open session, owns the composer's
+ * Container: Claude's modal. It fetches agents, the session list and the open session, owns the composer's
  * choices, starts turns through the API and hands everything to presentational components. The open session lives
  * in panel state (it defaults to the most recent one); the URL carries no session. What each agent can do comes from
  * its capabilities in `GET /api/agents`; nothing here looks at an agent's name. A turn never starts a run: only the
@@ -58,6 +59,7 @@ export function ClaudePanel(_props: PanelProps) {
   const [cwd, setCwd] = useState(readCwd);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [models, setModels] = useState<Record<string, string[]>>({});
+  const [routeOn, setRouteOn] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | undefined>();
   const [now, setNow] = useState(() => Date.now());
@@ -220,12 +222,14 @@ export function ClaudePanel(_props: PanelProps) {
           </p>
         ) : (
           <>
-            {agent ? (
-              <UsagePanel compact reportsPlanUsage={agent.capabilities.planUsage} planUsage={live.detail?.meta.planUsage ?? []} inputTokens={tokens.input} outputTokens={tokens.output} now={now} />
-            ) : null}
             <Timeline items={items} emptyText="No messages yet." />
-            {drafts.listing ? <PlanDrafts dir={drafts.listing.dir} plans={drafts.listing.plans} launching={launching} error={launchError} onLaunch={(plan) => void launch(plan)} /> : null}
-            {continueCommand ? <CopyCommand command={continueCommand} /> : null}
+            <aside className="claude-panel__side" aria-label="Usage and plans">
+              {agent ? (
+                <UsagePanel compact reportsPlanUsage={agent.capabilities.planUsage} planUsage={live.detail?.meta.planUsage ?? []} inputTokens={tokens.input} outputTokens={tokens.output} now={now} />
+              ) : null}
+              {drafts.listing ? <PlanDrafts dir={drafts.listing.dir} plans={drafts.listing.plans} launching={launching} error={launchError} onLaunch={(plan) => void launch(plan)} /> : null}
+              {continueCommand ? <CopyCommand command={continueCommand} /> : null}
+            </aside>
             {live.error ? (
               <p className="claude-panel__error" role="alert">
                 {live.error}
@@ -245,7 +249,8 @@ export function ClaudePanel(_props: PanelProps) {
             profile={profiles[agent.id] ?? {}}
             onProfileChange={(p) => setProfiles((all) => ({ ...all, [agent.id]: p }))}
             commands={commands}
-            onSubmit={submit}
+            onSubmit={(prompt) => submit(routeOn && !prompt.startsWith("/") ? routedPrompt(prompt) : prompt)}
+            routing={{ on: routeOn, onChange: setRouteOn }}
             onKnitCommand={onKnitCommand}
             busy={sending || running}
             busyLabel={sending ? "Starting the turn…" : "A turn is running…"}
