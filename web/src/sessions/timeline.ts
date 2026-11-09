@@ -2,8 +2,8 @@ import type { SessionEvent, Turn } from "./types";
 
 /** What the timeline draws. One shape for every agent: the item kinds come from the shared normalized timeline. */
 export type TimelineItem =
-  | { type: "prompt"; key: string; seq: number; text: string; model?: string }
-  | { type: "message"; key: string; text: string }
+  | { type: "prompt"; key: string; seq: number; text: string; model?: string; at: string }
+  | { type: "message"; key: string; text: string; at: string }
   | { type: "thinking"; key: string; text: string; shared: boolean }
   | { type: "tool"; key: string; tool: string; args?: string; result?: string; isError: boolean; done: boolean }
   | { type: "result"; key: string; text: string; isError: boolean; durationMs?: number; inputTokens?: number; outputTokens?: number }
@@ -35,7 +35,7 @@ export function buildTimeline(turns: Turn[], events: SessionEvent[]): TimelineIt
 
   const items: TimelineItem[] = [];
   for (const turn of turns) {
-    items.push({ type: "prompt", key: `turn-${turn.id}`, seq: turn.seq, text: turn.prompt, ...(turn.profile?.model ? { model: turn.profile.model } : {}) });
+    items.push({ type: "prompt", key: `turn-${turn.id}`, seq: turn.seq, text: turn.prompt, ...(turn.profile?.model ? { model: turn.profile.model } : {}), at: turn.startedAt });
     const open = new Map<string, Extract<TimelineItem, { type: "tool" }>>();
     let hasResult = false;
     for (const e of byTurn.get(turn.id) ?? []) {
@@ -43,7 +43,7 @@ export function buildTimeline(turns: Turn[], events: SessionEvent[]): TimelineIt
       const key = `event-${e.id}`;
       switch (e.kind) {
         case "message":
-          if (str(p.text) !== "") items.push({ type: "message", key, text: str(p.text) });
+          if (str(p.text) !== "") items.push({ type: "message", key, text: str(p.text), at: e.ts });
           break;
         case "thinking": {
           const text = str(p.text);

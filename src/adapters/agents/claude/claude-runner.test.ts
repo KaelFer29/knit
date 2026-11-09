@@ -191,3 +191,17 @@ describe("ClaudeAgentRunner listModels", () => {
     expect(new Set(models).size).toBe(models.length);
   });
 });
+
+describe("ClaudeAgentRunner.readPlanUsage", () => {
+  it("asks the CLI for /usage without keeping a session, and reads the plan windows", async () => {
+    const windows = await make().readPlanUsage();
+    expect(windows).toEqual([
+      { label: "Current session", percent: 36, resets: "Nov 9, 3:10am (America/Santiago)" },
+      { label: "Current week (all models)", percent: 50, resets: "Nov 12, 1am (America/Santiago)" },
+    ]);
+  });
+
+  it("rejects with the reason when the CLI cannot be started", async () => {
+    await expect(make({ command: "/nonexistent/claude", prefixArgs: [] }).readPlanUsage()).rejects.toThrow(/Could not read/);
+  });
+});

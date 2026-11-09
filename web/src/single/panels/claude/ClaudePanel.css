@@ -55,7 +55,8 @@
     grid-row: 1;
   }
 
-  .claude-panel__scroll > .timeline {
+  .claude-panel__scroll > .timeline,
+  .claude-panel__scroll > .empty-chat {
     grid-column: 1;
     grid-row: 1;
   }
@@ -81,36 +82,75 @@
   resize: none;
 }
 
-/* The conversation sits straight on the modal, like the Claude Code panel: no box around it. */
+/* The conversation sits straight on the modal, like a chat app: no box around it. */
 .claude-panel .timeline {
+  gap: var(--space-2);
   padding: 0 var(--space-1);
   border: 0;
   background: none;
 }
 
-.claude-panel .tl-entry--prompt {
-  align-self: flex-start;
-  background: color-mix(in srgb, var(--text) 8%, transparent);
-}
-
-.claude-panel .tl-entry--result {
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--border);
-  color: var(--text-muted);
-}
-
-/* What Claude answers sits in its own white card, apart from the grey bubble of what you asked. */
+/* Bubbles: yours on the right in Claude's soft tint, Claude's on the left in white; small text, the time inside. */
+.claude-panel .tl-entry--prompt,
 .claude-panel .tl-entry--message,
 .claude-panel .tl-entry--result {
-  max-width: none;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--claude-line);
-  border-radius: var(--radius-lg);
-  background: var(--surface-1);
-  box-shadow: var(--shadow-sm);
+  position: relative;
+  max-width: min(36rem, 80%);
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  border-radius: 14px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
 }
 
+.claude-panel .tl-entry--prompt {
+  align-self: flex-end;
+  border: 1px solid color-mix(in srgb, var(--agent-claude) 22%, transparent);
+  border-bottom-right-radius: 4px;
+  background: color-mix(in srgb, var(--agent-claude) 12%, var(--claude-paper));
+}
+
+.claude-panel .tl-entry--message,
 .claude-panel .tl-entry--result {
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--claude-line);
+  align-self: flex-start;
+  border: 1px solid var(--claude-line);
+  border-bottom-left-radius: 4px;
+  background: var(--claude-paper);
+  box-shadow: 0 1px 1px rgb(20 20 15 / 5%);
+}
+
+.claude-panel .tl-entry__time {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  text-align: right;
+}
+
+/* The end of a turn: a quiet line, with any final text as one more bubble. */
+.claude-panel .tl-entry--result .tl-entry__meta {
+  color: var(--text-faint);
+  font-size: 0.68rem;
+}
+
+.claude-panel .tl-entry--thinking,
+.claude-panel .tl-entry--tool,
+.claude-panel .tl-entry--working {
+  align-self: flex-start;
+  max-width: 80%;
+  font-size: var(--text-xs);
+}
+
+.claude-panel .tl-entry--tool {
+  padding: var(--space-1) var(--space-3);
+  border: 1px dashed var(--claude-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--claude-paper) 60%, transparent);
+}
+
+.claude-panel .tl-entry--tool[open] {
+  border-radius: var(--radius-lg);
+}
+
+.claude-panel__side {
+  gap: var(--space-3);
 }

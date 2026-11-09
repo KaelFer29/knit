@@ -2,14 +2,17 @@ import type {
   AgentCapabilities,
   AgentEvent,
   AgentPlanUsage,
+  PlanWindow,
   AgentProfile,
   AgentRunMeta,
   AgentRunRequest,
   AgentRunResult,
   AgentRunner,
 } from "../../../core/ports/agent-runner.js";
+import { tmpdir } from "node:os";
 import { claudeTokenUsage } from "../../../core/timeline/normalize-claude-events.js";
 import { spawnWithTimeout } from "../../system/spawn-with-timeout.js";
+import { parseUsageText } from "./usage-text.js";
 
 export interface ClaudeRunnerOptions {
   /** Binary to run. Default: `claude`. */
@@ -49,6 +52,9 @@ interface ResultEvent {
 const MODELS = ["sonnet", "opus", "haiku", "fable", "claude-sonnet-5-5", "claude-haiku-5-5"];
 
 const WINDOWS = ["five_hour", "seven_day"] as const;
+
+/** `/usage` answers in about half a second; this only guards against a hung CLI. */
+const USAGE_TIMEOUT_MS = 30_000;
 
 type Rec = Record<string, unknown>;
 const isRecord = (v: unknown): v is Rec => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -118,6 +124,26 @@ export class ClaudeAgentRunner implements AgentRunner {
 
   async listModels(): Promise<string[]> {
     return [...MODELS];
+  }
+
+  /**
+   * Runs `/usage` in print mode: a local command of Claude Code, so it makes no model call (cost 0), and
+   * `--no-session-persistence` keeps it out of the session list. Reads the windows from the text it prints.
+   */
+  async readPlanUsage(): Promise<PlanWindow[]> {
+    const args = [...this.prefixArgs, "-p", "--output-format", "json", "--no-session-persistence", "--", "/usage"];
+    const res = await spawnWithTimeout(this.command, args, { cwd: tmpdir(), timeoutMs: USAGE_TIMEOUT_MS, ...(this.killGraceMs !== undefined ? { killGraceMs: this.killGraceMs } : {}) });
+    if (res.spawnError || res.timedOut || res.exitCode !== 0) {
+      throw new Error(`Could not read the plan usage: ${res.spawnError ?? (res.timedOut ? "timed out" : `exit code ${res.exitCode}`)}`);
+    }
+    let text = "";
+    try {
+      const parsed: unknown = JSON.parse(res.stdout);
+      if (isRecord(parsed) && typeof parsed.result === "string") text = parsed.result;
+    } catch {
+      throw new Error("Could not read the plan usage: the answer was not JSON");
+    }
+    return parseUsageText(text);
   }
 
   async run(request: AgentRunRequest, onEvent?: (event: AgentEvent) => void): Promise<AgentRunResult> {

@@ -4,7 +4,9 @@ import { ApiError } from "../../../api/client";
 import { PlanDrafts } from "../../../organisms/PlanDrafts";
 import { Composer } from "../../../organisms/Composer";
 import { Timeline } from "../../../organisms/Timeline";
-import { UsagePanel } from "../../../organisms/UsagePanel";
+import { PlanUsageCard } from "../../../organisms/PlanUsageCard";
+import { ClaudeAtWork } from "../../../molecules/ClaudeAtWork";
+import { usePlanUsage } from "../../../sessions/usePlanUsage";
 import { CopyCommand } from "../../../molecules/CopyCommand";
 import { fetchAgentList, fetchModels, fetchSessions, sendTurn, startSession } from "../../../sessions/api";
 import { identityOf } from "../../../identity/agents";
@@ -112,6 +114,7 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
     };
   }, [wantsModels, agentId]);
 
+  const usage = usePlanUsage(agent?.id, agent?.capabilities.planUsage === true);
   const items = useMemo(() => (live.detail ? buildTimeline(live.detail.turns, live.events) : []), [live.detail, live.events]);
   const commands = useMemo(() => paletteCommands(agent, live.detail?.meta.commands ?? []), [agent, live.detail]);
 
@@ -177,6 +180,15 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
 
   const continueCommand = live.detail?.continueCommand;
 
+  const side = (
+    <aside className="claude-panel__side" aria-label="Usage and plans">
+      <ClaudeAtWork working={running} tokens={tokens} />
+      {agent?.capabilities.planUsage ? <PlanUsageCard windows={usage.windows} checkedAt={usage.checkedAt} now={now} loading={usage.loading} error={usage.error} onRefresh={usage.refresh} /> : null}
+      {drafts.listing ? <PlanDrafts dir={drafts.listing.dir} plans={drafts.listing.plans} launching={launching} error={launchError} onLaunch={(plan) => void launch(plan)} /> : null}
+      {continueCommand ? <CopyCommand command={continueCommand} label="Continue in a terminal" compact /> : null}
+    </aside>
+  );
+
   return (
     <div className="claude-panel">
       <ClaudePanelHeader sessions={mine} selectedId={isNew ? undefined : sessionId} session={isNew ? undefined : session} agent={agent} now={now} onSelect={(id) => go(id)} onNew={() => go(NEW_SESSION)} />
@@ -190,7 +202,10 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
           agent === undefined ? (
             <p className="claude-panel__note">{agents.length === 0 ? "No agents are available on this server." : `${identityOf(wanted ?? "", wanted).label} is not available on this server.`}</p>
           ) : (
-            <EmptyConversation identity={identityOf(agent.id, agent.label)} />
+            <>
+              <EmptyConversation identity={identityOf(agent.id, agent.label)} />
+              {side}
+            </>
           )
         ) : session === undefined ? (
           <p className="claude-panel__note" role={live.error ? "alert" : "status"}>
@@ -199,13 +214,7 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
         ) : (
           <>
             <Timeline items={items} emptyText="No messages yet." />
-            <aside className="claude-panel__side" aria-label="Usage and plans">
-              {agent ? (
-                <UsagePanel compact reportsPlanUsage={agent.capabilities.planUsage} planUsage={live.detail?.meta.planUsage ?? []} inputTokens={tokens.input} outputTokens={tokens.output} now={now} />
-              ) : null}
-              {drafts.listing ? <PlanDrafts dir={drafts.listing.dir} plans={drafts.listing.plans} launching={launching} error={launchError} onLaunch={(plan) => void launch(plan)} /> : null}
-              {continueCommand ? <CopyCommand command={continueCommand} /> : null}
-            </aside>
+            {side}
             {live.error ? (
               <p className="claude-panel__error" role="alert">
                 {live.error}

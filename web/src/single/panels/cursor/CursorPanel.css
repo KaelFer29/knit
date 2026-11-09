@@ -141,21 +141,34 @@
 
 /* Before any task: what will show up, with Cursor's mark. */
 .cursor-panel__idle {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-7) var(--space-4);
+  min-height: min(38rem, 72vh);
+  padding: var(--space-6) var(--space-4);
+  overflow: hidden;
   text-align: center;
 }
 
-.cursor-panel__idle-mark {
-  width: 3rem;
-  height: 3rem;
-  padding: 0.7rem;
-  border-radius: var(--radius-xl);
-  background: var(--cursor-bg);
-  color: var(--cursor-ink);
+/* Cursor's logo, large and faint, centered behind the text so it never gets in the way of reading. */
+.cursor-panel__idle-art {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(26rem, 80%);
+  height: auto;
+  aspect-ratio: 1;
+  opacity: 0.05;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  color: var(--cursor-bg);
+}
+
+.cursor-panel__idle > :not(.cursor-panel__idle-art) {
+  position: relative;
 }
 
 .cursor-panel__idle-title {
@@ -179,6 +192,7 @@
   padding: var(--space-3) var(--space-5);
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-1) 75%, transparent);
   color: var(--text-muted);
   font-size: var(--text-sm);
   list-style: none;

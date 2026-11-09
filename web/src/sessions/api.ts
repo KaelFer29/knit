@@ -1,5 +1,5 @@
 import { apiGet, apiPost } from "../api/client";
-import type { AgentView, Profile, SessionDetail, SessionEvent, SessionListEntry } from "./types";
+import type { AgentView, PlanUsageReading, Profile, SessionDetail, SessionEvent, SessionListEntry } from "./types";
 
 const EVENTS_PAGE = 2000;
 
@@ -47,4 +47,9 @@ export async function startSession(request: { agent: string; cwd: string; prompt
 
 export async function sendTurn(sessionId: string, prompt: string, profile: Profile): Promise<void> {
   await apiPost(`/api/sessions/${encodeURIComponent(sessionId)}/turns`, { prompt, profile });
+}
+
+/** The person's plan windows now, read by the server from the agent's own usage command (cached a few seconds). */
+export function fetchPlanUsage(agent: string): Promise<PlanUsageReading> {
+  return apiGet<PlanUsageReading>(`/api/agents/${encodeURIComponent(agent)}/usage`);
 }

@@ -20,6 +20,21 @@ const replay = (file) => {
   }
 };
 
+// `/usage` asked in print mode with JSON output: a local command, answered at once with no model call.
+if (prompt === "/usage" && argv.includes("--no-session-persistence") && argv.includes("json")) {
+  const result = [
+    "You are currently using your subscription to power your Claude Code usage",
+    "",
+    "Current session: 36% used · resets Nov 9, 3:10am (America/Santiago)",
+    "Current week (all models): 50% used · resets Nov 12, 1am (America/Santiago)",
+    "",
+    "Last 24h · 1765 requests · 9 sessions",
+    "  89%  Give \"general-purpose\" subagents a cheaper model",
+  ].join("\n");
+  process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false, local_command: "usage", total_cost_usd: 0, result }));
+  process.exit(0);
+}
+
 const init = { type: "system", subtype: "init", session_id: "sess-claude-1", model: "claude-haiku-5-5", argv, cwd: process.cwd() };
 
 if (mode === "ok") replay("stream-tools.jsonl");

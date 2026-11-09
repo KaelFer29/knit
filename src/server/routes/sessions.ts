@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import type { AgentPlanUsage, AgentProfile } from "../../core/ports/agent-runner.js";
+import type { AgentPlanUsage, AgentProfile, PlanWindow } from "../../core/ports/agent-runner.js";
 import type { SessionListItem, SessionReader } from "../../core/ports/session-reader.js";
 import type { SessionRecord, StoredSessionEvent, TurnRecord } from "../../core/ports/session-store.js";
 import { HttpError, sendJson } from "../http.js";
@@ -189,6 +189,9 @@ function sessionView(item: SessionListItem): SessionListItem {
  * Chat sessions for the interface. Reads go through the `SessionReader` port; a turn starts by spawning `knit chat`
  * through the control spawner, so the server never writes the database. Every POST passes the security guard first.
  */
+/** How long a plan usage answer is reused before the agent is asked again. */
+const USAGE_CACHE_MS = 30_000;
+
 export const sessionsRoutes: RouteModule = ({ control, pollIntervalMs }) => {
   const sessions: SessionsDeps | undefined = control?.sessions;
   const pollMs = Math.min(pollIntervalMs, 100);
@@ -209,6 +212,9 @@ export const sessionsRoutes: RouteModule = ({ control, pollIntervalMs }) => {
     if (!session) throw new HttpError(404, `Session not found: ${id}`);
     return session;
   };
+
+  const usageCache = new Map<string, { at: number; body: { windows: PlanWindow[]; checkedAt: string } }>();
+  const usageReads = new Map<string, Promise<PlanWindow[]>>();
 
   return [
     {
@@ -231,6 +237,30 @@ export const sessionsRoutes: RouteModule = ({ control, pollIntervalMs }) => {
           }
         }
         sendJson(res, 200, { models });
+      },
+    },
+    {
+      method: "GET",
+      pattern: "/api/agents/:agent/usage",
+      // The person's plan windows, read from the agent's own usage command (a local command: no model call). Answers
+      // are kept for USAGE_CACHE_MS so pages that poll do not start a process each time; one read runs at a time.
+      handler: async ({ res, params }) => {
+        const agent = agentOf(params.agent!);
+        if (!agent.readPlanUsage) return sendJson(res, 200, { windows: [] });
+        const cached = usageCache.get(agent.id);
+        if (cached && Date.now() - cached.at < USAGE_CACHE_MS) return sendJson(res, 200, cached.body);
+        let pending = usageReads.get(agent.id);
+        if (!pending) {
+          pending = agent.readPlanUsage().finally(() => usageReads.delete(agent.id));
+          usageReads.set(agent.id, pending);
+        }
+        try {
+          const body = { windows: await pending, checkedAt: new Date().toISOString() };
+          usageCache.set(agent.id, { at: Date.now(), body });
+          sendJson(res, 200, body);
+        } catch (err) {
+          throw new HttpError(502, err instanceof Error ? err.message : String(err));
+        }
       },
     },
     {

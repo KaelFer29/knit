@@ -30,7 +30,7 @@ export function Logo({ identity, size }: Props) {
   } as CSSProperties;
 
   return (
-    <span className="logo" data-state={state} data-monochrome={identity.monochrome ? "true" : undefined} style={style} aria-hidden="true">
+    <span className="logo" data-state={state} data-monochrome={identity.monochrome ? "true" : undefined} data-tile={identity.logoTile ? "true" : undefined} style={style} aria-hidden="true">
       {state === "mark" ? <KnitMark /> : null}
       {url !== undefined && state !== "fallback" ? (
         <img className="logo__img" src={url} alt="" onLoad={() => setOutcome({ url, state: "ready" })} onError={() => setOutcome({ url, state: "fallback" })} />

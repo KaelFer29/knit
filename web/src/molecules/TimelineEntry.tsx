@@ -2,6 +2,12 @@ import { formatDuration, formatTokens } from "../flow/format";
 import type { TimelineItem } from "../sessions/timeline";
 import "./TimelineEntry.css";
 
+/** `10:42` in the reader's locale, or nothing for a date that cannot be read. */
+function clock(iso: string): string {
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime()) ? "" : at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 /**
  * One entry of the shared timeline. Every agent's session renders through this: messages, reasoning (or the note that
  * the agent does not share it), tool calls with arguments and result, and the closing result with its tokens.
@@ -11,18 +17,20 @@ export function TimelineEntry({ item }: { item: TimelineItem }) {
   switch (item.type) {
     case "prompt":
       return (
-        <div className="tl-entry tl-entry--prompt">
-          <div className="tl-entry__meta">
-            You · turn {item.seq}
-            {item.model ? ` · ${item.model}` : ""}
-          </div>
+        <div className="tl-entry tl-entry--prompt" data-side="me">
+          <span className="sr-only">You said: </span>
           <p className="tl-entry__text">{item.text}</p>
+          <span className="tl-entry__time">
+            {item.model ? `${item.model} · ` : ""}
+            {clock(item.at)}
+          </span>
         </div>
       );
     case "message":
       return (
-        <div className="tl-entry tl-entry--message">
+        <div className="tl-entry tl-entry--message" data-side="agent">
           <p className="tl-entry__text">{item.text}</p>
+          <span className="tl-entry__time">{clock(item.at)}</span>
         </div>
       );
     case "thinking":
@@ -58,7 +66,7 @@ export function TimelineEntry({ item }: { item: TimelineItem }) {
     case "result": {
       const tokens = (item.inputTokens ?? 0) + (item.outputTokens ?? 0);
       return (
-        <div className="tl-entry tl-entry--result" data-state={item.isError ? "failed" : "done"}>
+        <div className="tl-entry tl-entry--result" data-side="agent" data-state={item.isError ? "failed" : "done"}>
           <div className="tl-entry__meta">
             {item.isError ? "Turn failed" : "Turn finished"}
             {item.durationMs !== undefined ? ` · ${formatDuration(item.durationMs)}` : ""}

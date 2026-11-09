@@ -65,8 +65,8 @@ export function BlockCard({ identity, view, details, stages, open, onOpen }: Pro
         {identity.skin === "terminal" ? (
           <>
             <div className="block__bar">
-              <span className="claude__spark" aria-hidden="true">
-                ✻
+              <span className="claude__spark">
+                <Logo identity={identity} size={22} />
               </span>
               <span className="block__who">
                 <span className="block__name">{identity.label}</span>
@@ -116,7 +116,7 @@ export function BlockCard({ identity, view, details, stages, open, onOpen }: Pro
         ) : (
           <>
             <div className="block__bar">
-              <Logo identity={identity} size={20} />
+              <Logo identity={identity} size={26} />
               <span className="block__who">
                 <span className="block__name">{identity.label}</span>
                 <span className="cursor__mode" aria-hidden="true">

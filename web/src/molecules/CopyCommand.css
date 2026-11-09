@@ -46,3 +46,36 @@
 .copy-command__button:hover {
   background: var(--surface-2);
 }
+
+/* The compact card used beside a conversation. */
+.copy-command--compact {
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--claude-line);
+  border-radius: var(--radius-lg);
+  background: var(--claude-paper);
+  box-shadow: var(--shadow-sm);
+}
+
+.copy-command--compact .copy-command__label {
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.copy-command--compact .copy-command__code {
+  overflow: hidden;
+  border: 0;
+  background: var(--claude-term-bg);
+  color: var(--claude-term-fg);
+  text-overflow: ellipsis;
+}
+
+.copy-command--compact .copy-command__code > span {
+  color: var(--agent-claude);
+}
+
+.copy-command__note {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}

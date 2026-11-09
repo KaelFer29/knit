@@ -64,6 +64,15 @@ export interface AgentCapabilities {
   planUsage: boolean;
 }
 
+/** One window of the person's plan as the agent's own usage command reports it, for example "Current session". */
+export interface PlanWindow {
+  label: string;
+  /** 0 to 100. */
+  percent: number;
+  /** When the window resets, as the agent wrote it (for example "Nov 9, 3:10am (America/Santiago)"). */
+  resets?: string;
+}
+
 export interface AgentRunner {
   /** Short identifier stored with every timeline entry, for example `cursor`. */
   readonly name?: string;
@@ -75,6 +84,11 @@ export interface AgentRunner {
    * and the picker falls back to free text. Resolves to an empty list when the agent cannot be asked; never rejects.
    */
   listModels?(): Promise<string[]>;
+  /**
+   * The plan windows right now, read from the agent's own usage command without a model call and without keeping a
+   * session. Optional: only agents that report plan usage implement it. Rejects when the agent cannot be asked.
+   */
+  readPlanUsage?(): Promise<PlanWindow[]>;
 }
 
 export const NO_CAPABILITIES: AgentCapabilities = {

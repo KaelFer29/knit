@@ -9,7 +9,12 @@ const ev = (kind: string, payload: unknown, turnId = 1): SessionEvent => ({ id: 
 describe("buildTimeline", () => {
   it("starts every turn with its prompt and the model it was run with", () => {
     const items = buildTimeline([turn({ profile: { model: "opus" } })], []);
-    expect(items).toEqual([{ type: "prompt", key: "turn-1", seq: 1, text: "do it", model: "opus" }]);
+    expect(items).toEqual([{ type: "prompt", key: "turn-1", seq: 1, text: "do it", model: "opus", at: "t" }]);
+  });
+
+  it("dates the prompt by its turn and a message by its event, so the page can show when each was said", () => {
+    const items = buildTimeline([turn({ startedAt: "2026-11-09T10:00:00Z" })], [{ ...ev("message", { text: "hi" }), ts: "2026-11-09T10:00:05Z" }]);
+    expect(items.map((i) => ("at" in i ? i.at : undefined))).toEqual(["2026-11-09T10:00:00Z", "2026-11-09T10:00:05Z"]);
   });
 
   it("pairs a tool call with its result by call id and keeps arguments as text", () => {

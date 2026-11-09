@@ -59,6 +59,7 @@ function stubFetch(): void {
         return url === "/api/sessions" ? json({ sessionId: "chat-new" }, 202) : json({ sessionId: "a1" }, 202);
       }
       if (url === "/api/agents") return json({ agents: AGENTS, cwd: "/work/repo" });
+      if (url === "/api/agents/alpha/usage") return json({ windows: [{ label: "Current session", percent: 36, resets: "Nov 9, 3:10am" }], checkedAt: NOW_ISO });
       if (url === "/api/agents/alpha/models") return json({ models: ["alpha-fast", "alpha-deep"] });
       if (url === "/api/sessions") return json({ sessions: [...(posted.some((p) => p.url === "/api/sessions") ? [entry("chat-new", "alpha")] : []), entry("a1", "alpha"), entry("a2", "alpha"), entry("b1", "beta")] });
       const events = /^\/api\/sessions\/([^/]+)\/events/.exec(url);
@@ -87,6 +88,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("ClaudePanel: an open session", () => {
+  it("draws the conversation as chat bubbles: yours on the right with the time, Claude's on the left, no turn labels", async () => {
+    render(panel());
+    await screen.findByText("<b>Here is the plan</b>");
+    const mine = screen.getByText("Plan the board").closest(".tl-entry")!;
+    expect(mine.getAttribute("data-side")).toBe("me");
+    expect(mine.textContent).toContain(new Date(NOW_ISO).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    expect(screen.queryByText(/You · turn/)).toBeNull();
+    expect(screen.getByText("<b>Here is the plan</b>").closest(".tl-entry")!.getAttribute("data-side")).toBe("agent");
+  });
+
   it("lists the sessions and shows the open one's timeline as text, with the reasoning note", async () => {
     render(panel());
     await screen.findByText("<b>Here is the plan</b>");
@@ -99,8 +110,8 @@ describe("ClaudePanel: an open session", () => {
   it("shows the terminal command and the plan usage of an agent that declares them", async () => {
     render(panel());
     await screen.findByText("cd '/repo' && alpha --resume agent-sess-1");
-    expect(screen.getByRole("progressbar", { name: "5-hour window" }).getAttribute("aria-valuenow")).toBe("40");
-    expect(screen.getByText("1.2k")).toBeTruthy();
+    expect((await screen.findByRole("meter", { name: "Current session" })).getAttribute("aria-valuenow")).toBe("36");
+    expect(screen.getByText("1.2k tokens in this conversation")).toBeTruthy();
   });
 
   it("offers the agent's own commands and the capability-gated Knit commands in the palette", async () => {
@@ -114,7 +125,8 @@ describe("ClaudePanel: an open session", () => {
 
   it("an agent without those capabilities gets no model picker, no /usage and no terminal command", async () => {
     render(<ClaudePanel {...PROPS} agentId="beta" />);
-    await screen.findByText("This agent does not report plan usage.");
+    await screen.findByText("Plan the board");
+    expect(screen.queryByRole("region", { name: "Plan usage" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Model and effort" })).toBeNull();
     expect(screen.queryByText("Continue in terminal")).toBeNull();
     // It cannot resume, so continuing here is not offered either.
@@ -150,7 +162,7 @@ describe("ClaudePanel: an open session", () => {
     });
     render(panel());
     await screen.findByText("A turn is running…");
-    expect(screen.getByRole("status", { name: "" }) ?? true).toBeTruthy();
+    expect(screen.getByText(/Claude is working/)).toBeTruthy();
     expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
   });
 

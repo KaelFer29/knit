@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import type { BoardModel, TaskView } from "@board";
-import { PointerMark } from "../../../atoms/PointerMark";
+import { BrandArt } from "../../../atoms/BrandArt";
+import { AGENTS } from "../../../identity/agents";
 import { StatusBadge } from "../../../atoms/StatusBadge";
 import { FilesView } from "../../../containers/FilesView";
 import { demoFilesApi } from "../../../files/demo";
@@ -37,7 +38,7 @@ function Primary({ task, label, renderDetail }: { task: TaskView; label: string;
 function Waiting() {
   return (
     <section className="cursor-panel__idle" aria-label="Cursor is idle">
-      <PointerMark className="cursor-panel__idle-mark" />
+      <BrandArt identity={AGENTS.cursor} className="cursor-panel__idle-art" />
       <h3 className="cursor-panel__idle-title">Waiting for a task</h3>
       <p className="cursor-panel__idle-text">Cursor is the hands of the workflow: it works when the orchestrator hands it one. You do not write to it; you watch it.</p>
       <ul className="cursor-panel__idle-list" aria-label="What will appear here">

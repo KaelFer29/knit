@@ -147,6 +147,18 @@ describe("session routes", () => {
     expect((await call("/api/agents/nope/models")).status).toBe(404);
   });
 
+  it("reads the plan usage of an agent that reports it, and none for one that does not", async () => {
+    await launch();
+    const claude = (await call("/api/agents/claude/usage")).json();
+    expect(claude.windows.map((w: any) => [w.label, w.percent])).toEqual([
+      ["Current session", 36],
+      ["Current week (all models)", 50],
+    ]);
+    expect(typeof claude.checkedAt).toBe("string");
+    expect((await call("/api/agents/cursor/usage")).json().windows).toEqual([]);
+    expect((await call("/api/agents/nope/usage")).status).toBe(404);
+  });
+
   it("answers empty lists and 404s before any session exists", async () => {
     await launch();
     expect((await call("/api/sessions")).json()).toEqual({ sessions: [] });

@@ -4,7 +4,7 @@ import type { PlanDrafts } from "../core/ports/plan-drafts.js";
 import type { RunReader } from "../core/ports/run-reader.js";
 import type { TaskDiff } from "../core/ports/task-diff.js";
 import type { FileActivity } from "../core/ports/file-activity.js";
-import type { AgentCapabilities } from "../core/ports/agent-runner.js";
+import type { AgentCapabilities, PlanWindow } from "../core/ports/agent-runner.js";
 import type { SessionReader } from "../core/ports/session-reader.js";
 
 export type Method = "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -96,6 +96,8 @@ export interface AgentInfo {
   profileFields: ProfileField[];
   /** Model ids for the picker; resolves to an empty list when the agent cannot be asked. */
   listModels?: () => Promise<string[]>;
+  /** The plan windows now, from the agent's own usage command (no model call); absent for agents that do not report them. */
+  readPlanUsage?: () => Promise<PlanWindow[]>;
   /** The terminal command that continues the agent's own session (for example `claude --resume <id>`). */
   resumeCommand: (agentSessionId: string) => string;
 }

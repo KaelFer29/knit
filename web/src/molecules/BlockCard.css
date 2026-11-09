@@ -220,12 +220,17 @@
 }
 
 .claude__spark {
+  display: inline-flex;
   color: var(--agent-claude);
-  font-size: 1.15rem;
   line-height: 1;
 }
 
-.block[data-status="working"] .claude__spark {
+.claude__spark .logo {
+  background: none;
+}
+
+.block[data-status="working"] .claude__spark .logo__img,
+.block[data-status="working"] .claude__spark .logo__monogram {
   animation: spark-spin 4s linear infinite;
 }
 
@@ -458,9 +463,6 @@
   color: var(--cursor-ink);
 }
 
-.block[data-skin="editor"] .logo[data-monochrome="true"] .logo__img {
-  filter: invert(1);
-}
 
 .cursor__mode {
   padding: 0.05rem var(--space-2);
@@ -718,7 +720,8 @@
   .block__mascot,
   .block__chevron,
   .block__sheet,
-  .claude__spark,
+  .claude__spark .logo__img,
+  .claude__spark .logo__monogram,
   .claude__glyph::before,
   .pipe__dot {
     transition: none;
