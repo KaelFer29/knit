@@ -71,7 +71,7 @@ describe("SingleView", () => {
     expect((await screen.findAllByText("newest-plan")).length).toBeGreaterThan(0);
   });
 
-  it("opens a side panel from a block, keeps the pipeline, closes on Escape and returns the focus", async () => {
+  it("opens a modal from a block over the pipeline, closes on Escape and returns the focus", async () => {
     const user = userEvent.setup();
     render(<SingleView search="?fixture=runningRun" />);
     const block = screen.getByRole("button", { name: "Open Cursor" });
@@ -83,6 +83,40 @@ describe("SingleView", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(block);
+  });
+
+  it("is a real modal: it says so, closes on a click outside it and not on a click inside it", async () => {
+    const user = userEvent.setup();
+    render(<SingleView search="?fixture=runningRun" />);
+    await user.click(screen.getByRole("button", { name: "Open Claude" }));
+    const dialog = screen.getByRole("dialog", { name: "Claude" });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    await user.click(within(dialog).getByRole("heading", { name: "Claude" }));
+    expect(screen.getByRole("dialog", { name: "Claude" })).toBeTruthy();
+    await user.click(screen.getByTestId("modal-backdrop"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("keeps the Tab key inside the modal", async () => {
+    const user = userEvent.setup();
+    render(<SingleView search="?fixture=runningRun" />);
+    await user.click(screen.getByRole("button", { name: "Open Cursor" }));
+    const dialog = screen.getByRole("dialog", { name: "Cursor" });
+    for (let i = 0; i < 40; i++) {
+      await user.tab();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    }
+    for (let i = 0; i < 40; i++) {
+      await user.tab({ shift: true });
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    }
+  });
+
+  it("wears the identity of the block that opened it", async () => {
+    const user = userEvent.setup();
+    render(<SingleView search="?fixture=runningRun" />);
+    await user.click(screen.getByRole("button", { name: "Open Orchestrator" }));
+    expect(screen.getByRole("dialog", { name: "Orchestrator" }).getAttribute("data-agent")).toBe("knit");
   });
 
   it("opens the panel with Enter and closes it with its button", async () => {

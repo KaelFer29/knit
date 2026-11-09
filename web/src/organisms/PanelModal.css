@@ -1,0 +1,152 @@
+/* A modal over the single view: a dimmed, blurred backdrop and a dialog that grows from the block that opened it. */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--surface-0) 55%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: modal-fade var(--duration-base) var(--ease-out);
+}
+
+.modal__dialog {
+  --accent: var(--modal-accent, var(--text));
+  display: flex;
+  flex-direction: column;
+  width: min(64rem, 100%);
+  height: min(46rem, 100%);
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-lg), 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--text);
+  transform-origin: var(--origin-x, 50%) var(--origin-y, 50%);
+  animation: modal-grow var(--duration-slow) var(--ease-out);
+}
+
+.modal__dialog:focus {
+  outline: none;
+}
+
+.modal__dialog:focus-visible {
+  outline: 2px solid var(--focus);
+}
+
+.modal__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%), var(--surface-1);
+}
+
+.modal__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.modal__tagline {
+  flex: 1;
+  text-align: left;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.modal__close {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.modal__close:hover {
+  background: var(--surface-3);
+}
+
+/* Claude's modal is its ivory surface; Cursor's is its dark panel. */
+.modal__dialog[data-skin="terminal"] {
+  --surface-1: var(--claude-ivory);
+  border-color: var(--claude-line);
+}
+
+.modal__dialog[data-skin="terminal"] .modal__title {
+  font-family: var(--font-serif);
+  font-weight: 500;
+}
+
+/* Cursor's panel is dark in both themes: its contents read the same tokens, so they are redefined here. */
+.modal__dialog[data-skin="editor"] {
+  --surface-0: var(--cursor-bar);
+  --surface-1: var(--cursor-bg);
+  --surface-2: var(--cursor-chip);
+  --surface-3: #303030;
+  --border: var(--cursor-line);
+  --text: var(--cursor-ink);
+  --text-muted: var(--cursor-muted);
+  --text-faint: #6f6f6f;
+  --focus: #7aa7f5;
+  border-color: var(--cursor-line);
+  color-scheme: dark;
+}
+
+.modal__dialog[data-skin="editor"] .modal__head {
+  background: var(--cursor-bar);
+}
+
+.modal__body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4);
+  overflow: auto;
+}
+
+@keyframes modal-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-grow {
+  from {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal,
+  .modal__dialog {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .modal {
+    padding: 0;
+  }
+
+  .modal__dialog {
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .modal__close-text {
+    display: none;
+  }
+}

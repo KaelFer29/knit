@@ -3,12 +3,12 @@ import { ALL_FIXTURES } from "../fixtures/boards";
 import { fixtureDetailSource } from "../fixtures/detail";
 import { createApiDetailSource } from "../detail/apiSource";
 import { parseFlowParams } from "../flow/params";
-import { AGENT_ORDER, type AgentId } from "../identity/agents";
+import { AGENTS, AGENT_ORDER, type AgentId } from "../identity/agents";
 import { useBoard } from "../live/useBoard";
 import { LiveStatus } from "../molecules/LiveStatus";
 import { AppShell } from "../organisms/AppShell";
 import { PipelineStage } from "../organisms/PipelineStage";
-import { SidePanel } from "../organisms/SidePanel";
+import { PanelModal } from "../organisms/PanelModal";
 import { runsHash, useRoute } from "../route";
 import { useRuns } from "../runs/useRuns";
 import { deriveBlocks, deriveDetails, deriveHops, deriveStages } from "../single/pipeline";
@@ -27,7 +27,7 @@ interface Props {
 /**
  * Container: the one view of the app. It picks the run to show (`#/runs/<id>` or `?run=<id>`, else the most recent
  * run; `?fixture=` and `?demo=1` show a built-in sample), follows it live, derives the blocks and the pipeline from
- * it and from the latest Claude session, and opens the side panel the person asks for.
+ * it and from the latest Claude session, and opens the modal the person asks for.
  */
 export function SingleView({ search = window.location.search, actions }: Props) {
   const params = parseFlowParams(search);
@@ -67,15 +67,15 @@ export function SingleView({ search = window.location.search, actions }: Props) 
 
   return (
     <AppShell label="Knit pipeline" actions={<>{configButton}{actions}</>}>
-      <div className="single" data-panel-open={open !== undefined}>
+      <div className="single">
         <section className="single__stage" aria-label="Claude, orchestrator and Cursor pipeline">
           {runId !== undefined ? <LiveStatus connection={live.connection} error={live.error} /> : null}
           <PipelineStage blocks={blocks} details={details} hops={hops} stages={stages} openId={open !== undefined && (AGENT_ORDER as readonly string[]).includes(open) ? (open as AgentId) : undefined} onOpen={toggle} />
         </section>
         {Panel === undefined || open === undefined ? null : (
-          <SidePanel key={open} panelId={open} title={Panel.title} onClose={() => setOpen(undefined)}>
+          <PanelModal key={open} panelId={open} title={Panel.title} identity={(AGENT_ORDER as readonly string[]).includes(open) ? AGENTS[open as AgentId] : undefined} onClose={() => setOpen(undefined)}>
             <Panel.Component board={board} runId={runId} live={runId !== undefined} renderDetail={renderDetail} selectRun={selectRun} />
-          </SidePanel>
+          </PanelModal>
         )}
       </div>
     </AppShell>
