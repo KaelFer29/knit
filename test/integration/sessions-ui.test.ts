@@ -39,6 +39,7 @@ afterEach(async () => {
 
 const emptyRunReader: RunReader = {
   listRuns: () => [],
+  searchRuns: () => ({ items: [], total: 0 }),
   getRunSnapshot: () => undefined,
   getRun: () => undefined,
   getLatestAgentEvents: () => [],

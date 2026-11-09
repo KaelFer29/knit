@@ -1,5 +1,5 @@
 import { buildBoard } from "../../core/board/index.js";
-import type { RunReader, RunSnapshot } from "../../core/ports/run-reader.js";
+import type { RunReader, RunSearch, RunSnapshot } from "../../core/ports/run-reader.js";
 import { HttpError, sendJson } from "../http.js";
 import type { RouteModule } from "../types.js";
 
@@ -24,11 +24,38 @@ function openAttemptWindow(snapshot: RunSnapshot): { taskId: string; attempt: nu
 }
 
 /** Read routes for runs: list, snapshot with its board, and the timeline of one attempt. */
+const DEFAULT_PAGE = 50;
+const MAX_PAGE = 200;
+const STATUSES = ["running", "passed", "failed"] as const;
+
+/** Reads `?limit=&offset=&q=&status=` of the runs list; anything that makes no sense is a 400 before the database is touched. */
+function parseRunSearch(url: URL): RunSearch {
+  const whole = (name: string, fallback: number, min: number, max: number): number => {
+    const raw = url.searchParams.get(name);
+    if (raw === null) return fallback;
+    const n = Number(raw);
+    if (!/^\d+$/.test(raw) || !Number.isSafeInteger(n) || n < min || n > max) throw new HttpError(400, `${name} must be a whole number from ${min} to ${max}`);
+    return n;
+  };
+  const status = url.searchParams.get("status");
+  if (status !== null && !(STATUSES as readonly string[]).includes(status)) throw new HttpError(400, `status must be one of: ${STATUSES.join(", ")}`);
+  const text = url.searchParams.get("q")?.trim().slice(0, 200);
+  return {
+    limit: whole("limit", DEFAULT_PAGE, 1, MAX_PAGE),
+    offset: whole("offset", 0, 0, Number.MAX_SAFE_INTEGER),
+    ...(text ? { text } : {}),
+    ...(status === null ? {} : { status: status as (typeof STATUSES)[number] }),
+  };
+}
+
 export const runsRoutes: RouteModule = ({ reader, now }) => [
   {
     method: "GET",
     pattern: "/api/runs",
-    handler: ({ res }) => sendJson(res, 200, { runs: reader.listRuns() }),
+    handler: ({ res, url }) => {
+      const page = reader.searchRuns(parseRunSearch(url));
+      sendJson(res, 200, { runs: page.items, total: page.total });
+    },
   },
   {
     method: "GET",

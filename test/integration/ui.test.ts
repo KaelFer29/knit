@@ -196,6 +196,49 @@ describe("HTTP API", () => {
     expect(runs[1].taskCounts).toMatchObject({ total: 2, running: 1, pending: 1 });
   });
 
+  describe("GET /api/runs pages", () => {
+    function seedMany(n: number): void {
+      for (let i = 1; i <= n; i++) {
+        const id = `page-${String(i).padStart(2, "0")}`;
+        store.createRun({ ...RUN, id, planName: i === 3 ? "billing webhooks" : `plan ${i}`, startedAt: `2026-11-08T10:${String(i).padStart(2, "0")}:00.000Z` });
+        store.finishRun(id, i % 2 === 0 ? "failed" : "passed", `2026-11-08T11:${String(i).padStart(2, "0")}:00.000Z`);
+      }
+    }
+
+    it("returns one page of runs and the total of all that match", async () => {
+      seedMany(7);
+      const server = await launch();
+      const body = (await request(server, "/api/runs?limit=3&offset=2")).json();
+      expect(body.runs.map((r: any) => r.run.id)).toEqual(["page-05", "page-04", "page-03"]);
+      expect(body.total).toBe(7);
+    });
+
+    it("filters by status and by words in the plan name or the id, on the server", async () => {
+      seedMany(7);
+      const server = await launch();
+      const failed = (await request(server, "/api/runs?status=failed")).json();
+      expect(failed.runs.map((r: any) => r.run.id)).toEqual(["page-06", "page-04", "page-02"]);
+      expect(failed.total).toBe(3);
+      const found = (await request(server, `/api/runs?q=${encodeURIComponent("billing page-03")}`)).json();
+      expect(found.runs.map((r: any) => r.run.id)).toEqual(["page-03"]);
+    });
+
+    it("sends a default page when no limit is asked for, with the total", async () => {
+      seedMany(3);
+      const body = (await request(await launch(), "/api/runs")).json();
+      expect(body.runs).toHaveLength(3);
+      expect(body.total).toBe(3);
+    });
+
+    it("refuses a limit, an offset or a status that make no sense, without reading anything", async () => {
+      seedMany(2);
+      const server = await launch();
+      for (const query of ["limit=0", "limit=abc", "limit=201", "limit=1.5", "offset=-1", "offset=x", "status=bogus"]) {
+        expect((await request(server, `/api/runs?${query}`)).status, query).toBe(400);
+      }
+    });
+  });
+
   it("returns the snapshot of a run with its board", async () => {
     seedRun();
     const server = await launch();
@@ -601,6 +644,7 @@ describe("live stream (SSE)", () => {
     const counting: RunReader = {
       ...inner,
       listRuns: () => inner.listRuns(),
+      searchRuns: (search) => inner.searchRuns(search),
       getRunSnapshot: (id) => inner.getRunSnapshot(id),
       getRun: (id) => inner.getRun(id),
       getLatestAgentEvents: (...args) => inner.getLatestAgentEvents(...args),
@@ -630,6 +674,7 @@ describe("live stream (SSE)", () => {
     let fail = 2;
     const flaky: RunReader = {
       listRuns: () => inner.listRuns(),
+      searchRuns: (search) => inner.searchRuns(search),
       getRunSnapshot: (id) => inner.getRunSnapshot(id),
       getRun: (id) => inner.getRun(id),
       getLatestAgentEvents: (...args) => inner.getLatestAgentEvents(...args),
@@ -707,7 +752,7 @@ describe("knit ui", () => {
     const empty = mkdtempSync(join(tmpdir(), "knit-ui-empty-"));
     try {
       const ui = await startUi(["--port", "0", "--data-dir", empty]);
-      expect((await get(ui.url!, "/api/runs")).body).toBe(JSON.stringify({ runs: [] }));
+      expect((await get(ui.url!, "/api/runs")).body).toBe(JSON.stringify({ runs: [], total: 0 }));
       expect((await get(ui.url!, "/api/runs/run-1")).status).toBe(404);
 
       const created = new SqliteRunStore(join(empty, "knit.db"));

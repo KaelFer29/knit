@@ -285,3 +285,60 @@ describe("SqliteRunReader", () => {
     });
   });
 });
+
+describe("SqliteRunReader.searchRuns", () => {
+  /** n runs, run-01 the oldest, each with one task and some tokens. */
+  function seedRuns(n: number, extra: (i: number) => object = () => ({})): void {
+    for (let i = 1; i <= n; i++) {
+      const id = `run-${String(i).padStart(2, "0")}`;
+      store.createRun({ ...RUN, id, planName: `plan ${i}`, startedAt: `2026-11-08T10:${String(i).padStart(2, "0")}:00.000Z`, ...extra(i) });
+      store.upsertTask({ runId: id, taskId: "T1", title: "A", status: "passed" });
+      store.recordAttempt({ ...attempt("T1", 1, { inputTokens: i, outputTokens: 1 }), runId: id });
+      store.finishRun(id, i % 2 === 0 ? "failed" : "passed", `2026-11-08T11:${String(i).padStart(2, "0")}:00.000Z`);
+    }
+  }
+
+  it("returns one page, newest first, with the total of runs that match", () => {
+    seedRuns(12);
+    const page = open().searchRuns({ limit: 5, offset: 0 });
+    expect(page.total).toBe(12);
+    expect(page.items.map((r) => r.run.id)).toEqual(["run-12", "run-11", "run-10", "run-09", "run-08"]);
+    const next = open().searchRuns({ limit: 5, offset: 10 });
+    expect(next.items.map((r) => r.run.id)).toEqual(["run-02", "run-01"]);
+    expect(next.total).toBe(12);
+  });
+
+  it("gives each run on the page its task counts and tokens, and only those", () => {
+    seedRuns(3);
+    const [first] = open().searchRuns({ limit: 1, offset: 0 }).items;
+    expect(first).toMatchObject({ run: { id: "run-03" }, taskCounts: { total: 1, passed: 1 }, inputTokens: 3, outputTokens: 1 });
+  });
+
+  it("filters by status, and the total counts only the matches", () => {
+    seedRuns(6);
+    const failed = open().searchRuns({ limit: 10, offset: 0, status: "failed" });
+    expect(failed.items.map((r) => r.run.id)).toEqual(["run-06", "run-04", "run-02"]);
+    expect(failed.total).toBe(3);
+  });
+
+  it("searches the plan name and the id, ignoring case, and treats % and _ as plain characters", () => {
+    seedRuns(3, (i) => (i === 2 ? { planName: "Login_flow 100%" } : {}));
+    expect(open().searchRuns({ limit: 10, offset: 0, text: "LOGIN" }).items.map((r) => r.run.id)).toEqual(["run-02"]);
+    expect(open().searchRuns({ limit: 10, offset: 0, text: "run-03" }).items.map((r) => r.run.id)).toEqual(["run-03"]);
+    expect(open().searchRuns({ limit: 10, offset: 0, text: "_" }).items.map((r) => r.run.id)).toEqual(["run-02"]);
+    expect(open().searchRuns({ limit: 10, offset: 0, text: "%" }).items.map((r) => r.run.id)).toEqual(["run-02"]);
+    expect(open().searchRuns({ limit: 10, offset: 0, text: "nothing like this" })).toEqual({ items: [], total: 0 });
+  });
+
+  it("needs every word of the search, in the name or the id", () => {
+    seedRuns(3, (i) => (i === 1 ? { planName: "billing webhooks" } : {}));
+    expect(open().searchRuns({ limit: 10, offset: 0, text: "billing run-01" }).total).toBe(1);
+    expect(open().searchRuns({ limit: 10, offset: 0, text: "billing run-02" }).total).toBe(0);
+  });
+
+  it("is an empty page past the end, with the real total", () => {
+    seedRuns(3);
+    expect(open().searchRuns({ limit: 5, offset: 50 })).toEqual({ items: [], total: 3 });
+  });
+});
+

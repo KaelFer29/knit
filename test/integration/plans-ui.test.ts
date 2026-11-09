@@ -48,6 +48,7 @@ async function launch(): Promise<void> {
   store.close();
   const reader: RunReader = {
     listRuns: () => runs,
+    searchRuns: () => ({ items: runs, total: runs.length }),
     getRunSnapshot: () => undefined,
     getRun: () => undefined,
     getLatestAgentEvents: () => [],

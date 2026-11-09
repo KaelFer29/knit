@@ -3,7 +3,9 @@ import type { AttemptRecord } from "../../../core/ports/run-store.js";
 import type {
   AgentEventFilter,
   RunListItem,
+  RunPage,
   RunReader,
+  RunSearch,
   RunSnapshot,
   StoredAgentEvent,
   StoredRun,
@@ -46,38 +48,69 @@ export class SqliteRunReader implements RunReader {
   listRuns(): RunListItem[] {
     return this.db.transaction((): RunListItem[] => {
       const runs = this.db.prepare(`SELECT * FROM runs ORDER BY started_at DESC, rowid DESC`).all() as Row[];
-      const counts = new Map<string, TaskCounts>();
-      const taskRows = this.db
-        .prepare(`SELECT run_id, status, COUNT(*) AS n FROM tasks GROUP BY run_id, status`)
-        .all() as { run_id: string; status: string; n: number }[];
-      for (const row of taskRows) {
-        const c = counts.get(row.run_id) ?? { total: 0, pending: 0, running: 0, passed: 0, failed: 0 };
-        c.total += row.n;
-        if (row.status === "pending" || row.status === "running" || row.status === "passed" || row.status === "failed") {
-          c[row.status] += row.n;
-        }
-        counts.set(row.run_id, c);
-      }
-      const tokens = new Map<string, { input: number; output: number }>();
-      const tokenRows = this.db
-        .prepare(
-          `SELECT run_id, COALESCE(SUM(input_tokens), 0) AS input, COALESCE(SUM(output_tokens), 0) AS output
-           FROM attempts GROUP BY run_id`,
-        )
-        .all() as { run_id: string; input: number; output: number }[];
-      for (const row of tokenRows) tokens.set(row.run_id, { input: row.input, output: row.output });
-
-      return runs.map((row) => {
-        const run = toRun(row);
-        const t = tokens.get(run.id);
-        return {
-          run,
-          taskCounts: counts.get(run.id) ?? { total: 0, pending: 0, running: 0, passed: 0, failed: 0 },
-          inputTokens: t?.input ?? 0,
-          outputTokens: t?.output ?? 0,
-        };
-      });
+      return this.summarize(runs);
     }).deferred();
+  }
+
+  searchRuns(search: RunSearch): RunPage {
+    return this.db.transaction((): RunPage => {
+      const where: string[] = [];
+      const params: (string | number)[] = [];
+      if (search.status !== undefined) {
+        where.push("status = ?");
+        params.push(search.status);
+      }
+      // Every word must be in the plan name or in the id. `%` and `_` are plain characters, not wildcards.
+      for (const word of (search.text ?? "").split(/\s+/).filter((w) => w !== "")) {
+        const like = `%${word.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+        where.push("(plan_name LIKE ? ESCAPE '\\' OR id LIKE ? ESCAPE '\\')");
+        params.push(like, like);
+      }
+      const clause = where.length === 0 ? "" : `WHERE ${where.join(" AND ")}`;
+      const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM runs ${clause}`).get(...params) as { n: number }).n;
+      const rows = this.db
+        .prepare(`SELECT * FROM runs ${clause} ORDER BY started_at DESC, rowid DESC LIMIT ? OFFSET ?`)
+        .all(...params, Math.max(0, Math.floor(search.limit)), Math.max(0, Math.floor(search.offset))) as Row[];
+      return { items: this.summarize(rows), total };
+    }).deferred();
+  }
+
+  /** The runs as list items: each with its task counts and token totals, read only for these runs. */
+  private summarize(runs: Row[]): RunListItem[] {
+    const ids = runs.map((r) => r.id as string);
+    if (ids.length === 0) return [];
+    const marks = ids.map(() => "?").join(", ");
+    const counts = new Map<string, TaskCounts>();
+    const taskRows = this.db
+      .prepare(`SELECT run_id, status, COUNT(*) AS n FROM tasks WHERE run_id IN (${marks}) GROUP BY run_id, status`)
+      .all(...ids) as { run_id: string; status: string; n: number }[];
+    for (const row of taskRows) {
+      const c = counts.get(row.run_id) ?? { total: 0, pending: 0, running: 0, passed: 0, failed: 0 };
+      c.total += row.n;
+      if (row.status === "pending" || row.status === "running" || row.status === "passed" || row.status === "failed") {
+        c[row.status] += row.n;
+      }
+      counts.set(row.run_id, c);
+    }
+    const tokens = new Map<string, { input: number; output: number }>();
+    const tokenRows = this.db
+      .prepare(
+        `SELECT run_id, COALESCE(SUM(input_tokens), 0) AS input, COALESCE(SUM(output_tokens), 0) AS output
+         FROM attempts WHERE run_id IN (${marks}) GROUP BY run_id`,
+      )
+      .all(...ids) as { run_id: string; input: number; output: number }[];
+    for (const row of tokenRows) tokens.set(row.run_id, { input: row.input, output: row.output });
+
+    return runs.map((row) => {
+      const run = toRun(row);
+      const t = tokens.get(run.id);
+      return {
+        run,
+        taskCounts: counts.get(run.id) ?? { total: 0, pending: 0, running: 0, passed: 0, failed: 0 },
+        inputTokens: t?.input ?? 0,
+        outputTokens: t?.output ?? 0,
+      };
+    });
   }
 
   getRun(runId: string): StoredRun | undefined {
