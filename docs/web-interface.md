@@ -256,6 +256,18 @@ Built in task T7. `?run=<id>` draws a real run; with no `run` the page keeps sho
 | `LiveStatus` | `web/src/molecules/LiveStatus.tsx` | One quiet line: loading, "reconnecting", or the load error. Silent while everything works |
 
 Reduced motion is handled by the canvas (static highlight instead of a travelling dot), so live pulses need nothing extra. `RunReader` gained `getRun(runId)` (the run row alone, used by the stream for its status check instead of a full snapshot) and `getLatestAgentEvents(runId, limit, { taskId?, attempt? })` (the newest rows, oldest first; `GET /api/runs/:id` reads 20 of them for the live line instead of the whole attempt).
+## Detail panels (built)
+
+Built in task T6 on top of the flow canvas: the `renderDetail` slot of every disclosure widget is filled by `containers/detailRenderer.tsx`. What a panel needs beyond the board comes from a `DetailSource` (`web/src/detail/types.ts`): `createApiDetailSource` reads the attempts' notes from the run snapshot and fetches the timeline and the diff lazily; `fixtures/detail.ts` supplies samples for the fixtures. A panel is mounted only while open, so nothing is fetched for a closed block. With `?run=<id>` the page uses the API source, fed by the snapshot that `useBoard` keeps current; without it, the fixture source.
+
+| Block | Panel |
+| --- | --- |
+| Claude | the plan text (plain text; a run recorded before schema 4 says it stored none) and the specs of every task |
+| Knit | per task and attempt: the setup command, the verdicts on checks, scope and the commit history, the feedback sent to the agent for the next attempt (derived from the failed attempt before it) and the last lines of the recorded output |
+| a task (queue, active task, or a delivered task opened from the delivery lane) | its goal, every attempt with its verdicts and the agent timeline (loaded when the attempt opens), and "Changes": the diff from `GET /api/runs/:id/tasks/:task/diff`, one expandable section per file |
+| Cursor | none of its own: its work is opened task by task |
+
+Gaps: Knit stores only the failed check's command, not its output, so the "check output" is shown for the setup command only; the retry feedback is rebuilt from the verdicts, not read from a stored prompt. The agent output, the plan and the patch always render as text (never as markup).
 
 ## HTTP API
 
@@ -269,6 +281,7 @@ Built in tasks T3 (read routes) and T8 (run control, `src/server/routes/control.
 | `GET /api/runs/:id/roots` | `{ roots }`: what the explorer may show, `repo` (the run's repository) and one entry per task that has a worktree (id is the task id) |
 | `GET /api/runs/:id/files?root=<id>&path=<dir>` | `{ root, path, entries }`: one directory level, directories first; `path` is relative and empty for the root |
 | `GET /api/runs/:id/file?root=<id>&path=<file>` | `{ root, kind, path, size, ... }`: `kind` is `text` (with `text`), `binary` or `too-large` (with `limit`, 512 KiB); bytes of binary or oversized files are never sent |
+| `GET /api/runs/:id/tasks/:task/diff` | `{ runId, taskId, startSha, commitSha?, files, moreFiles }`: what the task changed, read from its worktree between `startSha` and `commitSha` (to the worktree content while the task has no commit). Each file has `path`, `status` (`added`, `modified`, `deleted`), `binary`, `additions`, `deletions` and the `patch` hunks; a patch over 100,000 characters is left out with `truncated: true`, and at most 200 files are listed (`moreFiles`). 404 when the task has not started or its worktree is gone, 503 on a server without the diff port |
 | `GET /api/runs/:id/stream` | Server-Sent Events, see below |
 | `GET /*` | the built app from `dist/web` (or the directory the server was started with) |
 

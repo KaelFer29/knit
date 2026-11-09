@@ -3,6 +3,7 @@ import { closeSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { FsFileTree } from "../../adapters/system/file-tree.js";
+import { GitTaskDiff } from "../../adapters/vcs/git/task-diff.js";
 import { SqliteRunReader } from "../../adapters/storage/sqlite/run-reader.js";
 import { lazyRunReader, PortInUseError, startServer, type ControlDeps, type Spawner } from "../../server/index.js";
 import { UsageError } from "../errors.js";
@@ -103,7 +104,13 @@ export async function uiCommand(args: string[], io: CliIo, deps: CliDeps, env: N
 
   let server;
   try {
-    server = await startServer({ reader, port, files: new FsFileTree(), ...(control ? { control } : {}) });
+    server = await startServer({
+      reader,
+      port,
+      files: new FsFileTree(),
+      taskDiff: deps.taskDiff ?? new GitTaskDiff(),
+      ...(control ? { control } : {}),
+    });
   } catch (err) {
     reader.close();
     if (err instanceof PortInUseError) {

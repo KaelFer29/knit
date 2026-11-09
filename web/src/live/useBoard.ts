@@ -3,10 +3,11 @@ import type { BoardModel } from "@board";
 import { apiGet } from "../api/client";
 import { openRunStream, type StreamConnection, type StreamOptions } from "../api/stream";
 import type { Pulse } from "../flow/pulses";
+import type { SnapshotParts } from "../detail/apiSource";
 import { pulseForEvent } from "./pulses";
 
 /** What `GET /api/runs/:id` returns that the page needs. */
-export interface RunDetail {
+export interface RunDetail extends Partial<SnapshotParts> {
   board: BoardModel;
   lastEventId: number;
   lastAgentEventId: number;
@@ -25,10 +26,16 @@ export interface UseBoardOptions {
 
 export interface LiveBoard {
   board: BoardModel | undefined;
+  /** Parts of the last snapshot the detail panels read (plan text, attempt notes). */
+  snapshot: SnapshotParts | undefined;
   connection: StreamConnection | "idle";
   error: string | undefined;
   pulses: Pulse[];
   onPulseEnd: (id: string) => void;
+}
+
+function partsOf(detail: RunDetail): SnapshotParts | undefined {
+  return detail.run && detail.attempts && detail.events ? { run: detail.run, attempts: detail.attempts, events: detail.events } : undefined;
 }
 
 const defaultFetch = (runId: string) => apiGet<RunDetail>(`/api/runs/${encodeURIComponent(runId)}`);
@@ -41,6 +48,7 @@ const defaultFetch = (runId: string) => apiGet<RunDetail>(`/api/runs/${encodeURI
  */
 export function useBoard(runId: string | undefined, options: UseBoardOptions = {}): LiveBoard {
   const [board, setBoard] = useState<BoardModel>();
+  const [snapshot, setSnapshot] = useState<SnapshotParts>();
   const [connection, setConnection] = useState<LiveBoard["connection"]>("idle");
   const [error, setError] = useState<string>();
   const [pulses, setPulses] = useState<Pulse[]>([]);
@@ -50,6 +58,7 @@ export function useBoard(runId: string | undefined, options: UseBoardOptions = {
   useEffect(() => {
     if (runId === undefined) {
       setBoard(undefined);
+      setSnapshot(undefined);
       setConnection("idle");
       setError(undefined);
       setPulses([]);
@@ -68,6 +77,7 @@ export function useBoard(runId: string | undefined, options: UseBoardOptions = {
         (detail) => {
           if (disposed || mine !== version) return;
           setBoard(detail.board);
+          setSnapshot(partsOf(detail));
           setError(undefined);
         },
         (err: unknown) => {
@@ -88,7 +98,10 @@ export function useBoard(runId: string | undefined, options: UseBoardOptions = {
     fetchDetail(runId).then(
       (detail) => {
         if (disposed) return;
-        if (first === version) setBoard(detail.board);
+        if (first === version) {
+          setBoard(detail.board);
+          setSnapshot(partsOf(detail));
+        }
         setError(undefined);
         closeStream = openRunStream(
           runId,
@@ -132,5 +145,5 @@ export function useBoard(runId: string | undefined, options: UseBoardOptions = {
   }, [runId]);
 
   const onPulseEnd = useCallback((id: string) => setPulses((list) => list.filter((p) => p.id !== id)), []);
-  return { board, connection, error, pulses, onPulseEnd };
+  return { board, snapshot, connection, error, pulses, onPulseEnd };
 }

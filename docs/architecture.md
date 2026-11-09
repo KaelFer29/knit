@@ -22,7 +22,7 @@ src/
     storage/sqlite/  RunStore and SessionStore (read-write), RunReader (read-only); one shared schema and migration (`schema.ts`)
     storage/files/   TranscriptStore (raw JSONL)
     system/          process spawning with timeouts and group kill; ProcessControl (inspect and signal processes)
-  server/          driving adapter: HTTP API, live stream (SSE), run control, static files and the security guard of `knit ui`; receives a `RunReader` and a spawner for Knit child processes, knows nothing about SQLite or adapters
+  server/          driving adapter: HTTP API, live stream (SSE), run control, static files and the security guard of `knit ui`; receives a `RunReader`, a `TaskDiff` and a spawner for Knit child processes, knows nothing about SQLite or adapters
   cli/             command line: wires adapters into the core
     commands/        one module per command
     support/         argument parsing, paths, formatting
@@ -48,6 +48,7 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 | `PullRequests` | open pull requests | `vcs/github` |
 | `RunStore` | persist runs (with a snapshot of the plan and the pid executing them), tasks, attempts, events | `storage/sqlite` |
 | `SessionStore` | persist chat sessions (agent-agnostic), their turns (prompt, answer, tokens, profile, meta, pid) and each turn's timeline; list sessions newest first, events after an id | `storage/sqlite` |
+| `TaskDiff` | read side of a task's code change: files, counts and hunks between its start commit and its commit, in its worktree | `vcs/git` |
 | `RunReader` | read side for the web interface: runs list, snapshot of a run, events and agent events after an id, over a read-only connection that never writes or migrates | `storage/sqlite` |
 | `TranscriptStore` | keep the raw agent stream | `storage/files` |
 | `ProcessControl` | inspect and signal processes: is a pid alive, what is its command line, which process group it leads or contains, send a signal to a process or a group. Used by `knit abort`; every method is total (a gone process gives `false`/`undefined`) and pids 0 and 1 and the caller's own group are never signalled | `system` |

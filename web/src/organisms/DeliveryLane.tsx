@@ -1,4 +1,7 @@
 import type { DeliveryItem } from "@board";
+import { useId, useState } from "react";
+import type { RenderDetail } from "../flow/detail";
+import { DetailPanel } from "../molecules/DetailPanel";
 import { prLabel, safeHttpUrl, shortSha } from "../flow/format";
 import "./Lane.css";
 import "./DeliveryLane.css";
@@ -6,12 +9,16 @@ import "./DeliveryLane.css";
 interface Props {
   /** Delivered tasks in execution order. */
   items: readonly DeliveryItem[];
+  /** Fills the panel a delivered task opens (its attempts and changes). Without it the task ids are plain text. */
+  renderDetail?: RenderDetail | undefined;
 }
 
 const iconProps = { viewBox: "0 0 16 16", width: 12, height: 12, fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true, focusable: false } as const;
 
 /** Knit's output: one commit chip and one pull request chip per delivered task, as a chain. */
-export function DeliveryLane({ items }: Props) {
+export function DeliveryLane({ items, renderDetail }: Props) {
+  const panelId = useId();
+  const [openId, setOpenId] = useState<string | undefined>();
   return (
     <section className="lane delivery-lane" aria-label="Delivered tasks">
       <h3 className="lane__title">
@@ -25,7 +32,20 @@ export function DeliveryLane({ items }: Props) {
             const url = safeHttpUrl(item.prUrl);
             return (
               <li className="delivery-lane__item" key={item.taskId} title={item.title}>
-                <span className="delivery-lane__task">{item.taskId}</span>
+                {renderDetail === undefined ? (
+                  <span className="delivery-lane__task">{item.taskId}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="delivery-lane__task delivery-lane__task--button"
+                    aria-expanded={openId === item.taskId}
+                    aria-controls={openId === item.taskId ? panelId : undefined}
+                    aria-label={`${item.taskId} details`}
+                    onClick={() => setOpenId(openId === item.taskId ? undefined : item.taskId)}
+                  >
+                    {item.taskId}
+                  </button>
+                )}
                 {item.commitSha === undefined ? null : (
                   <span className="chip chip--commit" title={item.commitSha}>
                     <svg {...iconProps}>
@@ -48,6 +68,11 @@ export function DeliveryLane({ items }: Props) {
           })}
         </ol>
       )}
+      {renderDetail !== undefined && openId !== undefined ? (
+        <DetailPanel id={panelId} label={`Detail of ${openId}`}>
+          {renderDetail({ kind: "task", taskId: openId })}
+        </DetailPanel>
+      ) : null}
     </section>
   );
 }

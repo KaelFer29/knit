@@ -133,6 +133,7 @@ const deliveredTask = (position: number, taskId: string, title: string, extra: P
     title,
     state: "delivered",
     branch: `knit/${taskId.toLowerCase()}-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-$/, "")}`,
+    startSha: `${(position * 0x1d4e07 + 0x5c0de1).toString(16).slice(0, 7)}`,
     commitSha: `${(position * 0x2f3a91 + 0xa1b2c3).toString(16).slice(0, 7)}`,
     prUrl: PR(40 + position),
     attempts: [attempt(0, "passed", { startedAt: at(position * 9), durationMs: 14_000 }), attempt(1, "passed", { startedAt: at(position * 9 + 1), durationMs: 5 * MIN, inputTokens: 38_200, outputTokens: 4_900, scopeOk: true })],

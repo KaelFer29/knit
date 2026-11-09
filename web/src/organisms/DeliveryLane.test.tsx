@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { DeliveryItem } from "@board";
 import { DeliveryLane } from "./DeliveryLane";
@@ -41,5 +42,22 @@ describe("DeliveryLane", () => {
   it("shows an empty state", () => {
     render(<DeliveryLane items={[]} />);
     expect(screen.getByText(/delivered tasks will appear/i)).toBeTruthy();
+  });
+
+  it("opens the detail of a delivered task when a detail slot is given", async () => {
+    const user = userEvent.setup();
+    render(<DeliveryLane items={[item(1), item(2)]} renderDetail={(t) => (t.kind === "task" ? <p>detail of {t.taskId}</p> : null)} />);
+    expect(screen.queryByRole("region", { name: /detail of/i })).toBeNull();
+    const trigger = screen.getByRole("button", { name: "T2 details" });
+    await user.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("region", { name: "Detail of T2" }).textContent).toContain("detail of T2");
+    await user.click(trigger);
+    expect(screen.queryByRole("region", { name: /detail of/i })).toBeNull();
+  });
+
+  it("keeps task ids as plain text without a detail slot", () => {
+    render(<DeliveryLane items={[item(1)]} />);
+    expect(screen.queryByRole("button")).toBeNull();
   });
 });

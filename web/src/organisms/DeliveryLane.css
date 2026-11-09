@@ -58,3 +58,17 @@
 .chip--pr:hover {
   border-color: var(--status-delivered);
 }
+
+.delivery-lane__task--button {
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.delivery-lane__task--button:hover,
+.delivery-lane__task--button[aria-expanded="true"] {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
