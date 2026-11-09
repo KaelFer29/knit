@@ -1,17 +1,22 @@
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { BoardModel, TaskView } from "@board";
 import { BrandArt } from "../../../atoms/BrandArt";
 import { AGENTS } from "../../../identity/agents";
 import { StatusBadge } from "../../../atoms/StatusBadge";
 import type { RenderDetail } from "../../../flow/detail";
 import { formatDuration, formatTokens } from "../../../flow/format";
+import { useList } from "../../../lists/useList";
 import { Disclosure } from "../../../molecules/Disclosure";
+import { ListToolbar } from "../../../molecules/ListToolbar";
+import { Pager } from "../../../molecules/Pager";
 import type { PanelProps } from "../registry";
 import { BranchesView } from "./BranchesView";
-import { ChangedFiles } from "./ChangedFiles";
 import "./CursorPanel.css";
 
-type Tab = "agent" | "files" | "branches";
+type Tab = "agent" | "branches";
+
+const PAGE_SIZE = 8;
+const searchable = (t: TaskView): string[] => [t.taskId, t.title];
 
 function TaskHead({ task }: { task: TaskView }) {
   return (
@@ -23,10 +28,10 @@ function TaskHead({ task }: { task: TaskView }) {
   );
 }
 
-function Primary({ task, label, renderDetail }: { task: TaskView; label: string; renderDetail: RenderDetail | undefined }) {
+function Primary({ task, renderDetail }: { task: TaskView; renderDetail: RenderDetail | undefined }) {
   return (
-    <section className="cursor-panel__primary" aria-label={label} data-state={task.state}>
-      <h3 className="cursor-panel__heading">{label === "Active task" ? "Now" : "Latest"}</h3>
+    <section className="cursor-panel__primary" aria-label="Active task" data-state={task.state}>
+      <h3 className="cursor-panel__heading">Now</h3>
       <TaskHead task={task} />
       {renderDetail?.({ kind: "task", taskId: task.taskId }) ?? <p className="detail-note">Loading the task detail…</p>}
     </section>
@@ -87,15 +92,15 @@ function Summary({ board }: { board: BoardModel }) {
   );
 }
 
-/** Cursor's panel: where it is and a summary of the run, the active task and its live timeline, the history of the other tasks, in a tab only the files Cursor changed grouped by task, and in another the branches it created, which can be undone or turned into pull requests. It is watched, not written to. */
-export function CursorPanel({ board, runId, live, renderDetail, detailSource }: PanelProps) {
+/** Cursor's panel: where it is and a summary of the run, the active task open with its live timeline, and every other task as a collapsed row (newest first, paged and searchable) whose detail, with the changes it made, opens on demand; in a second tab the branches it created, which can be undone or turned into pull requests. It is watched, not written to. */
+export function CursorPanel({ board, runId, live, renderDetail }: PanelProps) {
   const [tab, setTab] = useState<Tab>("agent");
   const id = useId();
-  const primary = board === undefined ? undefined : (board.tasks.find((t) => t.taskId === board.active?.taskId) ?? board.tasks[board.tasks.length - 1]);
-  const others = board?.tasks.filter((t) => t !== primary) ?? [];
+  const primary = board?.tasks.find((t) => t.taskId === board.active?.taskId);
+  const others = useMemo(() => (board?.tasks ?? []).filter((t) => t !== primary).reverse(), [board, primary]);
+  const history = useList({ items: others, pageSize: PAGE_SIZE, fields: searchable });
   const tabs: { id: Tab; label: string }[] = [
     { id: "agent", label: "Agent" },
-    { id: "files", label: "Files" },
     { id: "branches", label: "Branches" },
   ];
   if (board === undefined) {
@@ -137,21 +142,21 @@ export function CursorPanel({ board, runId, live, renderDetail, detailSource }: 
           ) : (
             <p className="detail-note">Branches are only available for a real run. This is sample data.</p>
           )
-        ) : tab === "files" ? (
-          <ChangedFiles tasks={board.tasks} source={detailSource} />
-        ) : primary === undefined ? (
+        ) : board.tasks.length === 0 ? (
           <p className="detail-note">No task has started yet.</p>
         ) : (
           <>
-            <Primary task={primary} label={board?.active?.taskId === primary.taskId ? "Active task" : "Latest task"} renderDetail={renderDetail} />
+            {primary === undefined ? null : <Primary task={primary} renderDetail={renderDetail} />}
             {others.length === 0 ? null : (
               <section className="cursor-panel__others" aria-label="History">
-                <h3 className="cursor-panel__heading">History</h3>
-                {others.map((task) => (
+                <h3 className="cursor-panel__heading">{primary === undefined ? "Tasks" : "History"}</h3>
+                {others.length > PAGE_SIZE ? <ListToolbar label="Search tasks" query={history.query} onQuery={history.setQuery} summary={history.narrowed ? `${history.matching} of ${others.length} tasks` : undefined} /> : null}
+                {history.view.items.map((task) => (
                   <Disclosure key={task.taskId} title={<TaskHead task={task} />}>
                     {renderDetail?.({ kind: "task", taskId: task.taskId }) ?? <p className="detail-note">Loading the task detail…</p>}
                   </Disclosure>
                 ))}
+                <Pager page={history.view} onPage={history.setPage} noun="tasks" />
               </section>
             )}
           </>
