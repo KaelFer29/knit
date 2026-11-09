@@ -242,6 +242,12 @@ describe("knit branch pr", () => {
     expect(events(runId)).toContain("branch.pr_opened");
   });
 
+  it("takes a title or a body that starts with a dash when it is given as --title=... and --body=...", async () => {
+    const { runId } = await runPlan();
+    expect(await main(["branch", runId, "T1", "pr", "--title=-fix the typo", "--body=- adds the file", "--json"], capture().io, withPrs())).toBe(0);
+    expect(calls[0]).toMatchObject({ title: "-fix the typo", body: "- adds the file" });
+  });
+
   it("does not open a second one for the same task, and shows the first", async () => {
     const { runId } = await runPlan();
     await main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b"], capture().io, withPrs());

@@ -137,7 +137,8 @@ export const branchesRoutes: RouteModule = ({ reader, branches, control: control
         if (typeof title !== "string" || title.trim() === "" || /[\r\n]/.test(title) || title.length > MAX_TITLE) throw new HttpError(400, `title must be one line of at most ${MAX_TITLE} characters`);
         if (typeof text !== "string" || text.length > MAX_BODY) throw new HttpError(400, `body must be a string of at most ${MAX_BODY} characters`);
         requireTask(params.id!, params.task!);
-        await act(control, res, params.id!, params.task!, "pr", ["--title", title, "--body", text]);
+        // `--name=value`, one argument: a title or body that starts with a dash (a bullet, say) is never read as an option.
+        await act(control, res, params.id!, params.task!, "pr", [`--title=${title}`, `--body=${text}`]);
       },
     },
   ];

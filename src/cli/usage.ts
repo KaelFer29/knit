@@ -79,6 +79,7 @@ Options for branch undo:
   pr: pushes the branch to origin (never forced) and opens the pull request into the run's base branch, or into the parent
   task's branch when the task depends on another (that branch must be on origin first). Only for a task that passed, with
   commits and no pull request yet; the address is kept with the task. Checks the GitHub CLI before pushing anything.
+  A title or body that starts with a dash has to be written --title="-fix typo" and --body="- adds it", or it reads as an option.
   undo: refused (exit 1) while the run is still running, for a branch that is gone, with uncommitted changes (revert), after
   a rewritten history (reset), or when another task is stacked on the branch (reset, delete). A remote is never touched.
 

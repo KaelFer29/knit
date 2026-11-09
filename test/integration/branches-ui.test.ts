@@ -228,7 +228,16 @@ describe("POST /api/runs/:id/tasks/:task/pr-draft and /pr", () => {
     const reply = await request(await launch(), "POST", pr, { title: "Add prueba.md", body: "## Summary\n- adds it; `rm -rf /` stays text" });
     expect(reply.status).toBe(200);
     expect(reply.json()).toMatchObject({ ok: true, url: "https://example.test/pull/7" });
-    expect(calls[0]!.args).toEqual(["branch", RUN, "T1", "pr", "--title", "Add prueba.md", "--body", "## Summary\n- adds it; `rm -rf /` stays text", "--json", "--data-dir", dataDir]);
+    expect(calls[0]!.args).toEqual(["branch", RUN, "T1", "pr", "--title=Add prueba.md", "--body=## Summary\n- adds it; `rm -rf /` stays text", "--json", "--data-dir", dataDir]);
+  });
+
+  it("passes a title or a body that starts with a dash as one argument, so the command does not read it as an option", async () => {
+    seed();
+    answer = { json: { ok: true, url: "https://example.test/pull/7", base: "main", head: "docs/one" } };
+    await request(await launch(), "POST", pr, { title: "-fix the typo", body: "- adds the file\n--yes is only text" });
+    expect(calls[0]!.args).toContain("--title=-fix the typo");
+    expect(calls[0]!.args).toContain("--body=- adds the file\n--yes is only text");
+    expect(calls[0]!.args).not.toContain("--yes");
   });
 
   it("answers 409 with the reason when the command refuses", async () => {
