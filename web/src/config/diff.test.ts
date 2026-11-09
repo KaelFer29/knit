@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diffLines, isChanged, withContext } from "./diff";
+import { diffLines, isChanged, MAX_DIFF_CELLS, withContext } from "./diff";
 
 const kinds = (a: string, b: string) => diffLines(a, b).map((l) => `${l.kind}:${l.text}`);
 
@@ -59,5 +59,36 @@ describe("withContext", () => {
 
   it("does not fold anything shorter than the context", () => {
     expect(withContext(diffLines("a\nb\nc", "a\nx\nc"), 3).some((i) => i.kind === "skip")).toBe(false);
+  });
+});
+
+describe("diffLines on very large changes", () => {
+  it("falls back to replacing the changed block, still correct and fast, instead of building a huge table", () => {
+    const side = Math.ceil(Math.sqrt(MAX_DIFF_CELLS)) + 50;
+    const old = ["first", ...Array.from({ length: side }, (_, i) => `old ${i}`), "last"].join("\n");
+    const next = ["first", ...Array.from({ length: side }, (_, i) => `new ${i}`), "last"].join("\n");
+    const started = Date.now();
+    const lines = diffLines(old, next);
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(lines.filter((l) => l.kind !== "add").map((l) => l.text).join("\n")).toBe(old);
+    expect(lines.filter((l) => l.kind !== "del").map((l) => l.text).join("\n")).toBe(next);
+    expect(lines[0]).toMatchObject({ kind: "same", text: "first" });
+    expect(lines.at(-1)).toMatchObject({ kind: "same", text: "last" });
+  });
+});
+
+describe("diffLines on large files with scattered edits", () => {
+  it("reproduces both texts exactly and marks only the edited lines", () => {
+    const old = Array.from({ length: 2500 }, (_, i) => `line ${i}`);
+    const next = [...old];
+    for (let k = 0; k < 40; k++) next[k * 61] = `changed ${k}`;
+    next.splice(900, 0, "inserted a", "inserted b");
+    next.splice(1700, 3);
+    const lines = diffLines(old.join("\n"), next.join("\n"));
+    expect(lines.filter((l) => l.kind !== "add").map((l) => l.text)).toEqual(old);
+    expect(lines.filter((l) => l.kind !== "del").map((l) => l.text)).toEqual(next);
+    expect(lines.filter((l) => l.kind !== "same").length).toBeLessThan(160);
+    const same = lines.filter((l) => l.kind === "same");
+    expect(same.every((l) => l.oldNumber !== undefined && l.newNumber !== undefined)).toBe(true);
   });
 });

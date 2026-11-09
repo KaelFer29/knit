@@ -1,17 +1,18 @@
-import { closeSync, lstatSync, openSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
-import { isAbsolute, join, sep } from "node:path";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readdirSync, readSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute, join, relative as relativePath, sep } from "node:path";
 import { FileTreeError, type FileContent, type FileTree, type FileTreeEntry, type FileTreeListing } from "../../core/ports/file-tree.js";
 
 /** Largest file whose text is returned. */
 export const MAX_FILE_BYTES = 512 * 1024;
 const BINARY_SNIFF_BYTES = 8000;
-/** The version-control directory is not part of the explorer. */
+/** The version-control directory is not part of the explorer, in any letter case and at any depth. */
 const HIDDEN = ".git";
+const isHidden = (segment: string): boolean => segment.toLowerCase() === HIDDEN;
 
 function segmentsOf(path: string): string[] {
   if (path.includes("\0") || path.includes("\\") || isAbsolute(path)) throw new FileTreeError("outside", "Path is outside the root");
   const segments = path.split("/").filter((s) => s !== "" && s !== ".");
-  if (segments.includes("..") || segments[0] === HIDDEN) throw new FileTreeError("outside", "Path is outside the root");
+  if (segments.includes("..") || segments.some(isHidden)) throw new FileTreeError("outside", "Path is outside the root");
   return segments;
 }
 
@@ -31,6 +32,8 @@ function confine(root: string, path: string): { real: string; relative: string }
     throw new FileTreeError("not-found", "Path not found");
   }
   if (real !== realRoot && !real.startsWith(realRoot + sep)) throw new FileTreeError("outside", "Path is outside the root");
+  // A symlink inside the root can still lead into a version-control directory.
+  if (relativePath(realRoot, real).split(sep).some(isHidden)) throw new FileTreeError("outside", "Path is outside the root");
   return { real, relative: segments.join("/") };
 }
 
@@ -43,7 +46,7 @@ export class FsFileTree implements FileTree {
     if (!statSync(real).isDirectory()) throw new FileTreeError("not-directory", "Not a directory");
     const entries: FileTreeEntry[] = [];
     for (const name of readdirSync(real)) {
-      if (relative === "" && name === HIDDEN) continue;
+      if (isHidden(name)) continue;
       const entryPath = relative === "" ? name : `${relative}/${name}`;
       let stat;
       try {
@@ -62,13 +65,22 @@ export class FsFileTree implements FileTree {
 
   read(root: string, path: string): FileContent {
     const { real, relative } = confine(root, path);
-    const stat = statSync(real);
-    if (!stat.isFile()) throw new FileTreeError("not-file", "Not a regular file");
-    if (stat.size > this.maxBytes) return { kind: "too-large", path: relative, size: stat.size, limit: this.maxBytes };
-    const buffer = Buffer.alloc(stat.size);
-    const fd = openSync(real, "r");
-    let read = 0;
+    // Open without following a link and without blocking, then judge the open descriptor: a file swapped for a link
+    // or a FIFO after the check above is refused instead of read (or waited on).
+    let fd: number;
     try {
+      fd = openSync(real, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    } catch {
+      throw new FileTreeError("outside", "Path is outside the root");
+    }
+    let read = 0;
+    let stat;
+    let buffer: Buffer;
+    try {
+      stat = fstatSync(fd);
+      if (!stat.isFile()) throw new FileTreeError("not-file", "Not a regular file");
+      if (stat.size > this.maxBytes) return { kind: "too-large", path: relative, size: stat.size, limit: this.maxBytes };
+      buffer = Buffer.alloc(stat.size);
       while (read < buffer.length) {
         const n = readSync(fd, buffer, read, buffer.length - read, read);
         if (n === 0) break;

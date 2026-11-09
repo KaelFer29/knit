@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/client";
@@ -123,5 +123,35 @@ describe("config view", () => {
     vi.mocked(api.listConfigFiles).mockRejectedValue(new ApiError(503, "The configuration editor is not available on this server"));
     render(<ConfigView />);
     expect((await screen.findByRole("alert")).textContent).toContain("not available");
+  });
+
+  it("shows the file that was clicked last even when an earlier read answers later, and never shows old content under a new name", async () => {
+    const user = userEvent.setup();
+    const pending = new Map<string, (c: api.ConfigFileContent) => void>();
+    vi.mocked(api.readConfigFile).mockImplementation(
+      (id) =>
+        new Promise((resolve) => {
+          pending.set(id, resolve);
+        }),
+    );
+    render(<ConfigView />);
+    await user.click(await screen.findByRole("button", { name: /^CLAUDE\.md/ }));
+    await user.click(await screen.findByRole("button", { name: /ui\.mdc/ }));
+    const content = (id: string, text: string): api.ConfigFileContent => ({ id, exists: true, content: text, hash: `h-${id}`, json: false });
+    pending.get("cursor:project:rules/ui.mdc")!(content("cursor:project:rules/ui.mdc", "ui rules"));
+    expect(((await screen.findByRole("textbox", { name: /contents of/i })) as HTMLTextAreaElement).value).toBe("ui rules");
+    await act(async () => {
+      pending.get("claude:project:claude-md")!(content("claude:project:claude-md", "claude notes"));
+    });
+    expect((screen.getByRole("textbox", { name: /contents of/i }) as HTMLTextAreaElement).value).toBe("ui rules");
+  });
+
+  it("does not show the previous file's text while the next file is loading", async () => {
+    const user = userEvent.setup();
+    const box = await open(user, /^CLAUDE\.md/);
+    expect((box as HTMLTextAreaElement).value).toBe("line one\nline two");
+    vi.mocked(api.readConfigFile).mockImplementation(() => new Promise(() => {}));
+    await user.click(screen.getByRole("button", { name: /ui\.mdc/ }));
+    expect(screen.queryByRole("textbox", { name: /contents of/i })).toBeNull();
   });
 });
