@@ -1,10 +1,20 @@
 import { apiGet, apiPost } from "../api/client";
-import type { AgentView, Profile, SessionDetail, SessionEvent, SessionListEntry } from "./types";
+import type { AgentView, PlanUsageReading, Profile, SessionDetail, SessionEvent, SessionListEntry } from "./types";
 
 const EVENTS_PAGE = 2000;
 
+export interface AgentList {
+  agents: AgentView[];
+  /** Where `knit ui` was launched: the default directory of a new session. Absent when the server has no sessions. */
+  cwd?: string;
+}
+
+export async function fetchAgentList(): Promise<AgentList> {
+  return apiGet<AgentList>("/api/agents");
+}
+
 export async function fetchAgents(): Promise<AgentView[]> {
-  return (await apiGet<{ agents: AgentView[] }>("/api/agents")).agents;
+  return (await fetchAgentList()).agents;
 }
 
 export async function fetchModels(agent: string): Promise<string[]> {
@@ -37,4 +47,9 @@ export async function startSession(request: { agent: string; cwd: string; prompt
 
 export async function sendTurn(sessionId: string, prompt: string, profile: Profile): Promise<void> {
   await apiPost(`/api/sessions/${encodeURIComponent(sessionId)}/turns`, { prompt, profile });
+}
+
+/** The person's plan windows now, read by the server from the agent's own usage command (cached a few seconds). */
+export function fetchPlanUsage(agent: string): Promise<PlanUsageReading> {
+  return apiGet<PlanUsageReading>(`/api/agents/${encodeURIComponent(agent)}/usage`);
 }

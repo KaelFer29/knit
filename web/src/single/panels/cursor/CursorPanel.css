@@ -84,3 +84,141 @@
   overflow-wrap: anywhere;
   font-weight: 600;
 }
+
+/* Where Cursor is, and the numbers of the run. */
+.cursor-panel__summary {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-sm);
+}
+
+.cursor-panel__state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.cursor-panel__dot {
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.cursor-panel__state[data-working="true"] .cursor-panel__dot {
+  background: var(--status-delivered);
+  animation: cursor-pulse 1.4s ease-in-out infinite;
+}
+
+.cursor-panel__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.cursor-panel__stat dt {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cursor-panel__stat dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+/* Before any task: what will show up, with Cursor's mark. */
+.cursor-panel__idle {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: min(38rem, 72vh);
+  padding: var(--space-6) var(--space-4);
+  overflow: hidden;
+  text-align: center;
+}
+
+/* Cursor's logo, large and faint, centered behind the text so it never gets in the way of reading. */
+.cursor-panel__idle-art {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(36rem, 96%);
+  height: auto;
+  aspect-ratio: 1;
+  opacity: 0.055;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  color: var(--cursor-bg);
+}
+
+/* The text sits well inside the logo behind it, never across its edge. */
+.cursor-panel__idle-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: min(21rem, 100%);
+}
+
+.cursor-panel__idle-title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.cursor-panel__idle-text {
+  max-width: 100%;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.cursor-panel__idle-list {
+  display: grid;
+  gap: var(--space-1);
+  width: 100%;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-1) 75%, transparent);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  list-style: none;
+  text-align: left;
+}
+
+.cursor-panel__idle-list li::before {
+  content: "→ ";
+  color: var(--text-faint);
+}
+
+@keyframes cursor-pulse {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--status-delivered) 20%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-panel__state[data-working="true"] .cursor-panel__dot {
+    animation: none;
+  }
+}

@@ -85,3 +85,17 @@ export interface SessionEvent {
   payload?: unknown;
   agent: string;
 }
+
+/** One window of the person's plan, read from the agent's own usage command (for example "Current session"). */
+export interface PlanWindow {
+  label: string;
+  /** 0 to 100. */
+  percent: number;
+  resets?: string;
+}
+
+export interface PlanUsageReading {
+  windows: PlanWindow[];
+  /** When the server read them; absent for an agent that does not report plan usage. */
+  checkedAt?: string;
+}

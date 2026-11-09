@@ -1,0 +1,124 @@
+.plan-usage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--claude-line);
+  border-radius: var(--radius-lg);
+  background: var(--claude-paper);
+  box-shadow: var(--shadow-sm);
+}
+
+.plan-usage__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.plan-usage__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.plan-usage__refresh {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.plan-usage__refresh:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.plan-usage__refresh:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.plan-usage[data-loading] .plan-usage__refresh svg {
+  animation: usage-spin 0.9s linear infinite;
+}
+
+.plan-usage__window {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.plan-usage__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.plan-usage__label {
+  font-weight: 600;
+}
+
+.plan-usage__percent {
+  flex: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Like the terminal's bars: a soft track with the used part filled. */
+.plan-usage__bar {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--claude-ink) 10%, transparent);
+}
+
+.plan-usage__bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--agent-claude);
+  transition: width var(--duration-slow) var(--ease-out);
+}
+
+.plan-usage__window[data-level="mid"] .plan-usage__bar > span {
+  background: var(--status-retrying);
+}
+
+.plan-usage__window[data-level="high"] .plan-usage__bar > span {
+  background: var(--status-failed);
+}
+
+.plan-usage__resets,
+.plan-usage__checked,
+.plan-usage__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.plan-usage__checked {
+  color: var(--text-faint);
+}
+
+@keyframes usage-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-usage__bar > span {
+    transition: none;
+  }
+
+  .plan-usage[data-loading] .plan-usage__refresh svg {
+    animation: none;
+  }
+}

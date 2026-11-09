@@ -4,20 +4,35 @@
   gap: var(--space-2);
 }
 
+/* One rounded box, like the Claude Code panel: the text on top and the tools along the bottom. */
 .composer__box {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--surface-1);
+  transition: border-color var(--duration-base);
+}
+
+.composer__box:focus-within {
+  border-color: color-mix(in srgb, var(--text) 40%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 6%, transparent);
 }
 
 .composer__field {
   display: block;
   width: 100%;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--surface-1);
+  padding: var(--space-3) var(--space-4) var(--space-1);
+  border: 0;
+  background: none;
   color: var(--text);
   font: inherit;
-  resize: vertical;
+  resize: none;
+}
+
+.composer__field:focus {
+  outline: none;
 }
 
 .composer__field::placeholder {
@@ -28,8 +43,32 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-2) var(--space-3);
+}
+
+.composer__slash {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.composer__slash:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.composer__slash:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .composer__send {
@@ -39,30 +78,46 @@
   margin-left: auto;
 }
 
-.composer__hint,
 .composer__busy {
-  color: var(--text-muted);
+  color: var(--status-running);
   font-size: var(--text-xs);
 }
 
-.composer__busy {
-  color: var(--status-running);
+.composer__route-hint {
+  margin: 0;
+  font-weight: 600;
+  color: var(--claude-text);
+  font-size: var(--text-xs);
 }
 
+/* The send button is the one coral accent of the box. */
 .composer__button {
-  padding: var(--space-2) var(--space-5);
-  border: 1px solid var(--text);
-  border-radius: var(--radius-md);
-  background: var(--text);
-  color: var(--surface-1);
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--agent-claude);
+  color: #fff;
   font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 600;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
   cursor: pointer;
+  transition: filter var(--duration-fast);
+}
+
+.composer__button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.composer__button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .composer__button:disabled {
-  border-color: var(--border-strong);
   background: var(--surface-3);
   color: var(--text-faint);
   cursor: not-allowed;

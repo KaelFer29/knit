@@ -43,7 +43,7 @@ export function PlanDrafts({ dir, plans, launching, error, onLaunch }: Props) {
                 aria-describedby={plan.valid ? undefined : `${plan.path}-why`}
                 onClick={() => onLaunch(plan)}
               >
-                {launching === plan.path ? "Sending…" : "Send plan to Knit"}
+                {launching === plan.path ? "Sending…" : "Send plan to the orchestrator"}
               </button>
               {plan.valid ? null : (
                 <span id={`${plan.path}-why`} className="plan-draft__why">

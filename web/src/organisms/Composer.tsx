@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { CommandPalette } from "../molecules/CommandPalette";
 import { ProfileBar } from "../molecules/ProfileBar";
+import { RouteSwitch } from "../molecules/RouteSwitch";
 import { filterCommands, knitCommandOf, paletteQuery, type PaletteCommand } from "../sessions/commands";
 import type { AgentView, Profile } from "../sessions/types";
 import "./Composer.css";
@@ -21,15 +22,17 @@ interface Props {
   busyLabel?: string;
   error?: string;
   placeholder?: string;
+  /** The "send to the orchestrator" switch; absent when the container offers no routing. */
+  routing?: { on: boolean; onChange: (on: boolean) => void };
 }
 
 /** Prompt field with the command palette and the per-turn profile. Presentational: the container sends and tracks. */
-export function Composer({ agent, models, profile, onProfileChange, commands, onSubmit, onKnitCommand, busy, busyLabel, error, placeholder }: Props) {
+export function Composer({ agent, models, profile, onProfileChange, commands, onSubmit, onKnitCommand, busy, busyLabel, error, placeholder, routing }: Props) {
   const [text, setText] = useState("");
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
-  const modelField = useRef<HTMLSelectElement | HTMLInputElement | null>(null);
+  const modelField = useRef<HTMLButtonElement | null>(null);
   const paletteId = useId();
 
   const query = paletteQuery(text);
@@ -44,7 +47,7 @@ export function Composer({ agent, models, profile, onProfileChange, commands, on
 
   const runKnit = (command: PaletteCommand): void => {
     setText("");
-    if (command.name === "model") modelField.current?.focus();
+    if (command.name === "model") modelField.current?.click();
     else onKnitCommand(command.name);
   };
 
@@ -100,6 +103,11 @@ export function Composer({ agent, models, profile, onProfileChange, commands, on
           {error}
         </p>
       ) : null}
+      {routing?.on ? (
+        <p className="composer__route-hint" role="status">
+          The agent will write a plan; you confirm it before anything runs.
+        </p>
+      ) : null}
       <div className="composer__box">
         {open ? <CommandPalette id={paletteId} commands={matches} activeIndex={Math.min(active, matches.length - 1)} onPick={pick} /> : null}
         <textarea
@@ -117,14 +125,27 @@ export function Composer({ agent, models, profile, onProfileChange, commands, on
           onChange={(e) => change(e.target.value)}
           onKeyDown={onKeyDown}
         />
-      </div>
-      <div className="composer__bar">
-        <ProfileBar agent={agent} models={models} profile={profile} onChange={onProfileChange} modelRef={modelField} />
-        <div className="composer__send">
-          {busy ? <span className="composer__busy">{busyLabel ?? "Working…"}</span> : <span className="composer__hint">Enter to send, Shift+Enter for a new line</span>}
-          <button type="submit" className="composer__button" disabled={busy || text.trim() === ""}>
-            Send
+        <div className="composer__bar">
+          <button
+            type="button"
+            className="composer__slash"
+            aria-label="Commands"
+            title="Commands"
+            onClick={() => {
+              if (text === "") change("/");
+              field.current?.focus();
+            }}
+          >
+            /
           </button>
+          {routing ? <RouteSwitch on={routing.on} onChange={routing.onChange} /> : null}
+          <ProfileBar agent={agent} models={models} profile={profile} onChange={onProfileChange} modelRef={modelField} />
+          <div className="composer__send">
+            {busy ? <span className="composer__busy">{busyLabel ?? "Working…"}</span> : null}
+            <button type="submit" className="composer__button" aria-label="Send" title="Send (Enter; Shift+Enter for a new line)" disabled={busy || text.trim() === ""}>
+              <span aria-hidden="true">↑</span>
+            </button>
+          </div>
         </div>
       </div>
     </form>

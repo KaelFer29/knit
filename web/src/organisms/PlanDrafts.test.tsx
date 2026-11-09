@@ -30,7 +30,7 @@ describe("PlanDrafts", () => {
     expect(screen.getByText("feat/form")).toBeTruthy();
     expect(screen.getByRole("link", { name: /run-1234 · passed/ }).getAttribute("href")).toBe("?run=run-12345678-zz#/runs");
     expect(onLaunch).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Send plan to Knit" }));
+    await user.click(screen.getByRole("button", { name: "Send plan to the orchestrator" }));
     expect(onLaunch).toHaveBeenCalledWith(valid);
   });
 
@@ -39,7 +39,7 @@ describe("PlanDrafts", () => {
     expect(screen.getByText("Invalid · 2 issues")).toBeTruthy();
     expect(screen.getByText("<b>bad</b>")).toBeTruthy();
     expect(document.querySelector("b")).toBeNull();
-    expect((screen.getByRole("button", { name: "Send plan to Knit" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Send plan to the orchestrator" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText("Fix 2 issues first.")).toBeTruthy();
   });
 

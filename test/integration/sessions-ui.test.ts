@@ -131,8 +131,9 @@ const waitIdle = async (id: string): Promise<void> => {
 describe("session routes", () => {
   it("lists the agents with their capabilities and profile fields", async () => {
     await launch();
-    const { agents } = (await call("/api/agents")).json();
+    const { agents, cwd } = (await call("/api/agents")).json();
     expect(agents.map((a: any) => a.id)).toEqual(["claude", "cursor"]);
+    expect(cwd).toBe(process.cwd());
     expect(agents[0].capabilities).toMatchObject({ resume: true, chooseModel: true, commandList: true, planUsage: true });
     expect(agents[1].profileFields).toEqual(["model"]);
     expect(agents[1].capabilities.planUsage).toBe(false);
@@ -144,6 +145,18 @@ describe("session routes", () => {
     expect(claude.models.length).toBeGreaterThan(0);
     expect((await call("/api/agents/cursor/models")).json()).toEqual({ models: [] });
     expect((await call("/api/agents/nope/models")).status).toBe(404);
+  });
+
+  it("reads the plan usage of an agent that reports it, and none for one that does not", async () => {
+    await launch();
+    const claude = (await call("/api/agents/claude/usage")).json();
+    expect(claude.windows.map((w: any) => [w.label, w.percent])).toEqual([
+      ["Current session", 36],
+      ["Current week (all models)", 50],
+    ]);
+    expect(typeof claude.checkedAt).toBe("string");
+    expect((await call("/api/agents/cursor/usage")).json().windows).toEqual([]);
+    expect((await call("/api/agents/nope/usage")).status).toBe(404);
   });
 
   it("answers empty lists and 404s before any session exists", async () => {

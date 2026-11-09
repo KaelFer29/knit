@@ -87,6 +87,7 @@ export function agentInfos(build: (agent: string) => AgentRunner): AgentInfo[] {
       capabilities: capabilitiesOf(runner),
       profileFields,
       ...(runner.listModels ? { listModels: () => runner.listModels!() } : {}),
+      ...(runner.readPlanUsage ? { readPlanUsage: () => runner.readPlanUsage!() } : {}),
       resumeCommand: (agentSessionId) => `${binary} --resume ${agentSessionId}`,
     };
   };

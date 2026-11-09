@@ -12,9 +12,9 @@ interface Props {
 
 export function VerdictList({ attempt, notes }: { attempt: AttemptView; notes: AttemptNotes }) {
   const verdicts = verdictsOf(attempt, notes);
-  if (verdicts.length === 0) return <p className="detail-note">{attempt.status === "interrupted" ? "The run stopped during this attempt." : "Knit has not judged this attempt yet."}</p>;
+  if (verdicts.length === 0) return <p className="detail-note">{attempt.status === "interrupted" ? "The run stopped during this attempt." : "The orchestrator has not judged this attempt yet."}</p>;
   return (
-    <ul className="verdicts" aria-label="Knit verdicts">
+    <ul className="verdicts" aria-label="Orchestrator verdicts">
       {verdicts.map((v) => (
         <li key={v.label} className="verdicts__item" data-ok={v.ok ? "true" : "false"}>
           <span className="verdicts__mark" aria-hidden="true">
@@ -63,7 +63,7 @@ function AttemptBlock({ attempt, previous, notes }: { attempt: AttemptView; prev
 /** What Knit did for each task: setup, the verdict on every attempt and the feedback it gave for the next one. */
 export function KnitDetail({ tasks, notes }: Props) {
   const started = tasks.filter((t) => t.attempts.length > 0);
-  if (started.length === 0) return <p className="detail-note">Knit has not started any task yet.</p>;
+  if (started.length === 0) return <p className="detail-note">The orchestrator has not started any task yet.</p>;
   return (
     <div className="knit-detail">
       {started.map((task) => (

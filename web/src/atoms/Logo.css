@@ -31,7 +31,8 @@
   opacity: 1;
 }
 
-.logo[data-state="mark"] svg {
+.logo[data-state="mark"] svg,
+.logo > svg[data-mark] {
   width: 72%;
   height: 72%;
 }
@@ -41,4 +42,16 @@
   font-weight: 650;
   line-height: 1;
   letter-spacing: -0.01em;
+}
+
+/* An app icon brings its own tile: no box behind it, and it fills the space once it has loaded. */
+.logo[data-tile="true"][data-state="ready"] {
+  background: none;
+}
+
+.logo[data-tile="true"] .logo__img {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 22%;
 }

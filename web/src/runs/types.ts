@@ -12,10 +12,3 @@ export interface Started {
   pid?: number;
   logPath: string;
 }
-
-export interface StartOptions {
-  planPath: string;
-  push: boolean;
-  pr: boolean;
-  maxAttempts?: number;
-}

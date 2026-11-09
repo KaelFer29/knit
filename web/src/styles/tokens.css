@@ -3,20 +3,18 @@
  * Components read tokens and never hard-code values. Color is reserved for agent identity and task status;
  * surfaces and text stay neutral.
  *
- * Theme: light by default, dark under `prefers-color-scheme: dark`, and an explicit
- * `data-theme="light" | "dark"` on <html> always wins over the system setting.
- * The dark values appear twice (media query and attribute) because CSS cannot share one block between them.
+ * Theme: light only. The interface has no dark mode; Cursor's dark surfaces are part of its identity, not a theme.
  */
 
 :root {
   color-scheme: light;
 
   /* Surfaces and text */
-  --surface-0: #f6f6f3;
+  --surface-0: #ffffff;
   --surface-1: #ffffff;
-  --surface-2: #efefeb;
-  --surface-3: #e6e6e1;
-  --border: #e2e2dc;
+  --surface-2: #f4f4f2;
+  --surface-3: #ececea;
+  --border: #e6e6e1;
   --border-strong: #cdcdc5;
   --text: #1a1a18;
   --text-muted: #5c5c55;
@@ -37,13 +35,40 @@
   --status-failed: #c22a2a;
   --status-failed-soft: #fae4e4;
 
-  /* Agent identity: Claude's terracotta, Cursor's monochrome, Knit's own teal */
+  /* Agent identity: Claude's terracotta, Cursor's monochrome, the orchestrator's light brown */
   --agent-claude: #d97757;
   --agent-claude-soft: #fbebe4;
   --agent-cursor: #14120b;
   --agent-cursor-soft: #ecece8;
-  --agent-knit: #0e8a8c;
-  --agent-knit-soft: #dcf1f1;
+  --agent-knit: #8b6a45;
+  --agent-knit-soft: #f3ece2;
+  /* The orchestrator: white is its main tone; light brown only touches (lines, the mark, the progress). */
+  --knit-canvas: #ffffff;
+  --knit-line: #ebe5da;
+  /* Block skins. Claude: claude.ai's ivory, ink and serif, with a Claude Code terminal inset. */
+  --claude-ivory: #fbfaf8;
+  /* Claude's modal: a near-white canvas with only a trace of warmth. */
+  --claude-canvas: #fbfaf8;
+  /* The white of a card or a bubble on Claude's warm canvas. */
+  --claude-paper: #ffffff;
+  /* Claude's orange for text (important notices): darker than the brand fill so it reads on white (about 5:1). */
+  --claude-text: #b4532f;
+  --claude-line: #ebe9e4;
+  --claude-ink: #141413;
+  --claude-ink-muted: #73726c;
+  --claude-term-bg: #1f1e1d;
+  --claude-term-fg: #e8e6dc;
+  --claude-term-muted: #9a9890;
+  /* Cursor is dark in both themes, like its editor. */
+  --cursor-bg: #181818;
+  --cursor-bar: #141414;
+  --cursor-line: #2b2b2b;
+  --cursor-chip: #242424;
+  --cursor-ink: #e4e4e4;
+  --cursor-muted: #8b8b8b;
+  --diff-add: #3fb950;
+  --diff-add-soft: rgb(63 185 80 / 14%);
+  --font-serif: "Copernicus", "Tiempos Text", "Source Serif 4", ui-serif, Georgia, Cambria, serif;
   /* A single-color official logo is drawn dark; it flips to light on dark surfaces. */
   --logo-mono-filter: none;
 
@@ -83,86 +108,4 @@
   --duration-base: 200ms;
   --duration-slow: 360ms;
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-
-    --surface-0: #121211;
-    --surface-1: #1a1a18;
-    --surface-2: #232321;
-    --surface-3: #2d2d2a;
-    --border: #2e2e2b;
-    --border-strong: #41413d;
-    --text: #ecece7;
-    --text-muted: #a4a49b;
-    --text-faint: #75756d;
-    --focus: #7aa7f5;
-
-    --status-queued: #9ba2ad;
-    --status-queued-soft: #262a2f;
-    --status-running: #75a5f6;
-    --status-running-soft: #1a2a45;
-    --status-retrying: #e8a64e;
-    --status-retrying-soft: #3a2a14;
-    --status-verifying: #ab93f3;
-    --status-verifying-soft: #2a2244;
-    --status-delivered: #5fc68b;
-    --status-delivered-soft: #15301f;
-    --status-failed: #f27d7d;
-    --status-failed-soft: #3b1c1c;
-
-    --agent-claude: #e08566;
-    --agent-claude-soft: #3a241c;
-    --agent-cursor: #f2f2ee;
-    --agent-cursor-soft: #2b2b28;
-    --agent-knit: #3cc2c4;
-    --agent-knit-soft: #12312f;
-    --logo-mono-filter: invert(1);
-
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
-    --shadow-md: 0 4px 14px rgb(0 0 0 / 45%);
-    --shadow-lg: 0 12px 32px rgb(0 0 0 / 55%);
-  }
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-
-  --surface-0: #121211;
-  --surface-1: #1a1a18;
-  --surface-2: #232321;
-  --surface-3: #2d2d2a;
-  --border: #2e2e2b;
-  --border-strong: #41413d;
-  --text: #ecece7;
-  --text-muted: #a4a49b;
-  --text-faint: #75756d;
-  --focus: #7aa7f5;
-
-  --status-queued: #9ba2ad;
-  --status-queued-soft: #262a2f;
-  --status-running: #75a5f6;
-  --status-running-soft: #1a2a45;
-  --status-retrying: #e8a64e;
-  --status-retrying-soft: #3a2a14;
-  --status-verifying: #ab93f3;
-  --status-verifying-soft: #2a2244;
-  --status-delivered: #5fc68b;
-  --status-delivered-soft: #15301f;
-  --status-failed: #f27d7d;
-  --status-failed-soft: #3b1c1c;
-
-  --agent-claude: #e08566;
-  --agent-claude-soft: #3a241c;
-  --agent-cursor: #f2f2ee;
-  --agent-cursor-soft: #2b2b28;
-  --agent-knit: #3cc2c4;
-  --agent-knit-soft: #12312f;
-  --logo-mono-filter: invert(1);
-
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
-  --shadow-md: 0 4px 14px rgb(0 0 0 / 45%);
-  --shadow-lg: 0 12px 32px rgb(0 0 0 / 55%);
 }

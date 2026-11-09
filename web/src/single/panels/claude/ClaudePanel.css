@@ -1,5 +1,5 @@
 /* The panel fills the frame's body and scrolls only its middle, so the composer stays in view. */
-.side-panel__body:has(> .claude-panel) {
+.modal__body:has(> .claude-panel) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -11,20 +11,6 @@
   flex-direction: column;
   gap: var(--space-3);
   min-height: 0;
-}
-
-.claude-panel__scroll {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.claude-panel__scroll .timeline {
-  flex: 1 0 auto;
-  min-height: 10rem;
 }
 
 .claude-panel__note {
@@ -45,4 +31,136 @@
 
 .claude-panel .composer__field {
   resize: none;
+}
+
+/* The conversation sits straight on the modal, like a chat app: no box around it. */
+.claude-panel .chat-timeline {
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-2) var(--space-1);
+  border: 0;
+  background: none;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text) 25%, transparent) transparent;
+}
+
+/* Bubbles, as in a messaging app: the same white bubble for both, yours on the right and Claude's on the left; small text, the time inside. */
+.claude-panel .tl-entry--prompt,
+.claude-panel .tl-entry--message,
+.claude-panel .tl-entry--result {
+  position: relative;
+  max-width: min(36rem, 80%);
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  border-radius: 14px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.claude-panel .tl-entry--prompt {
+  align-self: flex-end;
+  border: 1px solid var(--claude-line);
+  border-bottom-right-radius: 4px;
+  background: var(--claude-paper);
+  box-shadow: 0 1px 1px rgb(20 20 15 / 5%);
+}
+
+.claude-panel .tl-entry--message,
+.claude-panel .tl-entry--result {
+  align-self: flex-start;
+  border: 1px solid var(--claude-line);
+  border-bottom-left-radius: 4px;
+  background: var(--claude-paper);
+  box-shadow: 0 1px 1px rgb(20 20 15 / 5%);
+}
+
+.claude-panel .tl-entry__time {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  text-align: right;
+}
+
+/* The end of a turn: a quiet line, with any final text as one more bubble. */
+.claude-panel .tl-entry--result .tl-entry__meta {
+  color: var(--text-faint);
+  font-size: 0.68rem;
+}
+
+.claude-panel .tl-entry--thinking,
+.claude-panel .tl-entry--tool,
+.claude-panel .tl-entry--working {
+  align-self: flex-start;
+  max-width: 80%;
+  font-size: var(--text-xs);
+}
+
+.claude-panel .tl-entry--tool {
+  padding: var(--space-1) var(--space-3);
+  border: 1px dashed var(--claude-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--claude-paper) 60%, transparent);
+}
+
+.claude-panel .tl-entry--tool[open] {
+  border-radius: var(--radius-lg);
+}
+
+.claude-panel__side {
+  gap: var(--space-3);
+}
+
+/* The composer is white with a neutral outline; the send button is the one coral accent. */
+.claude-panel .composer__box {
+  background: var(--claude-paper);
+  border-color: var(--claude-line);
+}
+
+/* The chat on the left and a mini sidebar of usage on the right, each with its own scrollbar. */
+.claude-panel__body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem);
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.claude-panel__chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 0;
+}
+
+.claude-panel__chat > .chat-timeline {
+  flex: 1;
+  min-height: 0;
+}
+
+.claude-panel__drafts {
+  flex: none;
+  max-height: 45%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.claude-panel__aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+  padding: 0 var(--space-3) var(--space-2) var(--space-1);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text) 25%, transparent) transparent;
+}
+
+@media (max-width: 800px) {
+  .claude-panel__body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 13rem);
+  }
 }

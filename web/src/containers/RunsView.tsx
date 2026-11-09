@@ -1,9 +1,5 @@
-import { useState } from "react";
-import { StartRunForm } from "../organisms/StartRunForm";
 import { moveFocus } from "../organisms/RunsList";
 import { RunRow } from "../molecules/RunRow";
-import { startRun } from "../runs/api";
-import type { StartOptions } from "../runs/types";
 import { useRuns } from "../runs/useRuns";
 import "./RunsView.css";
 
@@ -15,29 +11,11 @@ interface Props {
   onSelect: (runId: string | undefined) => void;
 }
 
-/** Container: the runs picker (newest first) with the form that starts a new run. A started run becomes the shown one. */
+/** Container: the runs picker, newest first. Runs are not started here: a plan is drafted in Claude and sent from there. */
 export function RunsView({ pollMs, selectedId, onSelect }: Props) {
   const { runs, error, reload } = useRuns(pollMs);
-  const [busy, setBusy] = useState(false);
-  const [startError, setStartError] = useState<string>();
-  const start = async (options: StartOptions): Promise<void> => {
-    setBusy(true);
-    setStartError(undefined);
-    try {
-      const started = await startRun(options);
-      onSelect(started.runId);
-    } catch (err) {
-      setStartError(err instanceof Error ? err.message : "Could not start the run");
-    } finally {
-      setBusy(false);
-    }
-  };
   return (
     <>
-      <details className="knit-panel__start">
-        <summary>Start a run</summary>
-        <StartRunForm busy={busy} error={startError} onStart={(o) => void start(o)} />
-      </details>
       <section className="knit-panel__section" aria-labelledby="knit-runs">
         <h3 id="knit-runs" className="knit-panel__heading">
           Runs
@@ -60,7 +38,7 @@ export function RunsView({ pollMs, selectedId, onSelect }: Props) {
           <div className="knit-panel__state">
             <p className="knit-panel__strong">No runs yet</p>
             <p>
-              Start one from a plan file above, or run <code>knit run &lt;plan.md&gt;</code> in a terminal; it will appear here.
+              Plans come from Claude: turn on “Send to the orchestrator”, then send the draft it writes. A run started in a terminal with <code>knit run &lt;plan.md&gt;</code> appears here too.
             </p>
           </div>
         ) : (

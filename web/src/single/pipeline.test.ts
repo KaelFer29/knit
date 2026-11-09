@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deliveredRun, failedRun, retryingRun, runningRun, verifyingRun } from "../fixtures/boards";
-import { clipLine, deriveBlocks, deriveHops, hopProgress, type SessionGlimpse } from "./pipeline";
+import { clipLine, deriveBlocks, deriveDetails, deriveHops, deriveStages, hopProgress, type SessionGlimpse } from "./pipeline";
 
 const hop = (hops: ReturnType<typeof deriveHops>, id: string) => hops.find((h) => h.id === id)!;
 const claudeBusy: SessionGlimpse = { status: "running", title: "Plan billing", lastPrompt: "Write the plan for webhooks", lines: ["Reading the repo"] };
@@ -106,5 +106,81 @@ describe("clipLine and hopProgress", () => {
     expect(hopProgress({ stages: ["a", "b", "c", "d"], stageIndex: -1 })).toBe(0);
     expect(hopProgress({ stages: ["a", "b", "c", "d"], stageIndex: 1 })).toBe(0.5);
     expect(hopProgress({ stages: ["a", "b"], stageIndex: 5 })).toBe(1);
+  });
+});
+
+describe("deriveStages", () => {
+  const view = (board: Parameters<typeof deriveStages>[0]) => deriveStages(board).map((s) => `${s.id}:${s.status}`);
+
+  it("lists the orchestrator's five stages in order, all idle with no run", () => {
+    const stages = deriveStages(undefined);
+    expect(stages.map((s) => s.label)).toEqual(["Plan", "Queue", "Build", "Checks", "Deliver"]);
+    expect(stages.every((s) => s.status === "idle")).toBe(true);
+  });
+
+  it("marks the build stage active while Cursor works, with the task and the delivered count", () => {
+    expect(view(runningRun)).toEqual(["plan:done", "queue:active", "build:active", "checks:idle", "deliver:active"]);
+    const stages = deriveStages(runningRun);
+    expect(stages.find((s) => s.id === "build")!.detail).toBe("T3 · attempt 1");
+    expect(stages.find((s) => s.id === "deliver")!.detail).toBe("2 of 6");
+  });
+
+  it("moves to the checks stage while checks run, and keeps it active on a retry", () => {
+    expect(deriveStages(verifyingRun).find((s) => s.id === "checks")!.status).toBe("active");
+    expect(deriveStages(verifyingRun).find((s) => s.id === "build")!.status).toBe("done");
+    expect(deriveStages(retryingRun).find((s) => s.id === "checks")!.status).toBe("active");
+  });
+
+  it("fails the checks stage when the run ended on a failed task", () => {
+    expect(deriveStages(failedRun).find((s) => s.id === "checks")!.status).toBe("failed");
+  });
+
+  it("finishes every stage when the whole plan is delivered", () => {
+    expect(view(deliveredRun)).toEqual(["plan:done", "queue:done", "build:done", "checks:done", "deliver:done"]);
+  });
+});
+
+describe("deriveDetails", () => {
+  const session: SessionGlimpse = {
+    status: "running",
+    title: "Plan billing",
+    lines: [],
+    model: "claude-opus-5-5",
+    contextTokens: 48_200,
+    turns: 3,
+    agents: ["Map the server"],
+    planUsage: [{ name: "five_hour", utilization: 0.42 }],
+  };
+  const fact = (facts: { label: string; value: string }[], label: string) => facts.find((f) => f.label === label)?.value;
+
+  it("shows Claude's model, context, turns, running agents and plan usage from the session", () => {
+    const { claude } = deriveDetails(runningRun, session);
+    expect(fact(claude.facts, "Model")).toBe("claude-opus-5-5");
+    expect(fact(claude.facts, "Context")).toBe("48.2k tokens");
+    expect(fact(claude.facts, "Turns")).toBe("3");
+    expect(claude.agents).toEqual(["Map the server"]);
+    expect(claude.meters).toEqual([{ label: "5-hour limit", ratio: 0.42 }]);
+  });
+
+  it("says what is unknown instead of inventing it when there is no session", () => {
+    const { claude } = deriveDetails(runningRun, undefined);
+    expect(fact(claude.facts, "Model")).toBe("No session");
+    expect(fact(claude.facts, "Plan")).toBe("add-billing-webhooks");
+    expect(claude.agents).toEqual([]);
+  });
+
+  it("shows the run for the orchestrator and the active attempt for Cursor", () => {
+    const { knit, cursor } = deriveDetails(runningRun, undefined);
+    expect(fact(knit.facts, "Run")).toBe("running");
+    expect(fact(knit.facts, "Tasks")).toBe("2 of 6 delivered");
+    expect(fact(cursor.facts, "Task")).toBe("T3");
+    expect(fact(cursor.facts, "Attempt")).toBe("1");
+    expect(fact(cursor.facts, "Tokens")).toMatch(/k$|^\d+$/);
+  });
+
+  it("has nothing for the orchestrator and Cursor without a run", () => {
+    const { knit, cursor } = deriveDetails(undefined, undefined);
+    expect(fact(knit.facts, "Run")).toBe("No run yet");
+    expect(cursor.facts).toEqual([{ label: "Task", value: "None" }]);
   });
 });

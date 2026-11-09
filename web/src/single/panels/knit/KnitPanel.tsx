@@ -1,24 +1,39 @@
+import { useMemo } from "react";
 import { RunControlBar } from "../../../containers/RunControlBar";
 import { RunsView } from "../../../containers/RunsView";
+import { StageTrack } from "../../../molecules/StageTrack";
 import { TaskCard } from "../../../molecules/TaskCard";
+import { deriveStages } from "../../pipeline";
 import type { PanelProps } from "../registry";
 import { RunSummary } from "./RunSummary";
 import "./KnitPanel.css";
 
 /**
- * Knit's panel body: the run the view shows (header, run control, task queue in order with each task's checks
- * and verdicts one click away) and, below, the runs list as a picker with the form that starts a new run.
+ * The orchestrator's panel. The run on top (plan, numbers, and its five stages as one track), then two columns: the
+ * task queue in order, each task with its checks and verdicts one click away, and beside it run control and the runs
+ * list as a picker. There is no form to start a run: plans are drafted in Claude and sent from there.
  */
 export function KnitPanel({ board, runId, live, renderDetail, selectRun }: PanelProps) {
+  const stages = useMemo(() => deriveStages(board), [board]);
   return (
     <div className="knit-panel">
       {board === undefined ? (
-        <p className="knit-panel__state">No run to show yet. Start one below, or pick a past run.</p>
+        <section className="knit-panel__empty" aria-label="No run">
+          <h3 className="knit-panel__empty-title">No run yet</h3>
+          <p className="knit-panel__state">Ask Claude for a plan, then send it to the orchestrator. Or pick a past run below.</p>
+          <StageTrack stages={stages} label="Run stages" detail="each" size="large" />
+        </section>
       ) : (
         <>
           <RunSummary board={board} />
-          {live ? <RunControlBar board={board} /> : null}
-          <section className="knit-panel__section" aria-labelledby="knit-queue">
+          <section className="knit-panel__stages" aria-label="Stages">
+            <StageTrack stages={stages} label="Run stages" detail="each" size="large" />
+          </section>
+        </>
+      )}
+      <div className="knit-panel__cols" data-empty={board === undefined || undefined}>
+        {board === undefined ? null : (
+          <section className="knit-panel__section knit-panel__main" aria-labelledby="knit-queue">
             <h3 id="knit-queue" className="knit-panel__heading">
               Task queue
             </h3>
@@ -30,9 +45,12 @@ export function KnitPanel({ board, runId, live, renderDetail, selectRun }: Panel
               ))}
             </ol>
           </section>
-        </>
-      )}
-      <RunsView selectedId={runId} onSelect={selectRun} />
+        )}
+        <div className="knit-panel__side">
+          {board !== undefined && live ? <RunControlBar board={board} /> : null}
+          <RunsView selectedId={runId} onSelect={selectRun} />
+        </div>
+      </div>
     </div>
   );
 }
