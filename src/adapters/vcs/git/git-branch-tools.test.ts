@@ -194,3 +194,65 @@ describe("GitBranchTools.remove", () => {
     expect(branchExists("main")).toBe(true);
   });
 });
+
+describe("GitBranchTools.diff", () => {
+  it("returns the stat and the patch of what the branch changed since the start", () => {
+    const { ref, path } = worktree();
+    commit(path, "a.txt", "hello\n", "feat: add a");
+    const d = tools.diff(ref, 10_000);
+    expect(d.stat).toContain("a.txt");
+    expect(d.patch).toContain("+hello");
+    expect(d.truncated).toBe(false);
+  });
+
+  it("cuts a long patch to the byte limit and says so", () => {
+    const { ref, path } = worktree();
+    commit(path, "big.txt", "x".repeat(5000) + "\n", "feat: add big");
+    const d = tools.diff(ref, 1000);
+    expect(d.truncated).toBe(true);
+    expect(Buffer.byteLength(d.patch)).toBeLessThanOrEqual(1000);
+    expect(d.stat).toContain("big.txt");
+  });
+
+  it("is empty for a branch that does not exist", () => {
+    expect(tools.diff({ repo, branch: "feat/none", startSha: start }, 1000)).toEqual({ stat: "", patch: "", truncated: false });
+  });
+});
+
+describe("GitBranchTools.push", () => {
+  it("pushes the branch to origin with its upstream, from the main checkout, without needing the worktree", () => {
+    const bare = join(scratch, "origin.git");
+    git(scratch, "init", "-q", "--bare", bare);
+    git(repo, "remote", "add", "origin", bare);
+    const { ref, path } = worktree();
+    commit(path, "a.txt", "a\n", "feat: add a");
+    tools.push({ ...ref, worktree: undefined });
+    expect(git(bare, "branch", "--list", "feat/one")).toContain("feat/one");
+    expect(tools.state(ref).pushed).toBe(true);
+  });
+
+  it("never forces: a remote branch that moved on is an error, and it is left as it was", () => {
+    const bare = join(scratch, "origin.git");
+    git(scratch, "init", "-q", "--bare", bare);
+    git(repo, "remote", "add", "origin", bare);
+    const { ref, path } = worktree();
+    commit(path, "a.txt", "a\n", "feat: add a");
+    tools.push(ref);
+    const other = join(scratch, "other");
+    git(scratch, "clone", "-q", bare, other);
+    git(other, "checkout", "-q", "feat/one");
+    writeFileSync(join(other, "z.txt"), "z\n");
+    git(other, "add", ".");
+    git(other, "commit", "-qm", "feat: someone else");
+    git(other, "push", "-q", "origin", "feat/one");
+    const remoteHead = git(bare, "rev-parse", "feat/one");
+    commit(path, "b.txt", "b\n", "feat: add b");
+    expect(() => tools.push(ref)).toThrow(/rejected|failed/i);
+    expect(git(bare, "rev-parse", "feat/one")).toBe(remoteHead);
+  });
+
+  it("says so when there is no origin", () => {
+    const { ref } = worktree();
+    expect(() => tools.push(ref)).toThrow(/origin/i);
+  });
+});

@@ -45,7 +45,7 @@ export async function main(argv: string[], io: CliIo, deps: CliDeps = {}): Promi
       case "clean":
         return cleanCommand(rest, io, deps, env);
       case "branch":
-        return branchCommand(rest, io, deps, env);
+        return await branchCommand(rest, io, deps, env);
       case "abort":
         return await abortCommand(rest, io, deps, env);
       case "ui":

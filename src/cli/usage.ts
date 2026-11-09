@@ -15,6 +15,10 @@ export const USAGE = `Usage:
   ${PROGRAM_NAME} clean <run-id> [options]    Remove the worktrees of a run (branches are kept)
   ${PROGRAM_NAME} branch <run-id> <task-id> undo --mode <revert|reset|delete> [options]
                                               Take back what a task did on its branch (says what it would do until --yes)
+  ${PROGRAM_NAME} branch <run-id> <task-id> pr-draft [options]
+                                              Have a cheap model write the title and body of a pull request for the task
+  ${PROGRAM_NAME} branch <run-id> <task-id> pr --title <t> --body <b> [options]
+                                              Push the task branch and open its pull request
   ${PROGRAM_NAME} ui [options]                Serve the web interface on 127.0.0.1 and print its address (Ctrl+C to stop)
 
 Options for run and resume:
@@ -70,7 +74,12 @@ Options for branch undo:
   --yes                      Do it; without it the command only prints what it would do and changes nothing
   --json                     Print one JSON line (used by the web interface)
   --data-dir <dir>
-  Refused (exit 1) while the run is still running, for a branch that is gone, with uncommitted changes (revert), after
+  pr-draft: --model <id> picks the model (default composer-2.5-fast, see 'agent models'). It writes text only, in an empty
+  scratch directory, from the task, its commits and a cut of its diff.
+  pr: pushes the branch to origin (never forced) and opens the pull request into the run's base branch, or into the parent
+  task's branch when the task depends on another (that branch must be on origin first). Only for a task that passed, with
+  commits and no pull request yet; the address is kept with the task. Checks the GitHub CLI before pushing anything.
+  undo: refused (exit 1) while the run is still running, for a branch that is gone, with uncommitted changes (revert), after
   a rewritten history (reset), or when another task is stacked on the branch (reset, delete). A remote is never touched.
 
 Options for clean:

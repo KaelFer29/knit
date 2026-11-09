@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import type { BranchEditor, BranchInspector, BranchRef, BranchState } from "../../../core/ports/branch-tools.js";
+import type { BranchDiff, BranchEditor, BranchInspector, BranchRef, BranchState } from "../../../core/ports/branch-tools.js";
 
 export interface GitBranchToolsOptions {
   /** Extra args placed before every git subcommand (e.g. `-c core.hooksPath=...` in tests). */
@@ -81,6 +81,25 @@ export class GitBranchTools implements BranchInspector, BranchEditor {
       hasWorktree,
       dirty: hasWorktree && this.git(ref.worktree!, ["status", "--porcelain"]) !== "",
     };
+  }
+
+  diff(ref: BranchRef, maxBytes: number): BranchDiff {
+    if (!this.exists(ref.repo, ref.branch)) return { stat: "", patch: "", truncated: false };
+    const range = [`${ref.startSha}`, `refs/heads/${ref.branch}`];
+    const flags = ["--no-ext-diff", "--no-color"];
+    const stat = this.git(ref.repo, ["diff", ...flags, "--stat", ...range]);
+    const patch = this.git(ref.repo, ["diff", ...flags, ...range]);
+    const bytes = Buffer.from(patch, "utf8");
+    if (bytes.length <= maxBytes) return { stat, patch, truncated: false };
+    // Cut on bytes, then drop a character the cut split in half.
+    return { stat, patch: bytes.subarray(0, maxBytes).toString("utf8").replace(/\uFFFD+$/, ""), truncated: true };
+  }
+
+  push(ref: BranchRef): void {
+    if (!this.ok(ref.repo, ["remote", "get-url", "origin"])) throw new Error("The repository has no 'origin' remote to push to");
+    if (!this.exists(ref.repo, ref.branch)) throw new Error(`The branch ${ref.branch} no longer exists`);
+    // No --force, ever: if the remote branch moved on, the push is rejected and the remote is left as it was.
+    this.git(ref.repo, ["push", "-u", "origin", `refs/heads/${ref.branch}:refs/heads/${ref.branch}`]);
   }
 
   /** In a worktree the branch must be the one checked out there; otherwise the edit would hit another branch. */

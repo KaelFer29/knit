@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SqliteRunStore } from "../../src/adapters/storage/sqlite/run-store.js";
 import { main, type CliDeps } from "../../src/cli/main.js";
 import type { AgentRunner } from "../../src/core/ports/agent-runner.js";
+import type { CreatePullRequestInput, PullRequests } from "../../src/core/ports/pull-requests.js";
+import type { AgentOptions } from "../../src/cli/types.js";
 
 const GIT_ARGS = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null"];
 const git = (cwd: string, ...args: string[]): string => execFileSync("git", [...GIT_ARGS, ...args], { cwd, encoding: "utf8" }).trim();
@@ -147,5 +149,142 @@ describe("knit branch undo", () => {
     expect(await main(["branch", runId, "T1", "undo", "--mode", "explode"], c.io, deps())).toBe(2);
     expect(await main(["branch", runId, "T1", "undo"], capture().io, deps())).toBe(2);
     expect(await main(["branch", runId, "T1", "frobnicate"], capture().io, deps())).toBe(2);
+  });
+});
+
+/** A Cursor stand-in that only writes text and remembers how it was asked. */
+function draftAgent(answer: string, fail = false) {
+  const seen: { options: AgentOptions[]; requests: { cwd: string; prompt: string; profile?: unknown }[] } = { options: [], requests: [] };
+  const agent: AgentRunner = {
+    run: async (req) => {
+      seen.requests.push({ cwd: req.cwd, prompt: req.prompt, profile: req.profile });
+      return fail
+        ? { exitCode: 1, isError: true, resultText: "model exploded", durationMs: 1, timedOut: false }
+        : { exitCode: 0, isError: false, resultText: answer, durationMs: 1, timedOut: false };
+    },
+  };
+  return { seen, deps: (): CliDeps => ({ ...deps(), agent: (o) => (seen.options.push(o), agent) }) };
+}
+
+describe("knit branch pr-draft", () => {
+  it("asks the cheap model for a title and a body from the task and its diff, in a scratch directory, and prints them", async () => {
+    const { runId, worktree } = await runPlan();
+    const d = draftAgent("Title: Add a.txt\n\n## Summary\n- adds the file");
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "pr-draft", "--json"], c.io, d.deps())).toBe(0);
+    expect(JSON.parse(c.out().trim())).toEqual({ ok: true, title: "Add a.txt", body: "## Summary\n- adds the file", model: "composer-2.5-fast" });
+    expect(d.seen.options[0]).toMatchObject({ model: "composer-2.5-fast" });
+    const req = d.seen.requests[0]!;
+    expect(req.prompt).toContain("Create a");
+    expect(req.prompt).toContain("src/a.txt");
+    expect(req.prompt).toContain("+a");
+    expect(req.cwd.startsWith(worktree)).toBe(false);
+    expect(req.cwd.startsWith(repo)).toBe(false);
+    expect(existsSync(req.cwd)).toBe(false);
+  });
+
+  it("uses the model it is given instead of the default", async () => {
+    const { runId } = await runPlan();
+    const d = draftAgent("Title: T\n\nB");
+    expect(await main(["branch", runId, "T1", "pr-draft", "--model", "grok-4.7-high", "--json"], capture().io, d.deps())).toBe(0);
+    expect(d.seen.options[0]).toMatchObject({ model: "grok-4.7-high" });
+  });
+
+  it("fails with the reason, and no draft, when the model fails", async () => {
+    const { runId } = await runPlan();
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "pr-draft", "--json"], c.io, draftAgent("", true).deps())).toBe(1);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("model exploded") });
+  });
+
+  it("refuses a branch that is gone, without calling the model", async () => {
+    const { runId } = await runPlan();
+    await main(["branch", runId, "T1", "undo", "--mode", "delete", "--yes"], capture().io, deps());
+    const d = draftAgent("Title: x\n\ny");
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "pr-draft", "--json"], c.io, d.deps())).toBe(1);
+    expect(d.seen.requests).toHaveLength(0);
+  });
+});
+
+describe("knit branch pr", () => {
+  const calls: CreatePullRequestInput[] = [];
+  let preflightError: string | undefined;
+  const fakePrs: PullRequests = {
+    preflight: () => {
+      if (preflightError) throw new Error(preflightError);
+    },
+    create: (input) => {
+      calls.push(input);
+      return { url: "https://example.test/pull/7" };
+    },
+  };
+  const withPrs = (): CliDeps => ({ ...deps(), pullRequests: fakePrs });
+  let bare: string;
+  beforeEach(() => {
+    calls.length = 0;
+    preflightError = undefined;
+    bare = join(scratch, "origin.git");
+    git(scratch, "init", "-q", "--bare", bare);
+    git(repo, "remote", "add", "origin", bare);
+  });
+
+  it("pushes the branch, opens the pull request into the run's base with the given text, and remembers its address", async () => {
+    const { runId } = await runPlan();
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "pr", "--title", "Add a.txt", "--body", "## Summary\n- adds the file", "--json"], c.io, withPrs())).toBe(0);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: true, url: "https://example.test/pull/7", base: "main", head: "feat/create-a" });
+    expect(git(bare, "branch", "--list", "feat/create-a")).toContain("feat/create-a");
+    expect(calls).toEqual([{ repo, head: "feat/create-a", base: "main", title: "Add a.txt", body: "## Summary\n- adds the file" }]);
+    const store = new SqliteRunStore(join(dataDir, "knit.db"));
+    expect(store.getRun(runId)!.tasks[0]!.prUrl).toBe("https://example.test/pull/7");
+    store.close();
+    expect(events(runId)).toContain("branch.pr_opened");
+  });
+
+  it("does not open a second one for the same task, and shows the first", async () => {
+    const { runId } = await runPlan();
+    await main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b"], capture().io, withPrs());
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b", "--json"], c.io, withPrs())).toBe(1);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("https://example.test/pull/7") });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("checks that pull requests can be opened before it pushes anything", async () => {
+    const { runId } = await runPlan();
+    preflightError = "GitHub CLI is not logged in. Run: gh auth login";
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b", "--json"], c.io, withPrs())).toBe(1);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("not logged in") });
+    expect(git(bare, "branch", "--list")).toBe("");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("opens no pull request when the push is rejected, and says why", async () => {
+    const { runId, worktree } = await runPlan();
+    git(worktree, "push", "-q", "origin", "feat/create-a");
+    const other = join(scratch, "other");
+    git(scratch, "clone", "-q", bare, other);
+    git(other, "checkout", "-q", "feat/create-a");
+    writeFileSync(join(other, "z.txt"), "z\n");
+    git(other, "add", ".");
+    git(other, "commit", "-qm", "feat: someone else");
+    git(other, "push", "-q", "origin", "feat/create-a");
+    writeFileSync(join(worktree, "src/b.txt"), "b\n");
+    git(worktree, "add", "-A");
+    git(worktree, "commit", "-qm", "feat: more");
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b", "--json"], c.io, withPrs())).toBe(1);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringMatching(/rejected|failed/i) });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("needs a title and a body, and rejects a title with a line break", async () => {
+    const { runId } = await runPlan();
+    expect(await main(["branch", runId, "T1", "pr", "--body", "b"], capture().io, withPrs())).toBe(2);
+    expect(await main(["branch", runId, "T1", "pr", "--title", "t"], capture().io, withPrs())).toBe(2);
+    expect(await main(["branch", runId, "T1", "pr", "--title", "a\nb", "--body", "b"], capture().io, withPrs())).toBe(2);
+    expect(calls).toHaveLength(0);
   });
 });
