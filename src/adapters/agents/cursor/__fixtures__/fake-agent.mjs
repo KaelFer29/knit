@@ -43,7 +43,7 @@ if (mode === "ok") {
   emit({ type: "tool_call", subtype: "completed", call_id: "c1" });
   emit({
     type: "result", subtype: "success", is_error: false, duration_ms: 5, result: "done",
-    session_id: sessionId, usage: { inputTokens: 100, outputTokens: 20 },
+    session_id: sessionId, usage: { inputTokens: 100, outputTokens: 20, cacheReadTokens: 900, cacheWriteTokens: 50 },
   });
 } else if (mode === "error") {
   emit({ type: "result", subtype: "error", is_error: true, result: "model exploded", session_id: sessionId });

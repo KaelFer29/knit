@@ -43,6 +43,8 @@ export interface AgentRunResult {
   durationMs: number;
   inputTokens?: number;
   outputTokens?: number;
+  /** How much context the agent's chat carries after this turn (fresh input plus cache); absent when the agent does not report it. */
+  contextTokens?: number;
   sessionId?: string;
   timedOut: boolean;
   meta?: AgentRunMeta;

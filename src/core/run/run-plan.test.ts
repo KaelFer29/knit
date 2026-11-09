@@ -206,6 +206,14 @@ describe("runPlan: core loop", () => {
     expect(h.tasks.get("T2")).toMatchObject({ status: "passed", commitSha: "sha-feat/second", branch: "feat/second", startSha: "start-T2" });
   });
 
+  it("records how much context the agent's chat carries in the attempt.finished event, and nothing when it reports none", async () => {
+    const h = harness({ agent: (call, _r, s) => { s.changed = [call === 0 ? "src/a.ts" : "src/b.ts"]; return call === 0 ? { contextTokens: 12_381 } : {}; } });
+    await h.run();
+    const finished = h.events.filter((e) => e.type === "attempt.finished");
+    expect(finished[0]!.payload).toMatchObject({ passed: true, contextTokens: 12_381 });
+    expect(finished[1]!.payload).not.toHaveProperty("contextTokens");
+  });
+
   it("starts independent tasks from the plan base, not from the previous task", async () => {
     const h = harness({ planMd: PLAN_MD.replace("Depends: T1\n", ""), agent: writes(["src/a.ts"], ["src/b.ts"]) });
     await h.run();

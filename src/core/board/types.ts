@@ -31,6 +31,8 @@ export interface AttemptView {
   durationMs?: number;
   inputTokens?: number;
   outputTokens?: number;
+  /** How much context the agent's chat carried after this attempt (fresh input plus cache); absent when it was not recorded. */
+  contextTokens?: number;
   /** The check command that failed, or the setup command. */
   failedCheck?: string;
   /** Scope verdict: false when the agent changed files outside the task's allowed files. Absent while open. */

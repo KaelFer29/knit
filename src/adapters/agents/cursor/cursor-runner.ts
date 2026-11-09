@@ -1,3 +1,4 @@
+import { contextTokensOf, type TurnUsage } from "../../../core/context/index.js";
 import type {
   AgentCapabilities,
   AgentEvent,
@@ -21,7 +22,7 @@ interface ResultEvent {
   is_error?: boolean;
   result?: string;
   session_id?: string;
-  usage?: { inputTokens?: number; outputTokens?: number };
+  usage?: TurnUsage;
 }
 
 function tailLines(text: string, count: number): string {
@@ -133,6 +134,7 @@ export class CursorAgentRunner implements AgentRunner {
       timedOut: res.timedOut,
       ...(resultEvent?.usage?.inputTokens !== undefined ? { inputTokens: resultEvent.usage.inputTokens } : {}),
       ...(resultEvent?.usage?.outputTokens !== undefined ? { outputTokens: resultEvent.usage.outputTokens } : {}),
+      ...(contextTokensOf(resultEvent?.usage) !== undefined ? { contextTokens: contextTokensOf(resultEvent?.usage)! } : {}),
       ...(sessionId !== undefined ? { sessionId } : {}),
     };
   }

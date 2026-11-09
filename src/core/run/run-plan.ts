@@ -332,6 +332,7 @@ export async function runPlan(plan: ResolvedPlan, deps: RunDeps, options: RunOpt
         });
         emit("attempt.finished", actx, {
           passed, scopeOk: violations.length === 0, failedCheck,
+          ...(result.contextTokens !== undefined ? { contextTokens: result.contextTokens } : {}),
           ...(gitProblems.length > 0 ? { gitProblems } : {}),
         });
 

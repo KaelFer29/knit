@@ -408,3 +408,31 @@ Checks:
     expect(b.tasks[0]!.model).toBeUndefined();
   });
 });
+
+describe("the context of each attempt's chat", () => {
+  it("carries what attempt.finished recorded, and nothing for an attempt that recorded none (older runs)", () => {
+    const b = board({
+      tasks: [task("T1", { status: "passed" })],
+      attempts: [attempt("T1", 1), attempt("T1", 2)],
+      events: [
+        ev("attempt.started", "T1", 1),
+        ev("attempt.finished", "T1", 1, { payload: { passed: false, contextTokens: 12_381 } }, 5),
+        ev("attempt.started", "T1", 2, {}, 6),
+        ev("attempt.finished", "T1", 2, { payload: { passed: true } }, 9),
+      ],
+    });
+    const [first, second] = b.tasks[0]!.attempts;
+    expect(first!.contextTokens).toBe(12_381);
+    expect(second!.contextTokens).toBeUndefined();
+  });
+
+  it("ignores a context that is not a number", () => {
+    const b = board({
+      tasks: [task("T1", { status: "passed" })],
+      attempts: [attempt("T1", 1)],
+      events: [ev("attempt.started", "T1", 1), ev("attempt.finished", "T1", 1, { payload: { contextTokens: "lots" } }, 5)],
+    });
+    expect(b.tasks[0]!.attempts[0]!.contextTokens).toBeUndefined();
+  });
+});
+

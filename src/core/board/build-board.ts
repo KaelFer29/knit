@@ -144,6 +144,7 @@ function buildTask(
     durationMs: a.durationMs,
     ...(a.inputTokens !== undefined ? { inputTokens: a.inputTokens } : {}),
     ...(a.outputTokens !== undefined ? { outputTokens: a.outputTokens } : {}),
+    ...(trace?.attempts.get(a.attempt)?.contextTokens !== undefined ? { contextTokens: trace.attempts.get(a.attempt)!.contextTokens! } : {}),
     ...(a.failedCheck !== undefined ? { failedCheck: a.failedCheck } : {}),
     scopeOk: a.scopeOk,
   }));

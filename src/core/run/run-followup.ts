@@ -148,6 +148,7 @@ export async function runFollowup(deps: FollowupDeps, input: FollowupInput): Pro
     });
     emit("attempt.finished", {
       passed, scopeOk: violations.length === 0, failedCheck,
+      ...(result.contextTokens !== undefined ? { contextTokens: result.contextTokens } : {}),
       ...(gitProblems.length > 0 ? { gitProblems } : {}),
     });
 
