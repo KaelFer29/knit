@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { isModelId } from "../../core/plan/parse-plan.js";
 import { describeBranches } from "../../core/branches/overview.js";
 import type { UndoMode } from "../../core/ports/branch-tools.js";
 import { HttpError, sendJson } from "../http.js";
@@ -7,7 +8,6 @@ import { readJsonBody, requireControl, start } from "./control.js";
 import { requireSnapshot } from "./runs.js";
 
 const MODES: readonly UndoMode[] = ["revert", "reset", "delete"];
-const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$/;
 const MAX_TITLE = 200;
 const MAX_BODY = 60_000;
 /** How long each action may take: an undo is git, a draft waits for a model, a pull request waits for GitHub. */
@@ -54,11 +54,15 @@ export const branchesRoutes: RouteModule = ({ reader, branches, control: control
     const key = `${runId}/${taskId}`;
     if (busy.has(key)) throw new HttpError(409, `Another action on ${taskId} is still running`);
     busy.add(key);
+    let timedOut = false;
     try {
       const { child, logPath } = start(control, `branch-${verb}`, ["branch", runId, taskId, verb, ...args, "--json"]);
       const limit = control.actionTimeoutMs ?? DEFAULT_TIMEOUT_MS[verb] ?? 60_000;
       const outcome = await Promise.race([child.exited.then((code) => ({ code })), sleep(limit).then(() => undefined)]);
       if (outcome === undefined) {
+        // The child may still be working on this branch: the task stays locked until it exits, so two actions never overlap.
+        timedOut = true;
+        void child.exited.finally(() => busy.delete(key));
         sendJson(res, 504, { error: `knit branch ${verb} did not finish in time`, logPath });
         return;
       }
@@ -70,7 +74,7 @@ export const branchesRoutes: RouteModule = ({ reader, branches, control: control
       if (answer.ok === true) sendJson(res, 200, answer);
       else sendJson(res, 409, { error: typeof answer.reason === "string" ? answer.reason : `knit branch ${verb} did not do it` });
     } finally {
-      busy.delete(key);
+      if (!timedOut) busy.delete(key);
     }
   }
 
@@ -121,7 +125,7 @@ export const branchesRoutes: RouteModule = ({ reader, branches, control: control
         const control = requireControl(controlDeps);
         const body = await readJsonBody(req);
         rejectUnknown(body, ["model"]);
-        if (body.model !== undefined && (typeof body.model !== "string" || !MODEL_ID.test(body.model))) throw new HttpError(400, "model must be an id from 'agent models': no spaces, and it cannot start with a dash");
+        if (body.model !== undefined && (typeof body.model !== "string" || !isModelId(body.model))) throw new HttpError(400, "model must be an id from 'agent models': no spaces, and it cannot start with a dash");
         requireTask(params.id!, params.task!);
         await act(control, res, params.id!, params.task!, "pr-draft", body.model === undefined ? [] : ["--model", body.model as string]);
       },

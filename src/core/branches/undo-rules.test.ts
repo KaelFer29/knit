@@ -58,6 +58,14 @@ describe("decideUndo", () => {
     if (d.ok) expect(d.effects.join(" ")).toContain("2 commits");
   });
 
+  it("says the history was rewritten, not that there is nothing to undo, when the start is no longer on the branch", () => {
+    for (const mode of ["revert", "reset"] as const) {
+      const d = decideUndo(ctx({ mode, state: state({ historyIntact: false, ahead: [] }) }));
+      expect(d).toMatchObject({ ok: false, reason: expect.stringContaining("rewritten") });
+    }
+    expect(decideUndo(ctx({ mode: "delete", state: state({ historyIntact: false, ahead: [] }) })).ok).toBe(true);
+  });
+
   it("deletes a branch and its worktree, warning about the commits and that the pushed copy stays", () => {
     const d = decideUndo(ctx({ mode: "delete", state: state({ pushed: true }) }));
     expect(d.ok).toBe(true);

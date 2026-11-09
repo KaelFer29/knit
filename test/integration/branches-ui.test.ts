@@ -195,6 +195,8 @@ describe("POST /api/runs/:id/tasks/:task/undo", () => {
     await new Promise((r) => setTimeout(r, 100));
     expect((await request(server, "POST", url, { mode: "reset", confirm: true })).status).toBe(409);
     expect((await first).status).toBe(504);
+    // The child may still be running, so the task stays locked: a second action must not overlap it.
+    expect((await request(server, "POST", url, { mode: "reset", confirm: true })).status).toBe(409);
     expect(calls).toHaveLength(1);
   });
 });

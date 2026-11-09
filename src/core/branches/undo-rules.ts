@@ -24,14 +24,14 @@ export function decideUndo(ctx: UndoContext): UndoDecision {
   if (task.branch === undefined || task.startSha === undefined) return { ok: false, reason: `${task.taskId} has not started, so there is nothing to undo.` };
   if (!state.exists) return { ok: false, reason: `The branch ${task.branch} no longer exists.` };
 
+  if ((mode === "revert" || mode === "reset") && !state.historyIntact) {
+    return { ok: false, reason: `The history of ${task.branch} was rewritten, so its start commit is not on it any more. Delete the branch instead.` };
+  }
   if (mode === "revert" || mode === "reset") {
     if (state.ahead.length === 0 && !state.dirty) return { ok: false, reason: `${task.branch} has no commits after the start, so there is nothing to undo.` };
   }
   if (mode === "revert" && state.dirty) {
     return { ok: false, reason: "The worktree has uncommitted changes. Commit or discard them first, so they are not mixed into the revert." };
-  }
-  if (mode === "reset" && !state.historyIntact) {
-    return { ok: false, reason: `The history of ${task.branch} was rewritten, so its start commit is not on it any more. Delete the branch instead.` };
   }
   if ((mode === "reset" || mode === "delete") && dependents.length > 0) {
     const names = dependents.map((d) => `${d.taskId} (${d.branch})`).join(", ");

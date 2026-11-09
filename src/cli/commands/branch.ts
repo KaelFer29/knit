@@ -1,8 +1,9 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 import type { SqliteRunStore } from "../../adapters/storage/sqlite/run-store.js";
 import { CursorAgentRunner } from "../../adapters/agents/cursor/cursor-runner.js";
+import { isModelId } from "../../core/plan/parse-plan.js";
 import { GitBranchTools } from "../../adapters/vcs/git/git-branch-tools.js";
 import { GhPullRequests } from "../../adapters/vcs/github/gh-pull-requests.js";
 import { buildPrDraftPrompt, parsePrDraft } from "../../core/branches/pr-draft.js";
@@ -11,6 +12,7 @@ import type { BranchRef, BranchState, UndoMode } from "../../core/ports/branch-t
 import type { TaskRecord } from "../../core/ports/run-store.js";
 import { UsageError } from "../errors.js";
 import { parse } from "../support/args.js";
+import { ownsWorktree } from "../support/owns-worktree.js";
 import { dataDirOf, openStoreIfExists } from "../support/paths.js";
 import type { CliDeps, CliIo } from "../types.js";
 
@@ -59,6 +61,7 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
   // Everything that can be a usage mistake is checked before the database is opened.
   const mode = values.mode as UndoMode | undefined;
   if (action === "undo" && (mode === undefined || !MODES.includes(mode))) throw new UsageError(`undo needs --mode ${MODES.join("|")}`);
+  if (values.model !== undefined && !isModelId(values.model)) throw new UsageError("--model must be an id from 'agent models': no spaces, and it cannot start with a dash");
   if (action === "pr") {
     if (values.title === undefined || values.body === undefined) throw new UsageError("pr needs --title and --body");
     if (values.title.trim() === "" || /[\r\n]/.test(values.title) || values.title.length > MAX_TITLE) throw new UsageError(`--title must be one line of at most ${MAX_TITLE} characters`);
@@ -80,11 +83,11 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
     }
     const tools = new GitBranchTools(deps.gitArgs ? { gitArgs: deps.gitArgs } : {});
     // A worktree the run does not own is never touched: the path comes from the database, so it is checked.
-    const runDir = resolve(dataDirOf({ "data-dir": values["data-dir"] }, env), "worktrees", runId) + sep;
+    const runDir = resolve(dataDirOf({ "data-dir": values["data-dir"] }, env), "worktrees", runId);
     const refOf = (t: TaskRecord): BranchRef | undefined =>
       t.branch === undefined || t.startSha === undefined
         ? undefined
-        : { repo: detail.run.repo, branch: t.branch, startSha: t.startSha, ...(t.worktree !== undefined && resolve(t.worktree).startsWith(runDir) ? { worktree: t.worktree } : {}) };
+        : { repo: detail.run.repo, branch: t.branch, startSha: t.startSha, ...(t.worktree !== undefined && ownsWorktree(t.worktree, runDir) ? { worktree: t.worktree } : {}) };
     const stateOf = (t: TaskRecord): BranchState => {
       const ref = refOf(t);
       return ref ? tools.state(ref) : NONE;

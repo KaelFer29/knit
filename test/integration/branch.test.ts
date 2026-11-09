@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -137,6 +137,22 @@ describe("knit branch undo", () => {
     expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("no longer exists") });
   });
 
+  it("never removes a worktree that is only reached through a symlink out of the run's directory", async () => {
+    const { runId, worktree } = await runPlan();
+    // Another worktree of the same repository, outside the run's directory, that must survive.
+    const ext = join(scratch, "external");
+    git(repo, "worktree", "add", "-q", "-b", "other", ext);
+    writeFileSync(join(ext, "keep.txt"), "mine\n");
+    const link = join(worktree, "..", "link");
+    symlinkSync(ext, link);
+    const store = new SqliteRunStore(join(dataDir, "knit.db"));
+    store.upsertTask({ runId, taskId: "T1", title: "Create a", status: "passed", worktree: link });
+    store.close();
+    await main(["branch", runId, "T1", "undo", "--mode", "delete", "--yes"], capture().io, deps());
+    expect(existsSync(join(ext, "keep.txt"))).toBe(true);
+    expect(git(ext, "rev-parse", "--abbrev-ref", "HEAD")).toBe("other");
+  });
+
   it("exits 1 for a run or a task that does not exist, and 2 for a bad mode or a missing one", async () => {
     const { runId } = await runPlan();
     const a = capture();
@@ -195,6 +211,15 @@ describe("knit branch pr-draft", () => {
     const c = capture();
     expect(await main(["branch", runId, "T1", "pr-draft", "--json"], c.io, draftAgent("", true).deps())).toBe(1);
     expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("model exploded") });
+  });
+
+  it("rejects a model id that could be read as an option, and calls nothing", async () => {
+    const { runId } = await runPlan();
+    for (const model of ["--force", "-x", "a b", ""]) {
+      const d = draftAgent("Title: x\n\ny");
+      expect(await main(["branch", runId, "T1", "pr-draft", `--model=${model}`], capture().io, d.deps()), model).toBe(2);
+      expect(d.seen.requests).toHaveLength(0);
+    }
   });
 
   it("refuses a branch that is gone, without calling the model", async () => {
