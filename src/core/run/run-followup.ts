@@ -1,5 +1,6 @@
 import { contextShare, contextWindowOf, shouldSwitchChat } from "../context/index.js";
 import { runTurn } from "../chat/run-turn.js";
+import { renderFollowupPrompt } from "../prompt/render-prompt.js";
 import type { Task } from "../plan/parse-plan.js";
 import { capabilitiesOf, type AgentProfile, type AgentRunner } from "../ports/agent-runner.js";
 import type { CheckRunner } from "../ports/check-runner.js";
@@ -125,7 +126,7 @@ export async function runFollowup(deps: FollowupDeps, input: FollowupInput): Pro
       { agent, store: sessions, now },
       {
         sessionId: session.id,
-        prompt: input.prompt,
+        prompt: renderFollowupPrompt(input.prompt, task.branch),
         timeoutMs: input.agentTimeoutMs,
         ...(input.profile ? { profile: input.profile } : {}),
         ...(input.pid !== undefined ? { pid: input.pid } : {}),

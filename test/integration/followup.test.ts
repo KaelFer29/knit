@@ -231,9 +231,11 @@ describe("knit followup that passes", () => {
     const code = await main(["followup", runId, "T1", "please EDIT the file"], c.io, depsFor(seen));
 
     expect(code, c.err()).toBe(0);
-    // The agent was asked to continue chat-1 inside the worktree, with the prompt exactly as typed.
+    // The agent was asked to continue chat-1 inside the worktree, with the instruction as typed plus the git rules.
     expect(seen.requests).toHaveLength(1);
-    expect(seen.requests[0]).toMatchObject({ cwd: worktree, prompt: "please EDIT the file", resumeSessionId: "chat-1" });
+    expect(seen.requests[0]).toMatchObject({ cwd: worktree, resumeSessionId: "chat-1" });
+    expect(seen.requests[0]!.prompt.startsWith("please EDIT the file\n")).toBe(true);
+    expect(seen.requests[0]!.prompt).toMatch(/commit your work yourself/i);
     expect(seen.options).toEqual([{ agent: "cursor" }]);
 
     // Knit verified again: the second check ran against the new content, and the outcome is attempt 2.
@@ -265,7 +267,7 @@ describe("knit followup that passes", () => {
     expect(only!.session.title).toContain(runId);
     expect(only!.session.title).toContain("T1");
     expect(only!.turns).toHaveLength(1);
-    expect(only!.turns[0]).toMatchObject({ prompt: "please EDIT the file", status: "passed", inputTokens: 10, outputTokens: 3, exitCode: 0 });
+    expect(only!.turns[0]).toMatchObject({ status: "passed", inputTokens: 10, outputTokens: 3, exitCode: 0 });
     expect(only!.events.map((e) => e.kind)).toEqual(["message"]);
 
     // What the user sees: the stream, the answer, the verdict and how to keep going.
@@ -294,7 +296,7 @@ describe("knit followup that passes", () => {
     expect(readRun(runId).detail.attempts.map((a) => a.attempt)).toEqual([1, 2, 3]);
     const sessions = readSessions();
     expect(sessions).toHaveLength(1);
-    expect(sessions[0]!.turns.map((t) => [t.seq, t.prompt])).toEqual([[1, "EDIT once"], [2, "EDIT twice"]]);
+    expect(sessions[0]!.turns.map((t) => [t.seq, t.prompt.split("\n")[0]])).toEqual([[1, "EDIT once"], [2, "EDIT twice"]]);
   });
 
   it("uses the chat of the latest attempt that has one", async () => {

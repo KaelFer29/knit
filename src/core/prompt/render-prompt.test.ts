@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderContinuationPrompt, renderPrompt } from "./render-prompt.js";
+import { renderContinuationPrompt, renderFollowupPrompt, renderPrompt } from "./render-prompt.js";
 import type { Task } from "../plan/parse-plan.js";
 
 const TASK: Task = {
@@ -106,3 +106,13 @@ describe("renderContinuationPrompt", () => {
   });
 });
 
+
+describe("renderFollowupPrompt", () => {
+  it("keeps the instruction as typed and reminds the agent to commit on its branch", () => {
+    const text = renderFollowupPrompt("  Add the date.  ", "docs/alpha");
+    expect(text.startsWith("Add the date.\n")).toBe(true);
+    expect(text).toContain("docs/alpha");
+    expect(text).toMatch(/commit your work yourself/i);
+    expect(text).toMatch(/working tree clean/i);
+  });
+});

@@ -43,7 +43,8 @@ Project-wide rules (language, commits, where to look) live in `CLAUDE.md`, which
 7. **Interactive `claude --resume` of a `-p` session** is not verified: it cannot be tested headless. Session resume from the terminal rests on it (D10).
 8. **Known limits** of the web interface (see the link above): session-level file activity, and polling for sessions.
 9. **A first real run on a real project** with a minimal docs-only task, since the agent has no sandbox.
-10. Smaller items: a `LICENSE`, continue independent tasks after a failure, a verifier role for Claude, and measuring token cost on real tasks.
+10. **Nice to have: switch the repository back from the web.** After "Test this branch", a follow-up on that task is refused until the user runs `git checkout <other>` by hand. The interface could offer a button that returns the repository to the branch it was on.
+11. Smaller items: a `LICENSE`, continue independent tasks after a failure, a verifier role for Claude, and measuring token cost on real tasks.
 
 ## Picking it up
 
