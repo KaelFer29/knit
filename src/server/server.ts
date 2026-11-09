@@ -3,6 +3,7 @@ import type { FileTree } from "../core/ports/file-tree.js";
 import type { PlanDrafts } from "../core/ports/plan-drafts.js";
 import type { RunReader } from "../core/ports/run-reader.js";
 import type { TaskDiff } from "../core/ports/task-diff.js";
+import type { FileActivity } from "../core/ports/file-activity.js";
 import { BASE_HEADERS, HttpError, sendError } from "./http.js";
 import { decodeSegments, Router } from "./router.js";
 import { routeModules } from "./routes/index.js";
@@ -33,6 +34,8 @@ export interface ServerOptions {
   taskDiff?: TaskDiff;
   /** Draft plan detection. Without it the plans route answers 503. */
   plans?: PlanDrafts;
+  /** Reads the files a task worktree has changed. Without it the activity route leaves the worktree list out. */
+  fileActivity?: FileActivity;
 }
 
 export interface RunningServer {
@@ -62,6 +65,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     ...(options.files ? { files: options.files } : {}),
     ...(options.taskDiff ? { taskDiff: options.taskDiff } : {}),
     ...(options.plans ? { plans: options.plans } : {}),
+    ...(options.fileActivity ? { fileActivity: options.fileActivity } : {}),
   };
   const router = new Router(routeModules.flatMap((mod) => mod(deps)));
   const staticDir = options.staticDir ?? defaultStaticDir();

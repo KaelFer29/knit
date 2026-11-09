@@ -22,7 +22,7 @@ src/
     storage/sqlite/  RunStore and SessionStore (read-write), RunReader and SessionReader (read-only); one shared schema and migration (`schema.ts`)
     storage/files/   TranscriptStore (raw JSONL)
     system/          process spawning with timeouts and group kill; ProcessControl (inspect and signal processes)
-  server/          driving adapter: HTTP API, live stream (SSE), run control, static files and the security guard of `knit ui`; receives a `RunReader`, a `TaskDiff` and a spawner for Knit child processes, knows nothing about SQLite or adapters
+  server/          driving adapter: HTTP API, live stream (SSE), run control, static files and the security guard of `knit ui`; receives a `RunReader`, a `TaskDiff`, a `FileActivity` and a spawner for Knit child processes, knows nothing about SQLite or adapters
   cli/             command line: wires adapters into the core
     commands/        one module per command
     support/         argument parsing, paths, formatting
@@ -49,6 +49,7 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 | `RunStore` | persist runs (with a snapshot of the plan and the pid executing them), tasks, attempts, events | `storage/sqlite` |
 | `SessionStore` | persist chat sessions (agent-agnostic), their turns (prompt, answer, tokens, profile, meta, pid) and each turn's timeline; list sessions newest first, events after an id | `storage/sqlite` |
 | `TaskDiff` | read side of a task's code change: files, counts and hunks between its start commit and its commit, in its worktree | `vcs/git` |
+| `FileActivity` | read side of the files a task worktree has changed now (git status), for the web interface; the files a timeline touched are derived in `core/timeline` | `vcs/git` |
 | `SessionReader` | read side of the chat sessions for the web interface: sessions with turn counts and token totals, turns, timeline entries after an id; read-only, a database without session tables has none | `storage/sqlite` |
 | `RunReader` | read side for the web interface: runs list, snapshot of a run, events and agent events after an id, over a read-only connection that never writes or migrates | `storage/sqlite` |
 | `PlanDrafts` | read-only detection of the draft plans in `docs/plans/` of a repository (`PLAN_DIR`), each validated with the plan parser; used by the web interface | `system` |

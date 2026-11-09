@@ -34,6 +34,37 @@ describe("task detail", () => {
     expect(screen.getByText(/timingSafeEqual/)).toBeTruthy();
   });
 
+  it("shows the files an attempt touched, loaded when the attempt is opened", async () => {
+    const source = fixtureDetailSource(failedRun);
+    const spy = vi.spyOn(source, "activity");
+    const user = userEvent.setup();
+    render(<>{createRenderDetail(failedRun, source)({ kind: "task", taskId: "T2" })}</>);
+    await user.click(screen.getByRole("button", { name: /Attempt 1/ }));
+    expect(spy).toHaveBeenCalledWith("T2", 1);
+    expect(await screen.findByRole("list", { name: "Files touched" })).toBeTruthy();
+    expect(screen.getByText("src/webhooks/signature.test.ts")).toBeTruthy();
+  });
+
+  it("lists what the worktree changed, loaded when opened, and says when it cannot be read", async () => {
+    const source = fixtureDetailSource(failedRun);
+    const spy = vi.spyOn(source, "activity");
+    const user = userEvent.setup();
+    render(<>{createRenderDetail(failedRun, source)({ kind: "task", taskId: "T1" })}</>);
+    expect(spy).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: /Worktree changes/ }));
+    expect(spy).toHaveBeenCalledWith("T1");
+    expect(await screen.findByRole("list", { name: "Worktree changes" })).toBeTruthy();
+    expect(screen.getByText("src/webhooks/signature.ts")).toBeTruthy();
+  });
+
+  it("says that the worktree cannot be read when the server could not read it", async () => {
+    const source: DetailSource = { ...fixtureDetailSource(failedRun), activity: async () => ({ touched: [], worktree: null }) };
+    const user = userEvent.setup();
+    render(<>{createRenderDetail(failedRun, source)({ kind: "task", taskId: "T1" })}</>);
+    await user.click(screen.getByRole("button", { name: /Worktree changes/ }));
+    expect(await screen.findByText("The worktree cannot be read.")).toBeTruthy();
+  });
+
   it("shows the error when a load fails", async () => {
     const source: DetailSource = { ...fixtureDetailSource(failedRun), diff: async () => { throw new Error("The task's worktree no longer exists"); } };
     const user = userEvent.setup();

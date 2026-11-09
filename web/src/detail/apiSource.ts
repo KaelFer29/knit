@@ -1,5 +1,5 @@
 import { apiGet } from "../api/client";
-import type { AttemptNotes, DetailSource, TaskDiffData, TimelineEntry } from "./types";
+import type { AttemptNotes, DetailSource, FileActivityData, TaskDiffData, TimelineEntry } from "./types";
 
 /** The parts of `GET /api/runs/:id` this source reads. */
 export interface SnapshotParts {
@@ -37,6 +37,10 @@ export function createApiDetailSource(snapshot: SnapshotParts, fetcher: Fetcher 
     },
     async diff(taskId): Promise<TaskDiffData> {
       return fetcher<TaskDiffData>(`${runPath}/tasks/${enc(taskId)}/diff`);
+    },
+    async activity(taskId, attempt): Promise<FileActivityData> {
+      const query = attempt === undefined ? "" : `?attempt=${attempt}`;
+      return fetcher<FileActivityData>(`${runPath}/tasks/${enc(taskId)}/activity${query}`);
     },
   };
 }
