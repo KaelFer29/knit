@@ -4,6 +4,7 @@
  * small glimpse of the latest Claude session; no component decides a stage.
  */
 import type { BoardModel, NodeStatus } from "@board";
+import { formatDuration, formatTokens } from "../flow/format";
 
 export type HopId = "plan" | "prompt" | "result";
 export type HopStatus = "idle" | "active" | "done" | "failed";
@@ -32,6 +33,32 @@ export interface SessionGlimpse {
   lastPrompt?: string;
   /** Last timeline entries as one line each, oldest first. */
   lines: string[];
+  /** Model the agent reported, or the one the last turn asked for. */
+  model?: string;
+  /** Input tokens of the last finished turn: how much context the session carries. */
+  contextTokens?: number;
+  turns?: number;
+  /** Subagents still running in the current turn, by description. */
+  agents?: string[];
+  planUsage?: { name: string; utilization: number }[];
+}
+
+export interface DetailFact {
+  label: string;
+  value: string;
+}
+
+export interface DetailMeter {
+  label: string;
+  /** 0 to 1. */
+  ratio: number;
+}
+
+/** What a block shows when its details are expanded below it. */
+export interface BlockDetails {
+  facts: DetailFact[];
+  meters: DetailMeter[];
+  agents: string[];
 }
 
 export interface BlockView {
@@ -231,4 +258,42 @@ export function deriveBlocks(board: BoardModel | undefined, session: SessionGlim
     ]),
   };
   return { claude, knit, cursor };
+}
+
+const WINDOW_LABEL: Record<string, string> = { five_hour: "5-hour limit", seven_day: "Weekly limit" };
+
+/** The facts behind each block's "details" expansion. Unknown values say so; nothing is guessed. */
+export function deriveDetails(board: BoardModel | undefined, session: SessionGlimpse | undefined): Record<"claude" | "knit" | "cursor", BlockDetails> {
+  const claudeFacts: DetailFact[] = [{ label: "Model", value: session === undefined ? "No session" : (session.model ?? "Default") }];
+  if (session?.contextTokens !== undefined) claudeFacts.push({ label: "Context", value: `${formatTokens(session.contextTokens)} tokens` });
+  if (session?.turns !== undefined) claudeFacts.push({ label: "Turns", value: String(session.turns) });
+  if (board !== undefined) claudeFacts.push({ label: "Plan", value: board.planName });
+  const claude: BlockDetails = {
+    facts: claudeFacts,
+    meters: (session?.planUsage ?? []).map((w) => ({ label: WINDOW_LABEL[w.name] ?? w.name.replace(/_/g, " "), ratio: Math.max(0, Math.min(1, w.utilization)) })),
+    agents: session?.agents ?? [],
+  };
+  if (board === undefined) {
+    return { claude, knit: { facts: [{ label: "Run", value: "No run yet" }], meters: [], agents: [] }, cursor: { facts: [{ label: "Task", value: "None" }], meters: [], agents: [] } };
+  }
+  const { totals, active } = board;
+  const knitFacts: DetailFact[] = [
+    { label: "Run", value: board.runStatus },
+    { label: "Tasks", value: `${totals.tasks.delivered} of ${totals.tasks.total} delivered` },
+    { label: "Attempts", value: String(totals.attempts) },
+  ];
+  if (totals.elapsedMs !== undefined) knitFacts.push({ label: "Elapsed", value: formatDuration(totals.elapsedMs) });
+  const ratio = totals.tasks.total === 0 ? 0 : totals.tasks.delivered / totals.tasks.total;
+  const task = active === undefined ? undefined : board.tasks.find((t) => t.taskId === active.taskId);
+  const cursorFacts: DetailFact[] = [{ label: "Task", value: active?.taskId ?? "None" }];
+  if (active?.attempt !== undefined) cursorFacts.push({ label: "Attempt", value: String(active.attempt) });
+  if (task?.branch !== undefined) cursorFacts.push({ label: "Branch", value: task.branch });
+  const cursorTokens = totals.tokens.cursor;
+  cursorFacts.push({ label: "Tokens", value: formatTokens(cursorTokens.input + cursorTokens.output) });
+  if (totals.agentMs > 0) cursorFacts.push({ label: "Agent time", value: formatDuration(totals.agentMs) });
+  return {
+    claude,
+    knit: { facts: knitFacts, meters: [{ label: "Delivered", ratio }], agents: [] },
+    cursor: { facts: cursorFacts, meters: [], agents: [] },
+  };
 }

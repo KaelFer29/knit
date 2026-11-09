@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deliveredRun, failedRun, retryingRun, runningRun, verifyingRun } from "../fixtures/boards";
-import { clipLine, deriveBlocks, deriveHops, deriveStages, hopProgress, type SessionGlimpse } from "./pipeline";
+import { clipLine, deriveBlocks, deriveDetails, deriveHops, deriveStages, hopProgress, type SessionGlimpse } from "./pipeline";
 
 const hop = (hops: ReturnType<typeof deriveHops>, id: string) => hops.find((h) => h.id === id)!;
 const claudeBusy: SessionGlimpse = { status: "running", title: "Plan billing", lastPrompt: "Write the plan for webhooks", lines: ["Reading the repo"] };
@@ -137,5 +137,50 @@ describe("deriveStages", () => {
 
   it("finishes every stage when the whole plan is delivered", () => {
     expect(view(deliveredRun)).toEqual(["plan:done", "queue:done", "build:done", "checks:done", "deliver:done"]);
+  });
+});
+
+describe("deriveDetails", () => {
+  const session: SessionGlimpse = {
+    status: "running",
+    title: "Plan billing",
+    lines: [],
+    model: "claude-opus-5-5",
+    contextTokens: 48_200,
+    turns: 3,
+    agents: ["Map the server"],
+    planUsage: [{ name: "five_hour", utilization: 0.42 }],
+  };
+  const fact = (facts: { label: string; value: string }[], label: string) => facts.find((f) => f.label === label)?.value;
+
+  it("shows Claude's model, context, turns, running agents and plan usage from the session", () => {
+    const { claude } = deriveDetails(runningRun, session);
+    expect(fact(claude.facts, "Model")).toBe("claude-opus-5-5");
+    expect(fact(claude.facts, "Context")).toBe("48.2k tokens");
+    expect(fact(claude.facts, "Turns")).toBe("3");
+    expect(claude.agents).toEqual(["Map the server"]);
+    expect(claude.meters).toEqual([{ label: "5-hour limit", ratio: 0.42 }]);
+  });
+
+  it("says what is unknown instead of inventing it when there is no session", () => {
+    const { claude } = deriveDetails(runningRun, undefined);
+    expect(fact(claude.facts, "Model")).toBe("No session");
+    expect(fact(claude.facts, "Plan")).toBe("add-billing-webhooks");
+    expect(claude.agents).toEqual([]);
+  });
+
+  it("shows the run for the orchestrator and the active attempt for Cursor", () => {
+    const { knit, cursor } = deriveDetails(runningRun, undefined);
+    expect(fact(knit.facts, "Run")).toBe("running");
+    expect(fact(knit.facts, "Tasks")).toBe("2 of 6 delivered");
+    expect(fact(cursor.facts, "Task")).toBe("T3");
+    expect(fact(cursor.facts, "Attempt")).toBe("1");
+    expect(fact(cursor.facts, "Tokens")).toMatch(/k$|^\d+$/);
+  });
+
+  it("has nothing for the orchestrator and Cursor without a run", () => {
+    const { knit, cursor } = deriveDetails(undefined, undefined);
+    expect(fact(knit.facts, "Run")).toBe("No run yet");
+    expect(cursor.facts).toEqual([{ label: "Task", value: "None" }]);
   });
 });

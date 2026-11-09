@@ -1,5 +1,5 @@
 .pipeline {
-  --block-h: 15rem;
+  --block-h: 12.5rem;
   container-type: inline-size;
   width: 100%;
   min-width: 0;
@@ -23,7 +23,13 @@
 /* Claude's mascot sits above its card; the other cards start at the same line. */
 .pipeline__cell[data-area="knit"],
 .pipeline__cell[data-area="cursor"] {
-  padding-top: 2.6rem;
+  padding-top: 2.1rem;
+}
+
+/* Beside the blocks a hop keeps its two newest lines; the rest are in the panels. */
+.pipeline__cell[data-area="plan"] .hop__line:nth-child(n + 3),
+.pipeline__cell[data-area="prompt"] .hop__line:nth-child(n + 3) {
+  display: none;
 }
 
 .pipeline__cell[data-area="claude"] {
@@ -32,7 +38,7 @@
 .pipeline__cell[data-area="plan"] {
   grid-area: plan;
   align-self: start;
-  margin-top: calc(2.6rem + var(--block-h) / 2 - 1.75rem);
+  margin-top: calc(2.1rem + 4.25rem);
 }
 .pipeline__cell[data-area="knit"] {
   grid-area: knit;
@@ -40,7 +46,7 @@
 .pipeline__cell[data-area="prompt"] {
   grid-area: prompt;
   align-self: start;
-  margin-top: calc(2.6rem + var(--block-h) / 2 - 1.75rem);
+  margin-top: calc(2.1rem + 4.25rem);
 }
 .pipeline__cell[data-area="cursor"] {
   grid-area: cursor;
@@ -66,5 +72,10 @@
 
   .pipeline .block__frame {
     min-height: 0;
+  }
+
+  .pipeline .block__sheet {
+    position: static;
+    margin-top: var(--space-2);
   }
 }

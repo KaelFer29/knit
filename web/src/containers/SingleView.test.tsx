@@ -29,9 +29,23 @@ describe("SingleView", () => {
     render(<SingleView search="?fixture=runningRun" />);
     const cursor = screen.getByRole("group", { name: "Cursor" });
     expect(within(cursor).getByText("T3")).toBeTruthy();
-    expect(within(cursor).getByText("edit: src/billing/webhook-store.ts")).toBeTruthy();
+    expect(within(cursor).getByTitle("edit: src/billing/webhook-store.ts").textContent).toContain("webhook-store.ts");
     expect(within(screen.getByRole("group", { name: "Orchestrator" })).getByText("2 of 6 tasks delivered")).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "Orchestrator to Cursor" })).getByText("Agent working", { selector: ".hop__current" })).toBeTruthy();
+  });
+
+  it("expands a block's details below it without opening the panel, and folds them again", async () => {
+    const user = userEvent.setup();
+    render(<SingleView search="?fixture=runningRun" />);
+    const toggle = screen.getByRole("button", { name: "Cursor details" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    const region = screen.getByRole("region", { name: "Cursor details" });
+    expect(within(region).getByText("Attempt")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.click(toggle);
+    expect(screen.queryByRole("region", { name: "Cursor details" })).toBeNull();
   });
 
   it("is idle with no run and no session", async () => {
