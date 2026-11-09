@@ -10,7 +10,7 @@ import { AppShell } from "../organisms/AppShell";
 import { PipelineStage } from "../organisms/PipelineStage";
 import { PanelModal } from "../organisms/PanelModal";
 import { runsHash, useRoute } from "../route";
-import { useRuns } from "../runs/useRuns";
+import { useRunsPage } from "../runs/useRuns";
 import { deriveBlocks, deriveDetails, deriveHops, deriveStages } from "../single/pipeline";
 import { PANELS, type PanelId } from "../single/panels/registry";
 import { usePlanUsage } from "../sessions/usePlanUsage";
@@ -37,8 +37,9 @@ export function SingleView({ search = window.location.search, actions }: Props) 
   const query = new URLSearchParams(search);
   const fixtureMode = params.run === undefined && (query.has("fixture") || query.has("demo"));
   const route = useRoute();
-  const { runs } = useRuns();
-  const recent = useMemo(() => (runs === undefined ? undefined : [...runs].sort((a, b) => b.run.startedAt.localeCompare(a.run.startedAt))[0]?.run.id), [runs]);
+  // Only the newest run is needed here: the server returns runs newest first and the page asks for one.
+  const { runs } = useRunsPage({ limit: 1, offset: 0 });
+  const recent = runs?.[0]?.run.id;
   const runId = route.runId ?? params.run ?? (fixtureMode ? undefined : recent);
 
   const live = useBoard(runId);
