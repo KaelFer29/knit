@@ -64,6 +64,10 @@ It is a one-shot command, not a server: it starts, runs the turn, writes the his
 
 `knit followup <run-id> <task-id> "<prompt>"` sends one more prompt to the Cursor chat of a task (`agent --resume`), inside the task's own worktree, and has Knit verify the result again: scope, git hygiene and the task's checks, against the plan stored with the run. Options: `--model`, `--agent-command`, `--data-dir`. The outcome is recorded as the task's next attempt, so `show` and `logs` list it, and the turn is kept as a session (see `chat`). Exit code `0` when the verification passed, `1` when it failed or the follow-up was refused (the run is still running, the worktree is gone, no chat id was recorded, or the run predates plan snapshots), `2` for usage mistakes. After a passing follow-up on a failed run, `resume` keeps the task as passed and continues. Details in [docs/run-lifecycle.md](docs/run-lifecycle.md#follow-ups).
 
+### Branches of a task
+
+`knit branch <run-id> <task-id> undo --mode revert|reset|delete [--yes]` takes back what a task did on its branch: `revert` adds one commit that restores the start, `reset` returns the branch to where the task began, `delete` removes the worktree and the branch. Without `--yes` it only says what it would do; it refuses while the run is running or another task is stacked on the branch. `knit branch <run-id> <task-id> pr-draft [--model]` has a cheap model (default `composer-2.5-fast`, in an empty scratch directory) draft a title and body, and `knit branch <run-id> <task-id> pr --title=<t> --body=<b>` pushes the branch (never forced) and opens the pull request. All three accept `--json`; the web interface runs them. Details in [docs/web-interface.md](docs/web-interface.md#cursor-panel-built-u5).
+
 ## What a run does
 
 For each task, in file order:
