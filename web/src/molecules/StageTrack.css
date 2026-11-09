@@ -1,4 +1,4 @@
-/* The orchestrator's stages as a track of dots joined by segments: brown for the work done and in hand, red for a failure. */
+/* The orchestrator's stages as a track of dots joined by segments: green for the work done and in hand, red for a failure. */
 .stage-track {
   --stage-color: var(--agent-knit);
   --stage-line: color-mix(in srgb, var(--agent-knit) 22%, var(--border));

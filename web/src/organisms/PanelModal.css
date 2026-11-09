@@ -95,13 +95,8 @@
   font-weight: 500;
 }
 
-/* The orchestrator's modal: white with a faint green, flat. It redefines the knit tokens for everything inside, so the
-   main view's block keeps its own look. */
+/* The orchestrator's modal: white with a faint green, flat; the panels inside read these surfaces. */
 .modal__dialog[data-agent="knit"] {
-  --agent-knit: #0e8a8c;
-  --agent-knit-soft: #dcf1f1;
-  --knit-canvas: #fbfdfc;
-  --knit-line: #e1ebe9;
   --surface-1: var(--knit-canvas);
   --surface-2: #f1f7f6;
   --surface-3: #e6efed;
