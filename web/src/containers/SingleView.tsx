@@ -11,7 +11,7 @@ import { PipelineStage } from "../organisms/PipelineStage";
 import { SidePanel } from "../organisms/SidePanel";
 import { runsHash, useRoute } from "../route";
 import { useRuns } from "../runs/useRuns";
-import { deriveBlocks, deriveHops } from "../single/pipeline";
+import { deriveBlocks, deriveHops, deriveStages } from "../single/pipeline";
 import { PANELS, type PanelId } from "../single/panels/registry";
 import { useLatestSession } from "../single/useLatestSession";
 import { createRenderDetail } from "./detailRenderer";
@@ -49,6 +49,7 @@ export function SingleView({ search = window.location.search, actions }: Props) 
 
   const blocks = useMemo(() => deriveBlocks(board, session), [board, session]);
   const hops = useMemo(() => deriveHops(board, session), [board, session]);
+  const stages = useMemo(() => deriveStages(board), [board]);
 
   const [open, setOpen] = useState<PanelId>();
   const toggle = useCallback((id: PanelId) => setOpen((current) => (current === id ? undefined : id)), []);
@@ -66,9 +67,9 @@ export function SingleView({ search = window.location.search, actions }: Props) 
   return (
     <AppShell label="Knit pipeline" actions={<>{configButton}{actions}</>}>
       <div className="single" data-panel-open={open !== undefined}>
-        <section className="single__stage" aria-label="Claude, Knit and Cursor pipeline">
+        <section className="single__stage" aria-label="Claude, orchestrator and Cursor pipeline">
           {runId !== undefined ? <LiveStatus connection={live.connection} error={live.error} /> : null}
-          <PipelineStage blocks={blocks} hops={hops} openId={open !== undefined && (AGENT_ORDER as readonly string[]).includes(open) ? (open as AgentId) : undefined} onOpen={toggle} />
+          <PipelineStage blocks={blocks} hops={hops} stages={stages} openId={open !== undefined && (AGENT_ORDER as readonly string[]).includes(open) ? (open as AgentId) : undefined} onOpen={toggle} />
         </section>
         {Panel === undefined || open === undefined ? null : (
           <SidePanel key={open} panelId={open} title={Panel.title} onClose={() => setOpen(undefined)}>

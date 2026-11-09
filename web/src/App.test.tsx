@@ -23,7 +23,7 @@ describe("app shell", () => {
     window.history.replaceState(null, "", "/?fixture=runningRun");
     render(<App />);
     const main = screen.getByRole("main");
-    for (const text of ["Claude", "planner", "Knit", "orchestrator", "Cursor", "builder"]) {
+    for (const text of ["Claude", "planner", "Orchestrator", "pipeline", "Cursor", "builder"]) {
       expect(main.textContent).toContain(text);
     }
   });

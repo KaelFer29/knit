@@ -250,14 +250,14 @@ describe("ClaudePanel: plan handoff", () => {
     );
   }
 
-  it("shows the draft with its validation result and starts nothing until Send plan to Knit is clicked", async () => {
+  it("shows the draft with its validation result and starts nothing until Send plan to the orchestrator is clicked", async () => {
     const user = userEvent.setup();
     withPlans([draft()]);
     render(panel());
     await screen.findByText("Add login");
     expect(screen.getByText("Valid")).toBeTruthy();
     expect(posted).toEqual([]);
-    await user.click(screen.getByRole("button", { name: "Send plan to Knit" }));
+    await user.click(screen.getByRole("button", { name: "Send plan to the orchestrator" }));
     await waitFor(() => expect(posted).toEqual([{ url: "/api/runs", body: { planPath: "/repo/docs/plans/login.md" } }]));
   });
 
@@ -265,7 +265,7 @@ describe("ClaudePanel: plan handoff", () => {
     withPlans([draft({ valid: false, issues: ["T1 has no goal"], tasks: [] })]);
     render(panel());
     await screen.findByText("T1 has no goal");
-    const send = screen.getByRole("button", { name: "Send plan to Knit" }) as HTMLButtonElement;
+    const send = screen.getByRole("button", { name: "Send plan to the orchestrator" }) as HTMLButtonElement;
     expect(send.disabled).toBe(true);
     expect(screen.getByText(/Fix 1 issue/)).toBeTruthy();
   });

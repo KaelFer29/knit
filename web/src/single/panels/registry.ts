@@ -44,7 +44,7 @@ export interface PanelDefinition {
 
 export const PANELS: Record<PanelId, PanelDefinition> = {
   claude: { title: "Claude", Component: ClaudePanel },
-  knit: { title: "Knit", Component: KnitPanel },
+  knit: { title: "Orchestrator", Component: KnitPanel },
   cursor: { title: "Cursor", Component: CursorPanel },
   config: { title: "Configuration", Component: ConfigPanel },
 };

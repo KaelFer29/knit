@@ -13,7 +13,7 @@ describe("FlowCanvas", () => {
   it("draws Claude, Knit and Cursor, in that order", () => {
     render(<FlowCanvas board={runningRun} />);
     const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent ?? "");
-    expect(headings.map((t) => t.match(/Claude|Knit|Cursor/)?.[0])).toEqual(["Claude", "Knit", "Cursor"]);
+    expect(headings.map((t) => t.match(/Claude|Orchestrator|Cursor/)?.[0])).toEqual(["Claude", "Orchestrator", "Cursor"]);
   });
 
   it("shows what Claude handed over: the plan and its tasks", () => {
@@ -27,14 +27,14 @@ describe("FlowCanvas", () => {
 
   it("shows Knit's progress and no token count, since Knit never calls a model", () => {
     render(<FlowCanvas board={runningRun} />);
-    const knit = block(/Knit/);
+    const knit = block(/Orchestrator/);
     expect(knit.textContent).toContain("2 of 6 delivered");
     expect(within(knit).queryByText(/tokens/i)).toBeNull();
   });
 
   it("puts the queue at Knit's input, the running task at its center and the delivery lane at its output", () => {
     render(<FlowCanvas board={runningRun} />);
-    const knit = block(/Knit/);
+    const knit = block(/Orchestrator/);
     const queue = within(knit).getByRole("region", { name: "Queue" });
     const now = within(knit).getByRole("region", { name: "Running task" });
     const delivered = within(knit).getByRole("region", { name: "Delivered tasks" });
@@ -57,7 +57,7 @@ describe("FlowCanvas", () => {
     // While Knit checks, the line belongs to Knit's check, not to the builder.
     expect(within(block(/Cursor/)).queryByText("pnpm typecheck", { selector: ".live-line__text" })).toBeNull();
     expect(within(block(/Cursor/)).getByText(/waiting/i)).toBeTruthy();
-    expect(within(block(/Knit/)).getByText("pnpm typecheck")).toBeTruthy();
+    expect(within(block(/Orchestrator/)).getByText("pnpm typecheck")).toBeTruthy();
   });
 
   it("shows Claude's token total when sessions recorded some", () => {
@@ -83,7 +83,7 @@ describe("FlowCanvas", () => {
     }
     const at = (needle: string) => order.findIndex((t) => t.includes(needle));
     expect(at("Claude")).toBe(0);
-    expect(at("Knit")).toBe(1);
+    expect(at("Orchestrator")).toBe(1);
     expect([at("Update subscription"), at("Send a receipt"), at("Document the webhook"), at("Store events"), at("PR #41"), at("PR #42")]).toEqual([2, 3, 4, 5, 6, 7]);
     expect(at("Cursor")).toBe(8);
   });
@@ -152,7 +152,7 @@ describe("FlowCanvas", () => {
     const now = screen.getByRole("region", { name: "Running task" });
     expect(now.textContent).toContain("Verify the signature of incoming events");
     expect(now.textContent).toContain("Failed");
-    expect(block(/Knit/).textContent).toContain("Failed");
+    expect(block(/Orchestrator/).textContent).toContain("Failed");
   });
 
   it("draws a run recorded before schema 4 without goals or dependencies", () => {

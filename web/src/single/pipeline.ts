@@ -66,7 +66,7 @@ const RESULT_STAGES = ["Result back", "Checks running", "Verdict"] as const;
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 function planHop(board: BoardModel | undefined, session: SessionGlimpse | undefined): HopView {
-  const base = { id: "plan", from: "claude", to: "knit", label: "Claude to Knit", stages: PLAN_STAGES } as const;
+  const base = { id: "plan", from: "claude", to: "knit", label: "Claude to orchestrator", stages: PLAN_STAGES } as const;
   const prompt = session?.lastPrompt === undefined ? undefined : `Claude: ${session.lastPrompt}`;
   if (board === undefined) {
     if (session?.status === "running") return { ...base, stage: "Plan drafted", stageIndex: 0, status: "active", lines: tidy([prompt]) };
@@ -83,7 +83,7 @@ function planHop(board: BoardModel | undefined, session: SessionGlimpse | undefi
 }
 
 function promptHop(board: BoardModel | undefined): HopView {
-  const base = { id: "prompt", from: "knit", to: "cursor", label: "Knit to Cursor", stages: PROMPT_STAGES } as const;
+  const base = { id: "prompt", from: "knit", to: "cursor", label: "Orchestrator to Cursor", stages: PROMPT_STAGES } as const;
   if (board === undefined) return { ...base, stage: "No task queued", stageIndex: -1, status: "idle", lines: [] };
   const { active } = board;
   if (active !== undefined) {
@@ -106,7 +106,7 @@ function promptHop(board: BoardModel | undefined): HopView {
 }
 
 function resultHop(board: BoardModel | undefined): HopView {
-  const base = { id: "result", from: "cursor", to: "knit", label: "Cursor back to Knit", stages: RESULT_STAGES } as const;
+  const base = { id: "result", from: "cursor", to: "knit", label: "Cursor back to orchestrator", stages: RESULT_STAGES } as const;
   if (board === undefined) return { ...base, stage: "No result yet", stageIndex: -1, status: "idle", lines: [] };
   const { active } = board;
   const lastDelivered = board.delivery[board.delivery.length - 1];
@@ -125,6 +125,63 @@ function resultHop(board: BoardModel | undefined): HopView {
   if (board.tasks.length > 0 && board.tasks.every((t) => t.state === "delivered")) return { ...base, stage: "Verdict: delivered", stageIndex: 2, status: "done", lines: tidy([delivered]) };
   if (delivered !== undefined) return { ...base, stage: "Result back", stageIndex: 0, status: "done", lines: tidy([delivered]) };
   return { ...base, stage: "No result yet", stageIndex: -1, status: "idle", lines: [] };
+}
+
+export type StageId = "plan" | "queue" | "build" | "checks" | "deliver";
+export type StageStatus = "idle" | "active" | "done" | "failed";
+
+/** One stage of the orchestrator's own pipeline, as its block draws it. */
+export interface StageView {
+  id: StageId;
+  label: string;
+  status: StageStatus;
+  /** A few words on what the stage holds now. */
+  detail?: string;
+}
+
+const stage = (id: StageId, label: string, status: StageStatus, detail?: string): StageView => (detail === undefined ? { id, label, status } : { id, label, status, detail: clip(detail, 32) });
+
+/**
+ * The orchestrator's pipeline: the plan comes in, tasks wait in the queue, Cursor builds the open one, checks judge it
+ * and passed tasks are delivered. Each stage reads only the board.
+ */
+export function deriveStages(board: BoardModel | undefined): StageView[] {
+  if (board === undefined) {
+    return [stage("plan", "Plan", "idle", "Waiting for a plan"), stage("queue", "Queue", "idle"), stage("build", "Build", "idle"), stage("checks", "Checks", "idle"), stage("deliver", "Deliver", "idle")];
+  }
+  const { active, queue, tasks } = board;
+  const running = board.runStatus === "running";
+  const total = tasks.length;
+  const delivered = tasks.filter((t) => t.state === "delivered").length;
+  const failed = tasks.find((t) => t.state === "failed");
+  const allDelivered = total > 0 && delivered === total;
+
+  const queueStatus: StageStatus = queue.length > 0 ? (running ? "active" : "idle") : total > 0 ? "done" : "idle";
+  const buildStatus: StageStatus = active !== undefined ? (active.state === "verifying" ? "done" : "active") : tasks.some((t) => t.state !== "queued") ? "done" : "idle";
+  const buildDetail = active === undefined ? undefined : `${active.taskId} · ${active.attempt === undefined ? "setup" : `attempt ${active.attempt}`}`;
+
+  let checksStatus: StageStatus = "idle";
+  let checksDetail: string | undefined;
+  if (active?.state === "verifying") {
+    checksStatus = "active";
+    checksDetail = tasks.find((t) => t.taskId === active.taskId)?.attempts.find((a) => a.status === "verifying")?.checking;
+  } else if (active?.state === "retrying") {
+    checksStatus = "active";
+    const check = tasks.find((t) => t.taskId === active.taskId)?.attempts.find((a) => a.status === "failed")?.failedCheck;
+    checksDetail = check === undefined ? "retrying" : `retry: ${check}`;
+  } else if (active === undefined && failed !== undefined) {
+    checksStatus = "failed";
+    checksDetail = `${failed.taskId} failed`;
+  } else if (allDelivered) checksStatus = "done";
+
+  const deliverStatus: StageStatus = allDelivered ? "done" : delivered > 0 && running ? "active" : "idle";
+  return [
+    stage("plan", "Plan", "done", plural(total, "task")),
+    stage("queue", "Queue", queueStatus, queue.length > 0 ? `${queue.length} waiting` : undefined),
+    stage("build", "Build", buildStatus, buildDetail),
+    stage("checks", "Checks", checksStatus, checksDetail),
+    stage("deliver", "Deliver", deliverStatus, total > 0 ? `${delivered} of ${total}` : undefined),
+  ];
 }
 
 /** Share of a hop's stages already reached, 0 to 1. Drives the fill of the stage track. */

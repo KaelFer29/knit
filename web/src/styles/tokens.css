@@ -44,6 +44,11 @@
   --agent-cursor-soft: #ecece8;
   --agent-knit: #0e8a8c;
   --agent-knit-soft: #dcf1f1;
+  /* Block skins: the surfaces of the Claude Code terminal and the Cursor editor. */
+  --skin-term-bg: #fbf8f3;
+  --skin-term-fg: #3d3929;
+  --skin-editor-bg: #fbfbfa;
+  --skin-editor-bar: #efefec;
   /* A single-color official logo is drawn dark; it flips to light on dark surfaces. */
   --logo-mono-filter: none;
 
@@ -119,6 +124,10 @@
     --agent-cursor-soft: #2b2b28;
     --agent-knit: #3cc2c4;
     --agent-knit-soft: #12312f;
+    --skin-term-bg: #1d1b18;
+    --skin-term-fg: #e8e2d6;
+    --skin-editor-bg: #131313;
+    --skin-editor-bar: #1d1d1c;
     --logo-mono-filter: invert(1);
 
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
@@ -160,6 +169,10 @@
   --agent-cursor-soft: #2b2b28;
   --agent-knit: #3cc2c4;
   --agent-knit-soft: #12312f;
+  --skin-term-bg: #1d1b18;
+  --skin-term-fg: #e8e2d6;
+  --skin-editor-bg: #131313;
+  --skin-editor-bar: #1d1d1c;
   --logo-mono-filter: invert(1);
 
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);

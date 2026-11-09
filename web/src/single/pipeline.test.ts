@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deliveredRun, failedRun, retryingRun, runningRun, verifyingRun } from "../fixtures/boards";
-import { clipLine, deriveBlocks, deriveHops, hopProgress, type SessionGlimpse } from "./pipeline";
+import { clipLine, deriveBlocks, deriveHops, deriveStages, hopProgress, type SessionGlimpse } from "./pipeline";
 
 const hop = (hops: ReturnType<typeof deriveHops>, id: string) => hops.find((h) => h.id === id)!;
 const claudeBusy: SessionGlimpse = { status: "running", title: "Plan billing", lastPrompt: "Write the plan for webhooks", lines: ["Reading the repo"] };
@@ -106,5 +106,36 @@ describe("clipLine and hopProgress", () => {
     expect(hopProgress({ stages: ["a", "b", "c", "d"], stageIndex: -1 })).toBe(0);
     expect(hopProgress({ stages: ["a", "b", "c", "d"], stageIndex: 1 })).toBe(0.5);
     expect(hopProgress({ stages: ["a", "b"], stageIndex: 5 })).toBe(1);
+  });
+});
+
+describe("deriveStages", () => {
+  const view = (board: Parameters<typeof deriveStages>[0]) => deriveStages(board).map((s) => `${s.id}:${s.status}`);
+
+  it("lists the orchestrator's five stages in order, all idle with no run", () => {
+    const stages = deriveStages(undefined);
+    expect(stages.map((s) => s.label)).toEqual(["Plan", "Queue", "Build", "Checks", "Deliver"]);
+    expect(stages.every((s) => s.status === "idle")).toBe(true);
+  });
+
+  it("marks the build stage active while Cursor works, with the task and the delivered count", () => {
+    expect(view(runningRun)).toEqual(["plan:done", "queue:active", "build:active", "checks:idle", "deliver:active"]);
+    const stages = deriveStages(runningRun);
+    expect(stages.find((s) => s.id === "build")!.detail).toBe("T3 · attempt 1");
+    expect(stages.find((s) => s.id === "deliver")!.detail).toBe("2 of 6");
+  });
+
+  it("moves to the checks stage while checks run, and keeps it active on a retry", () => {
+    expect(deriveStages(verifyingRun).find((s) => s.id === "checks")!.status).toBe("active");
+    expect(deriveStages(verifyingRun).find((s) => s.id === "build")!.status).toBe("done");
+    expect(deriveStages(retryingRun).find((s) => s.id === "checks")!.status).toBe("active");
+  });
+
+  it("fails the checks stage when the run ended on a failed task", () => {
+    expect(deriveStages(failedRun).find((s) => s.id === "checks")!.status).toBe("failed");
+  });
+
+  it("finishes every stage when the whole plan is delivered", () => {
+    expect(view(deliveredRun)).toEqual(["plan:done", "queue:done", "build:done", "checks:done", "deliver:done"]);
   });
 });

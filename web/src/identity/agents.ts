@@ -8,10 +8,16 @@ export type AgentId = "claude" | "knit" | "cursor";
 
 export type AgentRole = "planner" | "orchestrator" | "builder";
 
+/** How a block is drawn: Claude as a Claude Code terminal, the orchestrator as a pipeline, Cursor as an editor. */
+export type BlockSkin = "terminal" | "pipeline" | "editor";
+
 export interface AgentIdentity {
   id: AgentId;
   label: string;
   role: AgentRole;
+  /** Short word shown under the label. */
+  tagline: string;
+  skin: BlockSkin;
   /** CSS value of the brand color, a design token. */
   accent: string;
   /** Tinted surface that goes with the accent, a design token. */
@@ -29,10 +35,10 @@ export interface AgentIdentity {
 const tokens = (id: AgentId) => ({ accent: `var(--agent-${id})`, accentSoft: `var(--agent-${id}-soft)` });
 
 export const AGENTS: Record<AgentId, AgentIdentity> = {
-  claude: { id: "claude", label: "Claude", role: "planner", ...tokens("claude"), logoFile: "claude.svg", monogram: "C" },
-  // Knit's own mark is original and lives in code (atoms/KnitMark), so it needs no file.
-  knit: { id: "knit", label: "Knit", role: "orchestrator", ...tokens("knit"), monogram: "K" },
-  cursor: { id: "cursor", label: "Cursor", role: "builder", ...tokens("cursor"), logoFile: "cursor.svg", monochrome: true, monogram: "C" },
+  claude: { id: "claude", label: "Claude", role: "planner", tagline: "planner", skin: "terminal", ...tokens("claude"), logoFile: "claude.svg", monogram: "C" },
+  // The orchestrator is part of Knit (the product), not a brand: its mark is drawn in code, so it needs no file.
+  knit: { id: "knit", label: "Orchestrator", role: "orchestrator", tagline: "pipeline", skin: "pipeline", ...tokens("knit"), monogram: "O" },
+  cursor: { id: "cursor", label: "Cursor", role: "builder", tagline: "builder", skin: "editor", ...tokens("cursor"), logoFile: "cursor.svg", monochrome: true, monogram: "C" },
 };
 
 /** The blocks of the canvas, left to right. */
@@ -57,6 +63,8 @@ export function identityOf(id: string, label?: string): AgentIdentity {
     id: "knit",
     label: name,
     role: "builder",
+    tagline: "builder",
+    skin: "editor",
     accent: "var(--text-muted)",
     accentSoft: "var(--surface-2)",
     monogram: name.slice(0, 1).toUpperCase() || "?",

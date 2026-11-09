@@ -19,19 +19,19 @@ afterEach(() => vi.unstubAllGlobals());
 describe("SingleView", () => {
   it("opens on three blocks and the pipeline, with no page navigation", () => {
     render(<SingleView search="?fixture=runningRun" />);
-    for (const name of ["Claude", "Knit", "Cursor"]) expect(screen.getByRole("button", { name: new RegExp(name) })).toBeTruthy();
-    expect(screen.getAllByRole("region", { name: /Claude to Knit|Knit to Cursor|Cursor back to Knit/ })).toHaveLength(3);
+    for (const name of ["Claude", "Orchestrator", "Cursor"]) expect(screen.getByRole("button", { name: `Open ${name}` })).toBeTruthy();
+    expect(screen.getAllByRole("region", { name: /Claude to orchestrator|Orchestrator to Cursor|Cursor back to orchestrator/ })).toHaveLength(3);
     expect(screen.queryByRole("navigation")).toBeNull();
     expect(screen.queryByRole("link", { name: /Runs|Workspace/ })).toBeNull();
   });
 
   it("shows each block's live state without opening it", () => {
     render(<SingleView search="?fixture=runningRun" />);
-    const cursor = screen.getByRole("button", { name: /Cursor/ });
+    const cursor = screen.getByRole("group", { name: "Cursor" });
     expect(within(cursor).getByText("T3")).toBeTruthy();
     expect(within(cursor).getByText("edit: src/billing/webhook-store.ts")).toBeTruthy();
-    expect(within(screen.getByRole("button", { name: /Knit/ })).getByText("2 of 6 tasks delivered")).toBeTruthy();
-    expect(within(screen.getByRole("region", { name: "Knit to Cursor" })).getByText("Agent working", { selector: ".hop__current" })).toBeTruthy();
+    expect(within(screen.getByRole("group", { name: "Orchestrator" })).getByText("2 of 6 tasks delivered")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Orchestrator to Cursor" })).getByText("Agent working", { selector: ".hop__current" })).toBeTruthy();
   });
 
   it("is idle with no run and no session", async () => {
@@ -60,12 +60,12 @@ describe("SingleView", () => {
   it("opens a side panel from a block, keeps the pipeline, closes on Escape and returns the focus", async () => {
     const user = userEvent.setup();
     render(<SingleView search="?fixture=runningRun" />);
-    const block = screen.getByRole("button", { name: /Cursor/ });
+    const block = screen.getByRole("button", { name: "Open Cursor" });
     await user.click(block);
     const dialog = screen.getByRole("dialog", { name: "Cursor" });
     expect(dialog.contains(document.activeElement)).toBe(true);
     expect(block.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("region", { name: "Knit to Cursor" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Orchestrator to Cursor" })).toBeTruthy();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(block);
@@ -74,12 +74,12 @@ describe("SingleView", () => {
   it("opens the panel with Enter and closes it with its button", async () => {
     const user = userEvent.setup();
     render(<SingleView search="?fixture=runningRun" />);
-    screen.getByRole("button", { name: /Knit/ }).focus();
+    screen.getByRole("button", { name: "Open Orchestrator" }).focus();
     await user.keyboard("{Enter}");
-    expect(screen.getByRole("dialog", { name: "Knit" })).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Close Knit" }));
+    expect(screen.getByRole("dialog", { name: "Orchestrator" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Close Orchestrator" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: /Knit/ }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Open Orchestrator" }));
   });
 
   it("opens the configuration preview from the header button, over the same view", async () => {
@@ -89,7 +89,7 @@ describe("SingleView", () => {
     await user.click(button);
     const dialog = screen.getByRole("dialog", { name: "Configuration" });
     expect(await within(dialog).findByText(/pick a file to edit/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Claude/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open Claude" })).toBeTruthy();
     await user.keyboard("{Escape}");
     expect(document.activeElement).toBe(button);
   });

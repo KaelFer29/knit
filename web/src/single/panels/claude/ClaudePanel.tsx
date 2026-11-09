@@ -46,7 +46,7 @@ const messageOf = (err: unknown): string => (err instanceof ApiError || err inst
  * choices, starts turns through the API and hands everything to presentational components. The open session lives
  * in panel state (it defaults to the most recent one); the URL carries no session. What each agent can do comes from
  * its capabilities in `GET /api/agents`; nothing here looks at an agent's name. A turn never starts a run: only the
- * explicit "Send plan to Knit" click does.
+ * explicit "Send plan to the orchestrator" click does.
  */
 export function ClaudePanel(_props: PanelProps) {
   const [picked, setPicked] = useState<string | undefined>();
