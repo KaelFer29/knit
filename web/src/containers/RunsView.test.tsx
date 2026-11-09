@@ -18,17 +18,53 @@ beforeEach(() => onSelect.mockClear());
 afterEach(() => vi.unstubAllGlobals());
 
 describe("RunsView", () => {
-  it("lists runs with status, progress and tokens per agent, each a button that picks it", async () => {
+  it("lists runs as compact rows with status, progress and tokens, each a button that picks it", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(200, { runs: [item("r1", "failed", 1500, 500), item("r2", "passed")] })));
     render(<RunsView pollMs={60_000} onSelect={onSelect} selectedId="r2" />);
     const links = await screen.findAllByRole("button", { name: /plan-/ });
     expect(links.map((l) => l.getAttribute("aria-current"))).toEqual([null, "true"]);
     await userEvent.setup().click(links[0]!);
     expect(onSelect).toHaveBeenCalledWith("r1");
-    expect(links[0]!.textContent).toContain("2 of 3 tasks · 1 failed");
-    expect(links[0]!.textContent).toContain("Cursor2k");
-    expect(links[0]!.textContent).toContain("Claude—");
+    expect(links[0]!.textContent).toContain("2/3");
+    expect(links[0]!.textContent).toContain("2k tokens");
     expect(links[0]!.textContent).toContain("Failed");
+    expect(links[1]!.textContent).not.toContain("tokens");
+  });
+
+  it("shows one page of runs and moves through the rest", async () => {
+    const runs = Array.from({ length: 11 }, (_, i) => item(`r${i + 1}`, "passed"));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(200, { runs })));
+    const user = userEvent.setup();
+    render(<RunsView pollMs={60_000} onSelect={onSelect} />);
+    expect(await screen.findAllByRole("button", { name: /plan-/ })).toHaveLength(8);
+    expect(screen.getByText("1–8 of 11 runs")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getAllByRole("button", { name: /plan-/ })).toHaveLength(3);
+    expect(screen.getByText("9–11 of 11 runs")).toBeTruthy();
+  });
+
+  it("searches by plan name or id and goes back to the first page", async () => {
+    const runs = Array.from({ length: 11 }, (_, i) => item(`r${i + 1}`, "passed"));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(200, { runs })));
+    const user = userEvent.setup();
+    render(<RunsView pollMs={60_000} onSelect={onSelect} />);
+    await screen.findAllByRole("button", { name: /plan-/ });
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    await user.type(screen.getByRole("searchbox", { name: "Search runs" }), "r10");
+    expect(screen.getAllByRole("button", { name: /plan-/ }).map((b) => b.textContent)).toEqual([expect.stringContaining("plan-r10")]);
+    expect(screen.getByText("1 of 11 runs")).toBeTruthy();
+  });
+
+  it("filters by status and says when nothing matches", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(200, { runs: [item("r1", "failed"), item("r2", "passed")] })));
+    const user = userEvent.setup();
+    render(<RunsView pollMs={60_000} onSelect={onSelect} />);
+    await screen.findAllByRole("button", { name: /plan-/ });
+    await user.click(screen.getByRole("button", { name: "Failed" }));
+    expect(screen.getAllByRole("button", { name: /plan-/ })).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Running" }));
+    expect(screen.queryAllByRole("button", { name: /plan-/ })).toHaveLength(0);
+    expect(screen.getByText("No run matches this filter.")).toBeTruthy();
   });
 
   it("moves focus between runs with the arrow keys", async () => {
