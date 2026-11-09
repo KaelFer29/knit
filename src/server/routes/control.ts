@@ -16,7 +16,7 @@ const DEFAULT_REGISTER_TIMEOUT_MS = 10_000;
 const MAX_ATTEMPTS_LIMIT = 20;
 
 /** Reads a JSON object body. Requires `Content-Type: application/json`; an empty body is `{}`. */
-async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+export async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   const type = (req.headers["content-type"] ?? "").split(";")[0]!.trim().toLowerCase();
   if (type !== "application/json") throw new HttpError(415, "Content-Type must be application/json");
   const declared = Number(req.headers["content-length"]);
@@ -138,7 +138,7 @@ function logFileFor(control: ControlDeps, verb: string): string {
   return join(control.dataDir, "logs", "_ui", `${verb}-${stamp}-${randomBytes(3).toString("hex")}.log`);
 }
 
-function start(control: ControlDeps, verb: string, args: string[], cwd?: string): { child: SpawnedProcess; logPath: string } {
+export function start(control: ControlDeps, verb: string, args: string[], cwd?: string): { child: SpawnedProcess; logPath: string } {
   const logPath = logFileFor(control, verb);
   let child: SpawnedProcess;
   try {
@@ -150,7 +150,7 @@ function start(control: ControlDeps, verb: string, args: string[], cwd?: string)
   return { child, logPath };
 }
 
-function requireControl(control: ControlDeps | undefined): ControlDeps {
+export function requireControl(control: ControlDeps | undefined): ControlDeps {
   if (!control) throw new HttpError(503, "Run control is not available on this server");
   return control;
 }

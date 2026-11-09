@@ -6,8 +6,7 @@ import { CursorAgentRunner } from "../../adapters/agents/cursor/cursor-runner.js
 import { GitBranchTools } from "../../adapters/vcs/git/git-branch-tools.js";
 import { GhPullRequests } from "../../adapters/vcs/github/gh-pull-requests.js";
 import { buildPrDraftPrompt, parsePrDraft } from "../../core/branches/pr-draft.js";
-import { decidePr } from "../../core/branches/pr-rules.js";
-import { decideUndo } from "../../core/branches/undo-rules.js";
+import { describeBranches, type BranchOverview } from "../../core/branches/overview.js";
 import type { BranchRef, BranchState, UndoMode } from "../../core/ports/branch-tools.js";
 import type { TaskRecord } from "../../core/ports/run-store.js";
 import { UsageError } from "../errors.js";
@@ -91,20 +90,19 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
       return ref ? tools.state(ref) : NONE;
     };
     const ref = refOf(task);
-    const state = stateOf(task);
     const now = (): string => (deps.now?.() ?? new Date()).toISOString();
+    // The same decisions the web interface shows: one function reads every branch and decides each action.
+    const overview = describeBranches(
+      { status: detail.run.status, base: detail.run.base },
+      detail.tasks.map((t) => ({ taskId: t.taskId, title: t.title, status: t.status, ...(t.branch ? { branch: t.branch } : {}), ...(t.startSha ? { startSha: t.startSha } : {}), ...(t.dependsOn ? { dependsOn: t.dependsOn } : {}), ...(t.prUrl ? { prUrl: t.prUrl } : {}) })),
+      (t) => stateOf(detail.tasks.find((r) => r.taskId === t.taskId)!),
+    );
+    const mine = overview.find((b) => b.taskId === taskId);
+    if (mine === undefined) return fail(io, json, `${taskId} has not started, so it has no branch.`);
 
-    if (action === "undo") return undo({ io, json, store, runId, taskId, task, ref, state, mode: mode!, yes: values.yes === true, now, tools, detail });
-    if (action === "pr-draft") return await prDraft({ io, json, task, ref, state, tools, deps, model: values.model ?? PR_DRAFT_MODEL });
-    const parent = task.dependsOn === undefined ? undefined : detail.tasks.find((t) => t.taskId === task.dependsOn);
-    const decision = decidePr({
-      runStatus: detail.run.status,
-      runBase: detail.run.base,
-      task: { taskId, status: task.status, ...(task.branch ? { branch: task.branch } : {}), ...(task.dependsOn ? { dependsOn: task.dependsOn } : {}), ...(task.prUrl ? { prUrl: task.prUrl } : {}) },
-      tasks: detail.tasks.map((t) => ({ taskId: t.taskId, ...(t.branch ? { branch: t.branch } : {}), ...(t.dependsOn ? { dependsOn: t.dependsOn } : {}) })),
-      state,
-      parentState: parent ? stateOf(parent) : undefined,
-    });
+    if (action === "undo") return undo({ io, json, store, runId, taskId, task, ref, mine, mode: mode!, yes: values.yes === true, now, tools });
+    if (action === "pr-draft") return await prDraft({ io, json, task, ref, state: mine.state, tools, deps, model: values.model ?? PR_DRAFT_MODEL });
+    const decision = mine.pr;
     if (!decision.ok) return fail(io, json, decision.reason);
 
     const prs = deps.pullRequests ?? new GhPullRequests();
@@ -133,27 +131,16 @@ interface UndoInput {
   taskId: string;
   task: TaskRecord;
   ref: BranchRef | undefined;
-  state: BranchState;
+  mine: BranchOverview;
   mode: UndoMode;
   yes: boolean;
   now: () => string;
   tools: GitBranchTools;
-  detail: NonNullable<ReturnType<SqliteRunStore["getRun"]>>;
 }
 
 function undo(i: UndoInput): number {
-  const { io, json, task, state, mode } = i;
-  const dependents = i.detail.tasks
-    .filter((t) => t.dependsOn === i.taskId && t.branch !== undefined)
-    .filter((t) => t.startSha !== undefined && i.tools.state({ repo: i.detail.run.repo, branch: t.branch!, startSha: t.startSha }).exists)
-    .map((t) => ({ taskId: t.taskId, branch: t.branch! }));
-  const decision = decideUndo({
-    runStatus: i.detail.run.status,
-    mode,
-    task: { taskId: i.taskId, ...(task.branch ? { branch: task.branch } : {}), ...(task.startSha ? { startSha: task.startSha } : {}) },
-    state,
-    dependents,
-  });
+  const { io, json, task, mode } = i;
+  const decision = i.mine.undo[mode];
   if (!decision.ok) return fail(io, json, decision.reason);
   if (!i.yes) {
     report(io, json, { ok: true, dryRun: true, mode, branch: task.branch, effects: decision.effects }, [...decision.effects, "Nothing was changed. Repeat with --yes to do it."]);

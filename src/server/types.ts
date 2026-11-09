@@ -5,6 +5,7 @@ import type { RunReader } from "../core/ports/run-reader.js";
 import type { TaskDiff } from "../core/ports/task-diff.js";
 import type { FileActivity } from "../core/ports/file-activity.js";
 import type { AgentCapabilities, PlanWindow } from "../core/ports/agent-runner.js";
+import type { BranchInspector } from "../core/ports/branch-tools.js";
 import type { SessionReader } from "../core/ports/session-reader.js";
 
 export type Method = "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -27,6 +28,8 @@ export interface ServerDeps {
   taskDiff?: TaskDiff;
   /** Read-only detection of the draft plans in a session's directory. Without it the plans route answers 503. */
   plans?: PlanDrafts;
+  /** Reads the state of the branches the tasks created. Without it the branches route answers 503. */
+  branches?: BranchInspector;
   /** Reads the files a task worktree has changed. Without it the activity route leaves the worktree list out. */
   fileActivity?: FileActivity;
 }
@@ -80,6 +83,8 @@ export interface ControlDeps {
   spawn: Spawner;
   /** How long to wait for a started or resumed run to show up in the database (default 10000). */
   registerTimeoutMs?: number;
+  /** How long a branch action (undo, pull request draft, pull request) may take before the route gives up (default depends on the action). */
+  actionTimeoutMs?: number;
   /** Chat sessions (list, turns, start a turn). Absent: the session routes answer empty lists or 503. */
   sessions?: SessionsDeps;
 }
