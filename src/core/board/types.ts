@@ -149,6 +149,20 @@ export interface BoardTotals {
   tasks: Record<TaskState, number> & { total: number };
 }
 
+/** How full the chat of the builder agent is, from the latest attempt that recorded its context. */
+export interface ContextView {
+  /** The task whose chat was measured, and its attempt. */
+  taskId: string;
+  attempt: number;
+  tokens: number;
+  /** The window of the model the plan chose for that task, or the default one. */
+  window: number;
+  /** `tokens / window`, from 0 to 1. */
+  share: number;
+  /** The window is the default, not read from the model id. */
+  assumedWindow: boolean;
+}
+
 export interface BoardModel {
   runId: string;
   planName: string;
@@ -167,4 +181,6 @@ export interface BoardModel {
   tasks: TaskView[];
   totals: BoardTotals;
   liveLine?: LiveLine;
+  /** Absent when no attempt recorded the context of its chat (older runs, or an agent that does not report it). */
+  context?: ContextView;
 }

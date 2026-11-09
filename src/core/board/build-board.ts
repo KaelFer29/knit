@@ -1,3 +1,4 @@
+import { contextShare, contextWindowOf, windowIsStated } from "../context/index.js";
 import { parsePlan } from "../plan/parse-plan.js";
 import type { StoredRun } from "../ports/run-reader.js";
 import type { AttemptRecord, EventRecord, TaskRecord } from "../ports/run-store.js";
@@ -8,6 +9,7 @@ import type {
   AttemptView,
   BoardModel,
   BoardTotals,
+  ContextView,
   DeliveryItem,
   LiveLine,
   NodeId,
@@ -102,6 +104,7 @@ export function buildBoard(input: BoardInput): BoardModel {
     tasks,
     totals: buildTotals(run, tasks, input.nowMs),
     ...(line ? { liveLine: line } : {}),
+    ...(contextOf(tasks) ? { context: contextOf(tasks)! } : {}),
   };
 }
 
@@ -110,6 +113,17 @@ function nodeStatus(run: StoredRun, whileRunning: NodeStatus): NodeStatus {
   if (run.status === "passed") return "done";
   if (run.status === "failed") return "failed";
   return whileRunning;
+}
+
+/** The chat measured most recently: the last attempt, of the last task in execution order, that recorded its context. */
+function contextOf(tasks: readonly TaskView[]): ContextView | undefined {
+  for (const task of [...tasks].reverse()) {
+    const measured = [...task.attempts].reverse().find((a) => a.contextTokens !== undefined);
+    if (measured?.contextTokens === undefined) continue;
+    const window = contextWindowOf(task.model);
+    return { taskId: task.taskId, attempt: measured.attempt, tokens: measured.contextTokens, window, share: contextShare(measured.contextTokens, window), assumedWindow: !windowIsStated(task.model) };
+  }
+  return undefined;
 }
 
 /** The `Model:` line of each task in the plan the run stored. Pure: a plan that does not parse names no models. */

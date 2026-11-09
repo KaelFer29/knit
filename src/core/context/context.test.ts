@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_WINDOW, contextShare, contextTokensOf, contextWindowOf } from "./context.js";
+import { DEFAULT_WINDOW, contextShare, contextTokensOf, contextWindowOf, windowIsStated } from "./context.js";
 
 describe("contextTokensOf", () => {
   it("adds what the chat sent fresh to what it read from and wrote to the cache", () => {
@@ -43,3 +43,13 @@ describe("contextShare", () => {
     expect(contextShare(0, 200_000)).toBe(0);
   });
 });
+
+describe("windowIsStated", () => {
+  it("tells a window the model id carries from one that is assumed", () => {
+    expect(windowIsStated("m[context=1m]")).toBe(true);
+    expect(windowIsStated("composer-2.5-fast")).toBe(false);
+    expect(windowIsStated(undefined)).toBe(false);
+    expect(windowIsStated("m[context=lots]")).toBe(false);
+  });
+});
+

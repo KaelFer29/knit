@@ -21,14 +21,20 @@ export function contextTokensOf(usage: TurnUsage | undefined): number | undefine
   return count(usage.inputTokens) + count(usage.cacheReadTokens) + count(usage.cacheWriteTokens);
 }
 
-/** The window a model id carries (`name[context=1m]`, `[context=200k]`, `[context=128000]`), else the default. */
-export function contextWindowOf(model: string | undefined): number {
+/** The window a model id carries (`name[context=1m]`, `[context=200k]`, `[context=128000]`), when it says one. */
+function statedWindow(model: string | undefined): number | undefined {
   const match = /\[[^\]]*\bcontext=(\d+(?:\.\d+)?)([km])?\b[^\]]*\]/i.exec(model ?? "");
-  if (match === null) return DEFAULT_WINDOW;
+  if (match === null) return undefined;
   const unit = match[2]?.toLowerCase();
   const window = Math.round(Number(match[1]) * (unit === "m" ? 1_000_000 : unit === "k" ? 1_000 : 1));
-  return window > 0 ? window : DEFAULT_WINDOW;
+  return window > 0 ? window : undefined;
 }
+
+/** The window of a model: the one its id carries, else the default. */
+export const contextWindowOf = (model: string | undefined): number => statedWindow(model) ?? DEFAULT_WINDOW;
+
+/** Whether the window comes from the model id (true) or is the assumed default (false). */
+export const windowIsStated = (model: string | undefined): boolean => statedWindow(model) !== undefined;
 
 /** The fraction of the window in use, from 0 to 1. */
 export function contextShare(tokens: number, window: number): number {

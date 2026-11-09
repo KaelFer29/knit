@@ -436,3 +436,62 @@ describe("the context of each attempt's chat", () => {
   });
 });
 
+describe("the context view of the board", () => {
+  const PLAN = `# Plan: demo
+
+## T1: First
+
+Branch: feat/one
+Goal: first.
+Specs:
+- S1: first spec.
+Allowed files:
+- src/a.ts
+Checks:
+- true
+
+## T2: Second
+
+Branch: feat/two
+Model: composer-2.5-fast
+Goal: second.
+Specs:
+- S1: second spec.
+Allowed files:
+- src/b.ts
+Checks:
+- true
+`;
+  const finished = (taskId: string, n: number, contextTokens: number | undefined) => [
+    ev("attempt.started", taskId, n),
+    ev("attempt.finished", taskId, n, { payload: contextTokens === undefined ? { passed: true } : { passed: true, contextTokens } }, 5),
+  ];
+
+  it("shows the latest chat measured: its tokens, the window assumed for its model and how full it is", () => {
+    const b = board({
+      run: run({ planText: PLAN }),
+      tasks: [task("T1", { status: "passed" }), task("T2", { status: "passed" })],
+      attempts: [attempt("T1", 1), attempt("T2", 1), attempt("T2", 2)],
+      events: [...finished("T1", 1, 50_000), ...finished("T2", 1, 60_000), ...finished("T2", 2, 100_000)],
+    });
+    // A plan can only name plain model ids, which carry no window, so the default one is assumed and flagged as such.
+    expect(b.context).toEqual({ taskId: "T2", attempt: 2, tokens: 100_000, window: 200_000, share: 0.5, assumedWindow: true });
+  });
+
+  it("assumes the default window when the plan names no model, and says so", () => {
+    const b = board({ run: run({ planText: PLAN }), tasks: [task("T1", { status: "passed" })], attempts: [attempt("T1", 1)], events: finished("T1", 1, 50_000) });
+    expect(b.context).toEqual({ taskId: "T1", attempt: 1, tokens: 50_000, window: 200_000, share: 0.25, assumedWindow: true });
+  });
+
+  it("is absent when no attempt recorded a context, and skips attempts that did not", () => {
+    expect(board({ tasks: [task("T1", { status: "passed" })], attempts: [attempt("T1", 1)], events: finished("T1", 1, undefined) }).context).toBeUndefined();
+    const b = board({
+      run: run({ planText: PLAN }),
+      tasks: [task("T1", { status: "passed" }), task("T2", { status: "passed" })],
+      attempts: [attempt("T1", 1), attempt("T2", 1)],
+      events: [...finished("T1", 1, 50_000), ...finished("T2", 1, undefined)],
+    });
+    expect(b.context).toMatchObject({ taskId: "T1", tokens: 50_000 });
+  });
+});
+
