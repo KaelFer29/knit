@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { FileTree } from "../core/ports/file-tree.js";
+import type { PlanDrafts } from "../core/ports/plan-drafts.js";
 import type { RunReader } from "../core/ports/run-reader.js";
 import type { TaskDiff } from "../core/ports/task-diff.js";
 import { BASE_HEADERS, HttpError, sendError } from "./http.js";
@@ -30,6 +31,8 @@ export interface ServerOptions {
   files?: FileTree;
   /** Reads what a task changed from its worktree. Without it the diff route answers 503. */
   taskDiff?: TaskDiff;
+  /** Draft plan detection. Without it the plans route answers 503. */
+  plans?: PlanDrafts;
 }
 
 export interface RunningServer {
@@ -58,6 +61,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     ...(options.control ? { control: options.control } : {}),
     ...(options.files ? { files: options.files } : {}),
     ...(options.taskDiff ? { taskDiff: options.taskDiff } : {}),
+    ...(options.plans ? { plans: options.plans } : {}),
   };
   const router = new Router(routeModules.flatMap((mod) => mod(deps)));
   const staticDir = options.staticDir ?? defaultStaticDir();

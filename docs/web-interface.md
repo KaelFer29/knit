@@ -298,6 +298,8 @@ Built in task T12: the sessions of any agent in one place (S10, S13, S16, D5, D8
 
 **Sending.** A session that is running, or a request in flight, disables Send and says why. The server answers `202` only when the child has recorded its turn, so the page then reads again at once. A refusal (`409`, `400`, `502`) is shown as an alert and keeps the text. An agent that cannot resume gets no composer on a session that already has a conversation.
 
+**Plan handoff (T13, S15, D7).** `skills/knit-plan` (`.claude/skills/knit-plan/SKILL.md`) teaches Claude to write a plan in the [plan format](plan-format.md) to `docs/plans/<slug>.md` of the repository the session runs in and to run `knit validate` until it passes. The directory is the constant `PLAN_DIR` in `src/core/ports/plan-drafts.ts`. The session view lists the drafts it finds there (`GET /api/sessions/:id/plans`) as a card above the composer: name, validation result (every issue when invalid), the tasks and their branches. **Launch** is an explicit button that posts `{ planPath }` to the run-control start route (`POST /api/runs`); a Claude turn never starts a run, and an invalid plan cannot be launched. The run is linked to its session by its plan file: the runs list of a draft is every run whose recorded `planPath` is that file, and each links to the run view. The link is derived, not stored, so the server still writes nothing and the schema is unchanged; two sessions in the same directory share their drafts.
+
 **Shared timeline components.** The timeline components of T6 and T7 were not on this branch's base, so the workspace has its own `Timeline` and `TimelineEntry` over the same normalized entry kinds. When those tasks land, replacing `TimelineEntry` with the shared one is a change in one molecule.
 
 ## HTTP API
@@ -399,6 +401,7 @@ Phase B (`src/server/routes/sessions.ts`). Reads go through the `SessionReader` 
 | `GET /api/sessions/:id/events?after=<id>` | `{ sessionId, events, lastEventId }`: timeline entries with `id > after` (at most 2000), so a poller resumes with no gap or duplicate |
 | `POST /api/sessions` | `{ agent, cwd, prompt, profile? }` runs `knit chat --agent <a> --cwd <cwd> [profile flags] --data-dir <dir> -- <prompt>` and answers `202 { sessionId, logPath }` once a new session shows up |
 | `POST /api/sessions/:id/turns` | `{ prompt, profile? }` runs `knit chat --session <id> ...` and answers `202 { sessionId, logPath }` once the turn is recorded; `409` while a turn is running or when the agent cannot resume |
+| `GET /api/sessions/:id/plans` | `{ dir, plans: [{ path, file, modifiedAt, name, valid, issues, tasks, runs }] }`: the drafts in `docs/plans/` of the session's directory (newest first, at most 20), each validated with the plan parser, with `runs: [{ id, status, startedAt }]` started from that file. Read-only; `404` for an unknown session, `503` without plan detection |
 
 `cwd` must be an absolute existing directory; `prompt` at most 32,000 characters; a profile field must be one the agent takes and match `[A-Za-z0-9][A-Za-z0-9._:/[\]-]*` (never starts with a dash). The prompt goes after `--`, so a prompt that starts with a dash is still a prompt. `502` and `504` as for run control when the child dies or is too slow to record its turn.
 

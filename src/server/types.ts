@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { FileTree } from "../core/ports/file-tree.js";
+import type { PlanDrafts } from "../core/ports/plan-drafts.js";
 import type { RunReader } from "../core/ports/run-reader.js";
 import type { TaskDiff } from "../core/ports/task-diff.js";
 import type { AgentCapabilities } from "../core/ports/agent-runner.js";
@@ -23,6 +24,8 @@ export interface ServerDeps {
   files?: FileTree;
   /** Reads what a task changed from its worktree. Without it the diff route answers 503. */
   taskDiff?: TaskDiff;
+  /** Read-only detection of the draft plans in a session's directory. Without it the plans route answers 503. */
+  plans?: PlanDrafts;
 }
 
 export interface RouteContext {

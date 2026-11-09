@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "../api/client";
 import { identityOf } from "../identity/agents";
+import { PlanDrafts } from "../organisms/PlanDrafts";
 import { Composer } from "../organisms/Composer";
 import { NewSessionHeader } from "../organisms/NewSessionHeader";
 import { SessionHeader } from "../organisms/SessionHeader";
@@ -10,9 +11,11 @@ import { UsagePanel } from "../organisms/UsagePanel";
 import { WorkspaceLayout } from "../organisms/WorkspaceLayout";
 import { NEW_SESSION, workspaceHash } from "../route";
 import { fetchAgents, fetchModels, fetchSessions, sendTurn, startSession } from "../sessions/api";
+import { launchPlan, type PlanDraftView } from "../sessions/plans";
 import { paletteCommands } from "../sessions/commands";
 import { buildTimeline } from "../sessions/timeline";
 import type { AgentView, Profile, SessionListEntry } from "../sessions/types";
+import { usePlanDrafts } from "../sessions/usePlanDrafts";
 import { useSessionLive } from "../sessions/useSessionLive";
 import "./WorkspaceView.css";
 
@@ -64,6 +67,9 @@ export function WorkspaceView({ sessionId }: Props) {
 
   const isNew = sessionId === undefined || sessionId === NEW_SESSION;
   const live = useSessionLive(isNew ? undefined : sessionId);
+  const drafts = usePlanDrafts(isNew ? undefined : sessionId);
+  const [launching, setLaunching] = useState<string | undefined>();
+  const [launchError, setLaunchError] = useState<string | undefined>();
 
   const loadSessions = useCallback(async (): Promise<void> => {
     try {
@@ -151,6 +157,20 @@ export function WorkspaceView({ sessionId }: Props) {
     }
   };
 
+  /** The only way a run starts from a conversation: the user clicks Launch on a valid draft. */
+  const launch = async (plan: PlanDraftView): Promise<void> => {
+    setLaunching(plan.path);
+    setLaunchError(undefined);
+    try {
+      await launchPlan(plan.path);
+      drafts.refresh();
+    } catch (err) {
+      setLaunchError(messageOf(err));
+    } finally {
+      setLaunching(undefined);
+    }
+  };
+
   const onKnitCommand = (name: string): void => {
     if (name === "clear") go(NEW_SESSION);
     else if (name === "usage") setUsageOpen(true);
@@ -201,6 +221,7 @@ export function WorkspaceView({ sessionId }: Props) {
             <UsagePanel reportsPlanUsage={agent.capabilities.planUsage} planUsage={live.detail?.meta.planUsage ?? []} inputTokens={tokens.input} outputTokens={tokens.output} now={now} />
           ) : null}
           <Timeline items={items} emptyText="No messages yet." />
+          {drafts.listing ? <PlanDrafts dir={drafts.listing.dir} plans={drafts.listing.plans} launching={launching} error={launchError} onLaunch={(plan) => void launch(plan)} /> : null}
           {live.error ? (
             <p className="workspace__error" role="alert">
               {live.error}
