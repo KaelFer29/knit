@@ -266,5 +266,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-4) 0;
+  /* No side padding: the bar takes the same width as the composer box under it. */
+  padding: var(--space-2) 0 0;
 }
