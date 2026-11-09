@@ -1,4 +1,5 @@
 import type {
+  AgentCapabilities,
   AgentEvent,
   AgentRunRequest,
   AgentRunResult,
@@ -34,6 +35,14 @@ function tailLines(text: string, count: number): string {
  */
 export class CursorAgentRunner implements AgentRunner {
   readonly name = "cursor";
+  /** What this adapter supports today: resume and the command and usage reports are not wired yet. */
+  readonly capabilities: AgentCapabilities = {
+    resume: false,
+    chooseModel: true,
+    commandList: false,
+    visibleReasoning: true,
+    planUsage: false,
+  };
   private readonly command: string;
   private readonly prefixArgs: string[];
   private readonly model?: string;

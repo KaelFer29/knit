@@ -32,11 +32,22 @@ One model serves every agent: a **session** is a conversation with one agent, a 
 
 | Capability | Claude | Cursor |
 | --- | --- | --- |
-| resume a session | yes (`--resume`) | yes (`--resume`) |
+| resume a session | yes (`--resume`; verified, the session id stays the same) | yes (`--resume`); not wired in the adapter yet |
 | choose the model | yes (`--model`) | yes (`--model`, `agent models`) |
-| command list | yes (`system/init.slash_commands`) | to verify |
-| visible reasoning | no (blocks arrive empty) | yes |
-| plan usage | yes (`rate_limit_event`: 5-hour and 7-day windows) | to verify |
+| command list | yes (`system/init.slash_commands` minus `terminal_slash_commands`) | to verify |
+| visible reasoning | no (blocks arrive empty, with only a signature) | yes |
+| plan usage | yes (`rate_limit_event`: 5-hour and 7-day windows, utilization 0 to 1) | to verify |
+
+The port declares these as `AgentCapabilities` on each runner (`src/core/ports/agent-runner.ts`); `capabilitiesOf(runner)` returns all-false for a runner that declares none. The Claude adapter (`src/adapters/agents/claude/`) declares resume, model, command list and plan usage as supported and reasoning as not visible. The Cursor adapter declares what it supports today: model choice and visible reasoning. The per-turn profile maps to flags one to one: `--model`, `--effort`, `--permission-mode`.
+
+**What was verified against the real Claude CLI (2.1.319, headless `-p`, subscription auth):**
+
+- **Slash commands through `-p`.** `/usage` sent as the prompt does not call the model: the stream holds one synthetic assistant message (model `<synthetic>`) with the command's text, and a `result` with `num_turns: 0` and zero tokens; there is no `rate_limit_event`. `/context` was not tried. So a slash command can be sent as a prompt and its answer is plain text, but Knit cannot read structured numbers from it: the `/usage` panel is built from `rate_limit_event` and `result.usage` instead (D9). Commands that only make sense in a terminal are listed in `terminal_slash_commands` and are left out of the palette.
+- **Resume.** `claude -p --resume <id> "<prompt>"` continues the same conversation (the agent recalled what the first turn asked) and the session id does not change: every event and the `result` carry the id given.
+- **Interactive resume of a `-p` session** (`claude --resume <id>` in a terminal) cannot be tested headless, so it is not verified. D10 relies on it, which stays an assumption until someone tries it by hand.
+- **Reasoning.** Headless Claude emits `thinking` blocks with an empty text; the timeline marks them as "not shared by the agent". The two short calls made to see one (a haiku-class model, with and without `--effort high`) produced no thinking block at all, so the empty-block shape comes from the design brief, not from a recorded stream.
+- **Configuration.** By default the adapter does not pass `--bare` or `--strict-mcp-config`, so the session uses the user's own CLAUDE.md, rules, skills, hooks and MCP servers (D6). Hooks run even with `--strict-mcp-config`: it only ignores configured MCP servers. A prompt is passed after `--` so one that starts with a dash is not read as a flag.
+- **Tokens.** `inputTokens` is `input_tokens + cache_creation_input_tokens + cache_read_input_tokens` of the final `result`, and its usage is cumulative over the requests of the turn, so a turn that calls tools counts the cached prompt once per request. The timeline entry keeps the cache parts apart.
 
 - **Command palette.** Built from the agent's own list, so it follows every CLI update. Session commands are handled by Knit: `/clear` starts a new session, switching chats uses the session list, `/model` sets the turn profile, `/usage` opens the usage panel. Any other command is sent to the agent as the prompt.
 - **Continue in a terminal.** Every session shows the command that continues it (`claude --resume <id>`, `agent --resume <chatId>`). Knit does not try to match each agent's own interface; whatever it lacks stays one copy away.

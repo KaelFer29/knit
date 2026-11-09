@@ -25,6 +25,9 @@ export interface NormalizerOptions {
   maxStringChars?: number;
 }
 
+/** Strings longer than this are clipped unless the caller says otherwise. */
+export const DEFAULT_MAX_STRING_CHARS = 4000;
+
 type Rec = Record<string, unknown>;
 
 const isRecord = (v: unknown): v is Rec => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -44,7 +47,7 @@ export class AgentEventNormalizer {
 
   constructor(options: NormalizerOptions = {}) {
     this.flushChars = options.thinkingFlushChars ?? 240;
-    this.maxString = options.maxStringChars ?? 4000;
+    this.maxString = options.maxStringChars ?? DEFAULT_MAX_STRING_CHARS;
   }
 
   /** Feeds one raw event; returns the entries that are ready (possibly none). */
@@ -121,17 +124,20 @@ export class AgentEventNormalizer {
     return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
   }
 
-  private clip(value: unknown, depth = 0): unknown {
-    if (typeof value === "string") {
-      return value.length > this.maxString
-        ? `${value.slice(0, this.maxString)}… [truncated ${value.length - this.maxString} chars]`
-        : value;
-    }
-    if (depth > 8) return "[max depth]";
-    if (Array.isArray(value)) return value.map((v) => this.clip(v, depth + 1));
-    if (isRecord(value)) {
-      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, this.clip(v, depth + 1)]));
-    }
-    return value;
+  private clip(value: unknown): unknown {
+    return clipValue(value, this.maxString);
   }
+}
+
+/** Clips every string longer than `maxString` anywhere inside `value`, saying how much was cut. */
+export function clipValue(value: unknown, maxString: number, depth = 0): unknown {
+  if (typeof value === "string") {
+    return value.length > maxString ? `${value.slice(0, maxString)}… [truncated ${value.length - maxString} chars]` : value;
+  }
+  if (depth > 8) return "[max depth]";
+  if (Array.isArray(value)) return value.map((v) => clipValue(v, maxString, depth + 1));
+  if (isRecord(value)) {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, clipValue(v, maxString, depth + 1)]));
+  }
+  return value;
 }

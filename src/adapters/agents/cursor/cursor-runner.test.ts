@@ -2,7 +2,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CursorAgentRunner } from "./cursor-runner.js";
-import type { AgentEvent } from "../../../core/ports/agent-runner.js";
+import { capabilitiesOf, type AgentEvent, type AgentRunner } from "../../../core/ports/agent-runner.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const runner = new CursorAgentRunner({
@@ -83,4 +83,36 @@ describe("CursorAgentRunner", () => {
     expect(r.exitCode).toBeNull();
     expect(r.resultText).toContain("definitely-not-a-real-binary-xyz");
   });
+
+  it("declares what the current adapter supports", () => {
+    expect(capabilitiesOf(runner)).toEqual({
+      resume: false,
+      chooseModel: true,
+      commandList: false,
+      visibleReasoning: true,
+      planUsage: false,
+    });
+  });
 });
+
+describe("capabilitiesOf", () => {
+  it("returns all-false for a runner that declares none", () => {
+    const bare: AgentRunner = { run: async () => ({ exitCode: 0, isError: false, resultText: "", durationMs: 0, timedOut: false }) };
+    expect(capabilitiesOf(bare)).toEqual({
+      resume: false,
+      chooseModel: false,
+      commandList: false,
+      visibleReasoning: false,
+      planUsage: false,
+    });
+  });
+
+  it("fills in the flags a partial declaration leaves out", () => {
+    const partial = { run: bareRun, capabilities: { resume: true } } as unknown as AgentRunner;
+    expect(capabilitiesOf(partial)).toMatchObject({ resume: true, chooseModel: false });
+  });
+});
+
+async function bareRun() {
+  return { exitCode: 0, isError: false, resultText: "", durationMs: 0, timedOut: false };
+}
