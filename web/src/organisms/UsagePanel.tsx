@@ -11,13 +11,15 @@ interface Props {
   inputTokens: number;
   outputTokens: number;
   now: number;
+  /** One tight block for a narrow panel: meters stacked under the token total. */
+  compact?: boolean;
 }
 
 /** Plan windows (when the agent reports them) and the session's token total, the answer to `/usage`. */
-export function UsagePanel({ reportsPlanUsage, planUsage, inputTokens, outputTokens, now }: Props) {
+export function UsagePanel({ reportsPlanUsage, planUsage, inputTokens, outputTokens, now, compact }: Props) {
   const total = inputTokens + outputTokens;
   return (
-    <section className="usage-panel" aria-label="Usage">
+    <section className={compact ? "usage-panel usage-panel--compact" : "usage-panel"} aria-label="Usage">
       <div className="usage-panel__tokens">
         <span className="usage-panel__label">Session tokens</span>
         <span className="usage-panel__total">{total === 0 ? "—" : formatTokens(total)}</span>

@@ -1,8 +1,12 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentView, SessionDetail, SessionEvent, SessionListEntry } from "../sessions/types";
-import { WorkspaceView } from "./WorkspaceView";
+import type { AgentView, SessionDetail, SessionEvent, SessionListEntry } from "../../../sessions/types";
+import { ClaudePanel } from "./ClaudePanel";
+
+const PROPS = { board: undefined, runId: undefined, live: false, renderDetail: undefined, selectRun: () => {} };
+const panel = () => <ClaudePanel {...PROPS} />;
+const pick = (user: ReturnType<typeof userEvent.setup>, name: RegExp) => user.selectOptions(screen.getByRole("combobox", { name: "Session" }), screen.getByRole("option", { name }));
 
 const NOW_ISO = new Date().toISOString();
 const caps = { resume: true, chooseModel: false, commandList: false, visibleReasoning: false, planUsage: false };
@@ -52,7 +56,7 @@ function stubFetch(): void {
       }
       if (url === "/api/agents") return json({ agents: AGENTS });
       if (url === "/api/agents/alpha/models") return json({ models: ["alpha-fast", "alpha-deep"] });
-      if (url === "/api/sessions") return json({ sessions: [entry("a1", "alpha"), entry("b1", "beta")] });
+      if (url === "/api/sessions") return json({ sessions: [...(posted.some((p) => p.url === "/api/sessions") ? [entry("chat-new", "alpha")] : []), entry("a1", "alpha"), entry("b1", "beta")] });
       const events = /^\/api\/sessions\/([^/]+)\/events/.exec(url);
       if (events) return json({ events: events[1] === "a1" ? EVENTS : [], lastEventId: 2 });
       const one = /^\/api\/sessions\/([^/?]+)$/.exec(url);
@@ -77,11 +81,11 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe("WorkspaceView: an open session", () => {
+describe("ClaudePanel: an open session", () => {
   it("lists the sessions and shows the open one's timeline as text, with the reasoning note", async () => {
-    render(<WorkspaceView sessionId="a1" />);
+    render(panel());
     await screen.findByText("<b>Here is the plan</b>");
-    expect(screen.getByRole("button", { name: /Session b1/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /Session b1/ })).toBeTruthy();
     expect(screen.getByText("Plan the board")).toBeTruthy();
     expect(screen.getByText("Reasoning not shared by the agent")).toBeTruthy();
     // Untrusted output never becomes markup.
@@ -89,7 +93,7 @@ describe("WorkspaceView: an open session", () => {
   });
 
   it("shows the terminal command and the plan usage of an agent that declares them", async () => {
-    render(<WorkspaceView sessionId="a1" />);
+    render(panel());
     await screen.findByText("cd '/repo' && alpha --resume agent-sess-1");
     expect(screen.getByRole("progressbar", { name: "5-hour window" }).getAttribute("aria-valuenow")).toBe("40");
     expect(screen.getByText("1.2k")).toBeTruthy();
@@ -97,7 +101,7 @@ describe("WorkspaceView: an open session", () => {
 
   it("offers the agent's own commands and the capability-gated Knit commands in the palette", async () => {
     const user = userEvent.setup();
-    render(<WorkspaceView sessionId="a1" />);
+    render(panel());
     await screen.findByText("<b>Here is the plan</b>");
     await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "/");
     const names = within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.querySelector(".command-palette__name")?.textContent);
@@ -106,21 +110,20 @@ describe("WorkspaceView: an open session", () => {
 
   it("an agent without those capabilities gets no model picker, no /usage and no terminal command", async () => {
     const user = userEvent.setup();
-    render(<WorkspaceView sessionId="b1" />);
-    await screen.findByText("Plan the board");
-    expect(screen.getByText("This agent does not report plan usage.")).toBeTruthy();
+    render(panel());
+    await screen.findByText("<b>Here is the plan</b>");
+    await pick(user, /Session b1/);
+    await screen.findByText("This agent does not report plan usage.");
     expect(screen.queryByLabelText("Model")).toBeNull();
     expect(screen.queryByText("Continue in terminal")).toBeNull();
     // It cannot resume, so continuing here is not offered either.
     expect(screen.getByText(/cannot continue this conversation here/)).toBeTruthy();
     expect(screen.queryByRole("combobox", { name: /message beta/i })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Usage" }));
-    expect(screen.queryByText("This agent does not report plan usage.")).toBeNull();
   });
 
   it("sends a turn with the picked profile and reads again", async () => {
     const user = userEvent.setup();
-    render(<WorkspaceView sessionId="a1" />);
+    render(panel());
     await screen.findByText("<b>Here is the plan</b>");
     await screen.findByRole("option", { name: "alpha-deep" });
     await user.selectOptions(screen.getByLabelText("Model"), "alpha-deep");
@@ -132,7 +135,7 @@ describe("WorkspaceView: an open session", () => {
 
   it("/usage sends a /usage turn to an agent that reports plan usage", async () => {
     const user = userEvent.setup();
-    render(<WorkspaceView sessionId="a1" />);
+    render(panel());
     await screen.findByText("<b>Here is the plan</b>");
     await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "/usage{Enter}");
     await waitFor(() => expect(posted).toHaveLength(1));
@@ -144,7 +147,7 @@ describe("WorkspaceView: an open session", () => {
       session: { ...entry("a1", "alpha").session, status: "running", agentSessionId: "s" },
       turns: [{ id: 1, sessionId: "a1", seq: 1, prompt: "go", startedAt: NOW_ISO, status: "running" }],
     });
-    render(<WorkspaceView sessionId="a1" />);
+    render(panel());
     await screen.findByText("A turn is running…");
     expect(screen.getByRole("status", { name: "" }) ?? true).toBeTruthy();
     expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
@@ -152,7 +155,7 @@ describe("WorkspaceView: an open session", () => {
 
   it("shows the server's message when a turn is refused", async () => {
     const user = userEvent.setup();
-    render(<WorkspaceView sessionId="a1" />);
+    render(panel());
     await screen.findByText("<b>Here is the plan</b>");
     const base = globalThis.fetch as unknown as (input: string, init?: unknown) => Promise<Response>;
     vi.stubGlobal("fetch", (input: string, init?: { method?: string }) =>
@@ -165,37 +168,43 @@ describe("WorkspaceView: an open session", () => {
 
   it("starts a new session with /clear", async () => {
     const user = userEvent.setup();
-    render(<WorkspaceView sessionId="a1" />);
+    render(panel());
     await screen.findByText("<b>Here is the plan</b>");
     await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "/clear{Enter}");
-    expect(window.location.hash).toBe("#/workspace/new");
+    expect(await screen.findByRole("heading", { name: "New session" })).toBeTruthy();
+    expect(window.location.hash).toBe("");
   });
 
   it("switching to a session navigates to it", async () => {
     const user = userEvent.setup();
-    render(<WorkspaceView sessionId="a1" />);
-    await user.click(await screen.findByRole("button", { name: /Session b1/ }));
-    expect(window.location.hash).toBe("#/workspace/b1");
+    render(panel());
+    await screen.findByText("<b>Here is the plan</b>");
+    await pick(user, /Session b1/);
+    expect(await screen.findByRole("combobox", { name: "Session" })).toHaveProperty("value", "b1");
+    expect(window.location.hash).toBe("");
   });
 });
 
-describe("WorkspaceView: a new session", () => {
+describe("ClaudePanel: a new session", () => {
   it("offers every agent the server lists and starts the session with the directory and profile", async () => {
     const user = userEvent.setup();
-    render(<WorkspaceView sessionId="new" />);
+    details["chat-new"] = detail("chat-new", "alpha");
+    render(panel());
+    await user.click(await screen.findByRole("button", { name: "New session" }));
     await screen.findByRole("radio", { name: "Beta" });
     expect(screen.getAllByRole("radio").map((r) => (r as HTMLInputElement).value)).toEqual(["alpha", "beta"]);
     await user.type(screen.getByLabelText("Directory"), "/work/repo");
     await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "Plan it{Enter}");
     await waitFor(() => expect(posted).toHaveLength(1));
     expect(posted[0]).toEqual({ url: "/api/sessions", body: { agent: "alpha", cwd: "/work/repo", prompt: "Plan it", profile: {} } });
-    await waitFor(() => expect(window.location.hash).toBe("#/workspace/chat-new"));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Session" })).toHaveProperty("value", "chat-new"));
     expect(window.localStorage.getItem("knit.workspace.cwd")).toBe("/work/repo");
   });
 
   it("asks for a directory instead of sending without one", async () => {
     const user = userEvent.setup();
-    render(<WorkspaceView />);
+    render(panel());
+    await user.click(await screen.findByRole("button", { name: "New session" }));
     await screen.findByRole("radio", { name: "Alpha" });
     await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "Plan it{Enter}");
     expect((await screen.findByRole("alert")).textContent).toMatch(/directory/i);
@@ -204,7 +213,8 @@ describe("WorkspaceView: a new session", () => {
 
   it("changes the composer with the chosen agent's capabilities", async () => {
     const user = userEvent.setup();
-    render(<WorkspaceView sessionId="new" />);
+    render(panel());
+    await user.click(await screen.findByRole("button", { name: "New session" }));
     await screen.findByLabelText("Model");
     await user.click(screen.getByRole("radio", { name: "Beta" }));
     expect(screen.queryByLabelText("Model")).toBeNull();
@@ -212,7 +222,7 @@ describe("WorkspaceView: a new session", () => {
   });
 });
 
-describe("WorkspaceView: plan handoff", () => {
+describe("ClaudePanel: plan handoff", () => {
   const draft = (over: Record<string, unknown> = {}) => ({
     path: "/repo/docs/plans/login.md",
     file: "login.md",
@@ -240,21 +250,43 @@ describe("WorkspaceView: plan handoff", () => {
     );
   }
 
-  it("shows the draft with its validation result and starts nothing until Launch is clicked", async () => {
+  it("shows the draft with its validation result and starts nothing until Send plan to Knit is clicked", async () => {
     const user = userEvent.setup();
     withPlans([draft()]);
-    render(<WorkspaceView sessionId="a1" />);
+    render(panel());
     await screen.findByText("Add login");
     expect(screen.getByText("Valid")).toBeTruthy();
     expect(posted).toEqual([]);
-    await user.click(screen.getByRole("button", { name: "Launch run" }));
+    await user.click(screen.getByRole("button", { name: "Send plan to Knit" }));
     await waitFor(() => expect(posted).toEqual([{ url: "/api/runs", body: { planPath: "/repo/docs/plans/login.md" } }]));
   });
 
   it("shows the issues of an invalid draft and cannot launch it", async () => {
     withPlans([draft({ valid: false, issues: ["T1 has no goal"], tasks: [] })]);
-    render(<WorkspaceView sessionId="a1" />);
+    render(panel());
     await screen.findByText("T1 has no goal");
-    expect(screen.queryByRole("button", { name: "Launch run" })).toBeNull();
+    const send = screen.getByRole("button", { name: "Send plan to Knit" }) as HTMLButtonElement;
+    expect(send.disabled).toBe(true);
+    expect(screen.getByText(/Fix 1 issue/)).toBeTruthy();
+  });
+});
+
+describe("ClaudePanel: header", () => {
+  it("shows the agent, its model and profile, and the working directory of the open session", async () => {
+    const user = userEvent.setup();
+    render(panel());
+    await screen.findByText("<b>Here is the plan</b>");
+    await screen.findByRole("option", { name: "alpha-deep" });
+    await user.selectOptions(screen.getByLabelText("Model"), "alpha-deep");
+    const header = screen.getByRole("banner");
+    expect(within(header).getByText("Alpha")).toBeTruthy();
+    expect(within(header).getByText("alpha-deep")).toBeTruthy();
+    expect(within(header).getByText("/repo")).toBeTruthy();
+  });
+
+  it("opens on the most recent session and keeps the choice in the panel, not in the URL", async () => {
+    render(panel());
+    expect(await screen.findByText("<b>Here is the plan</b>")).toBeTruthy();
+    expect(window.location.hash).toBe("");
   });
 });

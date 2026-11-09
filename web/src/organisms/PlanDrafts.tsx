@@ -34,11 +34,22 @@ export function PlanDrafts({ dir, plans, launching, error, onLaunch }: Props) {
               <span className="plan-draft__result" data-valid={plan.valid}>
                 {plan.valid ? "Valid" : `Invalid · ${plan.issues.length} ${plan.issues.length === 1 ? "issue" : "issues"}`}
               </span>
-              {plan.valid ? (
-                <button type="button" className="plan-draft__launch" disabled={launching !== undefined} onClick={() => onLaunch(plan)}>
-                  {launching === plan.path ? "Launching…" : "Launch run"}
-                </button>
-              ) : null}
+            </div>
+            <div className="plan-draft__send">
+              <button
+                type="button"
+                className="plan-draft__launch"
+                disabled={!plan.valid || launching !== undefined}
+                aria-describedby={plan.valid ? undefined : `${plan.path}-why`}
+                onClick={() => onLaunch(plan)}
+              >
+                {launching === plan.path ? "Sending…" : "Send plan to Knit"}
+              </button>
+              {plan.valid ? null : (
+                <span id={`${plan.path}-why`} className="plan-draft__why">
+                  Fix {plan.issues.length} {plan.issues.length === 1 ? "issue" : "issues"} first.
+                </span>
+              )}
             </div>
             {plan.valid ? (
               <ol className="plan-draft__tasks">
