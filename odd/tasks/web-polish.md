@@ -19,7 +19,7 @@ Objective: polish the single view of `knit ui`: blocks with their own identity (
 | ID | Specs | What | Route | Status | Branch / commit |
 | --- | --- | --- | --- | --- | --- |
 | P1 | S1, S2, S7, S8 | Block redesign: landscape cards with brand identity (Claude Code style and mascot, Cursor identity), Orchestrator label, middle block as a pipeline | inline | done (RED seen: 13 tests) | `feat/polish-blocks`, ed6c0a5 |
-| P2 | S3 | Inline expansion: model switch, active agents, context use | inline | done (RED seen: 8 tests); model change goes through the block (opens it) | `feat/polish-blocks`, see L6 |
+| P2 | S3 | Inline expansion: model switch, active agents, context use | inline | done (RED seen: 8 tests); model change goes through the block (opens it) | `feat/polish-blocks`, 7d0b422 |
 | P3 | S4 | Animated modal over the view replacing the side panel (all blocks and configuration) | inline | pending | |
 | P4 | S4, S5 | Claude modal: session and model switch, routing switch to the orchestrator | inline | pending | |
 | P5 | S6 | Cursor modal: prompts, live reasoning and changes | inline | pending | |
