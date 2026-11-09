@@ -45,8 +45,16 @@ const MAX_LINES = 3;
 
 const clip = (text: string, max = MAX_LINE): string => {
   const flat = text.replace(/\s+/g, " ").trim();
-  return flat.length <= max ? flat : `${flat.slice(0, max - 1)}…`;
+  if (flat.length <= max) return flat;
+  const head = flat.slice(0, max - 1);
+  // Cut at a word boundary when one falls in the last third; otherwise the word is longer than that and is cut.
+  const space = head.lastIndexOf(" ");
+  const cut = space >= (max * 2) / 3 ? head.slice(0, space) : head;
+  return `${cut.replace(/[\s.,;:\-–—]+$/, "")}…`;
 };
+
+/** Clip a line at a word boundary with an ellipsis. Exported for the tests and the full-text title. */
+export const clipLine = clip;
 
 const tidy = (lines: (string | undefined)[]): string[] =>
   lines.filter((l): l is string => l !== undefined && l.trim() !== "").slice(0, MAX_LINES).map((l) => clip(l));
@@ -119,6 +127,11 @@ function resultHop(board: BoardModel | undefined): HopView {
   return { ...base, stage: "No result yet", stageIndex: -1, status: "idle", lines: [] };
 }
 
+/** Share of a hop's stages already reached, 0 to 1. Drives the fill of the stage track. */
+export function hopProgress(hop: Pick<HopView, "stages" | "stageIndex">): number {
+  return hop.stages.length === 0 ? 0 : Math.max(0, Math.min(1, (hop.stageIndex + 1) / hop.stages.length));
+}
+
 /** The three hops, in pipeline order: the plan goes to Knit, the prompt to Cursor, the result comes back. */
 export function deriveHops(board: BoardModel | undefined, session: SessionGlimpse | undefined): HopView[] {
   return [planHop(board, session), promptHop(board), resultHop(board)];
@@ -128,7 +141,7 @@ export function deriveHops(board: BoardModel | undefined, session: SessionGlimps
 export function deriveBlocks(board: BoardModel | undefined, session: SessionGlimpse | undefined): Record<"claude" | "knit" | "cursor", BlockView> {
   const claude: BlockView =
     session !== undefined
-      ? { status: session.status === "running" ? "working" : board?.nodes.claude.status ?? "idle", headline: clip(session.title, 40), lines: tidy(session.lines.slice(-MAX_LINES)) }
+      ? { status: session.status === "running" ? "working" : board?.nodes.claude.status ?? "idle", headline: clip(session.title, 40), lines: tidy(session.lines.slice(-MAX_LINES).reverse()) }
       : board !== undefined
         ? { status: board.nodes.claude.status, headline: board.planName, lines: tidy([`${plural(board.nodes.claude.taskCount, "task")} planned`]) }
         : { status: "idle", headline: "No session yet", lines: [] };

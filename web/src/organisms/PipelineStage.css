@@ -1,4 +1,5 @@
 .pipeline {
+  --block-h: clamp(22rem, 54vh, 34rem);
   container-type: inline-size;
   width: 100%;
   min-width: 0;
@@ -6,13 +7,13 @@
 
 .pipeline__grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.75fr) minmax(0, 1fr) minmax(0, 0.75fr) minmax(0, 1fr);
   grid-template-areas:
     "claude plan knit prompt cursor"
     ". . result result result";
   column-gap: var(--space-3);
-  row-gap: var(--space-4);
-  align-items: start;
+  row-gap: var(--space-2);
+  align-items: stretch;
 }
 
 .pipeline__cell {
@@ -24,14 +25,16 @@
 }
 .pipeline__cell[data-area="plan"] {
   grid-area: plan;
-  align-self: center;
+  align-self: start;
+  margin-top: calc(var(--block-h) / 2 - 1.75rem);
 }
 .pipeline__cell[data-area="knit"] {
   grid-area: knit;
 }
 .pipeline__cell[data-area="prompt"] {
   grid-area: prompt;
-  align-self: center;
+  align-self: start;
+  margin-top: calc(var(--block-h) / 2 - 1.75rem);
 }
 .pipeline__cell[data-area="cursor"] {
   grid-area: cursor;
@@ -44,6 +47,16 @@
   .pipeline__grid {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "claude" "plan" "knit" "prompt" "cursor" "result";
-    row-gap: var(--space-2);
+    row-gap: var(--space-3);
+  }
+
+  .pipeline__cell[data-area="plan"],
+  .pipeline__cell[data-area="prompt"] {
+    margin-top: 0;
+  }
+
+  .pipeline .block-card {
+    min-height: 0;
+    height: auto;
   }
 }
