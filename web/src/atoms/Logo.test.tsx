@@ -23,7 +23,7 @@ describe("Logo", () => {
     const { container } = render(<Logo identity={AGENTS.cursor} />);
     fireEvent.error(container.querySelector("img") as HTMLImageElement);
     expect(container.querySelector("img")).toBeNull();
-    expect(screen.getByText("C")).toBeTruthy();
+    expect(container.querySelector('[data-mark="pointer"]')).toBeTruthy();
     expect(container.querySelector("[data-state]")?.getAttribute("data-state")).toBe("fallback");
   });
 

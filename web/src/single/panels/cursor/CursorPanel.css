@@ -84,3 +84,120 @@
   overflow-wrap: anywhere;
   font-weight: 600;
 }
+
+/* Where Cursor is, and the numbers of the run. */
+.cursor-panel__summary {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-sm);
+}
+
+.cursor-panel__state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.cursor-panel__dot {
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.cursor-panel__state[data-working="true"] .cursor-panel__dot {
+  background: var(--status-delivered);
+  animation: cursor-pulse 1.4s ease-in-out infinite;
+}
+
+.cursor-panel__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.cursor-panel__stat dt {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cursor-panel__stat dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+/* Before any task: what will show up, with Cursor's mark. */
+.cursor-panel__idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-4);
+  text-align: center;
+}
+
+.cursor-panel__idle-mark {
+  width: 3rem;
+  height: 3rem;
+  padding: 0.7rem;
+  border-radius: var(--radius-xl);
+  background: var(--cursor-bg);
+  color: var(--cursor-ink);
+}
+
+.cursor-panel__idle-title {
+  margin: var(--space-2) 0 0;
+  font-size: 1.3rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.cursor-panel__idle-text {
+  max-width: 30rem;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.cursor-panel__idle-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) var(--space-5);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  list-style: none;
+  text-align: left;
+}
+
+.cursor-panel__idle-list li::before {
+  content: "→ ";
+  color: var(--text-faint);
+}
+
+@keyframes cursor-pulse {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--status-delivered) 20%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-panel__state[data-working="true"] .cursor-panel__dot {
+    animation: none;
+  }
+}

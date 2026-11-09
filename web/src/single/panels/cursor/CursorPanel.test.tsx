@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { BoardModel } from "@board";
 import { createRenderDetail } from "../../../containers/detailRenderer";
+import { formatDuration, formatTokens } from "../../../flow/format";
 import { deliveredRun, runningRun } from "../../../fixtures/boards";
 import { fixtureDetailSource } from "../../../fixtures/detail";
 import type { PanelProps } from "../registry";
@@ -22,7 +23,7 @@ describe("CursorPanel", () => {
     const now = screen.getByRole("region", { name: "Active task" });
     expect(within(now).getByText("T3")).toBeTruthy();
     expect(within(now).getByText(runningRun.tasks[2]!.goal!)).toBeTruthy();
-    const others = screen.getByRole("region", { name: "Other tasks" });
+    const others = screen.getByRole("region", { name: "History" });
     expect(within(others).getAllByRole("button", { name: /^T\d/ })).toHaveLength(5);
     expect(within(others).queryByText(runningRun.tasks[0]!.goal!)).toBeNull();
   });
@@ -61,8 +62,29 @@ describe("CursorPanel", () => {
     expect(screen.queryByRole("region", { name: "Active task" })).toBeNull();
   });
 
-  it("says so when there is no run", () => {
+  it("shows a waiting state with what Cursor will show, not an empty box, when there is no run", () => {
     render(<CursorPanel {...props(undefined)} />);
-    expect(screen.getByText("No task to show yet.")).toBeTruthy();
+    const idle = screen.getByRole("region", { name: "Cursor is idle" });
+    expect(within(idle).getByRole("heading", { name: "Waiting for a task" })).toBeTruthy();
+    expect(within(idle).getByText(/hands it one/i)).toBeTruthy();
+    expect(screen.queryByText("No task to show yet.")).toBeNull();
+  });
+
+  it("summarizes the run: tasks delivered, attempts, tokens and agent time", () => {
+    render(<CursorPanel {...props(runningRun)} />);
+    const summary = within(screen.getByRole("region", { name: "Summary" }));
+    const { totals } = runningRun;
+    expect(summary.getByText("Tasks").nextSibling?.textContent).toBe(`${totals.tasks.delivered} of ${totals.tasks.total}`);
+    expect(summary.getByText("Attempts").nextSibling?.textContent).toBe(String(totals.attempts));
+    expect(summary.getByText("Tokens").nextSibling?.textContent).toBe(formatTokens(totals.tokens.cursor.input + totals.tokens.cursor.output));
+    expect(summary.getByText("Agent time").nextSibling?.textContent).toBe(formatDuration(totals.agentMs));
+  });
+
+  it("says Cursor is working on the active task, and idle when everything is delivered", () => {
+    const { unmount } = render(<CursorPanel {...props(runningRun)} />);
+    expect(screen.getByRole("status", { name: "Cursor state" }).textContent).toMatch(/working on T3/i);
+    unmount();
+    render(<CursorPanel {...props(deliveredRun)} />);
+    expect(screen.getByRole("status", { name: "Cursor state" }).textContent).toMatch(/idle/i);
   });
 });

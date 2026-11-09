@@ -8,7 +8,7 @@ interface Props {
   nav?: ReactNode;
   /** Name of the main area for assistive technology. */
   label?: string;
-  /** Controls on the right of the header (the theme toggle). */
+  /** Controls on the right of the header . */
   actions?: ReactNode;
   /** The canvas. */
   children: ReactNode;

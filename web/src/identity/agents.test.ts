@@ -16,6 +16,11 @@ describe("agent identities", () => {
     expect(AGENT_ORDER.map((id) => AGENTS[id].skin)).toEqual(["terminal", "pipeline", "editor"]);
   });
 
+  it("gives Cursor a pointer mark of its own for when its logo file is missing", () => {
+    expect(AGENTS.cursor.fallbackMark).toBe("pointer");
+    expect(AGENTS.claude.fallbackMark).toBeUndefined();
+  });
+
   it("points the official logos at the git-ignored brand folder", () => {
     expect(logoUrl(AGENTS.claude)).toBe("/brand/claude.svg");
     expect(logoUrl(AGENTS.cursor)).toBe("/brand/cursor.svg");

@@ -31,7 +31,8 @@
   opacity: 1;
 }
 
-.logo[data-state="mark"] svg {
+.logo[data-state="mark"] svg,
+.logo > svg[data-mark] {
   width: 72%;
   height: 72%;
 }

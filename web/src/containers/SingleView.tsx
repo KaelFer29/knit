@@ -20,7 +20,7 @@ import "./SingleView.css";
 interface Props {
   /** The URL query string. Defaults to the page's own. */
   search?: string;
-  /** Controls next to the configuration button in the header (the theme toggle). */
+  /** Controls next to the configuration button in the header . */
   actions?: ReactNode;
 }
 

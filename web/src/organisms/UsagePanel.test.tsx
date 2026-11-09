@@ -32,8 +32,14 @@ describe("UsagePanel", () => {
     expect(screen.getByText("600")).toBeTruthy();
   });
 
-  it("waits for the first report when the agent can report but none arrived", () => {
-    render(<UsagePanel reportsPlanUsage planUsage={[]} inputTokens={0} outputTokens={0} now={NOW} />);
-    expect(screen.getByText("Plan usage appears after the first turn.")).toBeTruthy();
+  it("shows nothing at all while there is nothing to show yet", () => {
+    const { container } = render(<UsagePanel reportsPlanUsage planUsage={[]} inputTokens={0} outputTokens={0} now={NOW} />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("shows the plan windows alone when a turn reported them but no tokens", () => {
+    render(<UsagePanel reportsPlanUsage planUsage={[{ name: "five_hour", utilization: 0.3 }]} inputTokens={0} outputTokens={0} now={NOW} />);
+    expect(screen.getByRole("progressbar", { name: "5-hour window" })).toBeTruthy();
+    expect(screen.queryByText("Session tokens")).toBeNull();
   });
 });

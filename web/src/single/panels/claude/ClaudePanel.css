@@ -98,3 +98,19 @@
   border-top: 1px solid var(--border);
   color: var(--text-muted);
 }
+
+/* What Claude answers sits in its own white card, apart from the grey bubble of what you asked. */
+.claude-panel .tl-entry--message,
+.claude-panel .tl-entry--result {
+  max-width: none;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--claude-line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-sm);
+}
+
+.claude-panel .tl-entry--result {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--claude-line);
+}

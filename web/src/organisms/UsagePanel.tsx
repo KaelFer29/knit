@@ -18,22 +18,22 @@ interface Props {
 /** Plan windows (when the agent reports them) and the session's token total, the answer to `/usage`. */
 export function UsagePanel({ reportsPlanUsage, planUsage, inputTokens, outputTokens, now, compact }: Props) {
   const total = inputTokens + outputTokens;
+  // Nothing to say yet (a turn that made no model call, such as /usage, reports neither tokens nor windows).
+  if (reportsPlanUsage && total === 0 && planUsage.length === 0) return null;
   return (
     <section className={compact ? "usage-panel usage-panel--compact" : "usage-panel"} aria-label="Usage">
-      <div className="usage-panel__tokens">
-        <span className="usage-panel__label">Session tokens</span>
-        <span className="usage-panel__total">{total === 0 ? "—" : formatTokens(total)}</span>
-        {total === 0 ? null : (
+      {total === 0 ? null : (
+        <div className="usage-panel__tokens">
+          <span className="usage-panel__label">Session tokens</span>
+          <span className="usage-panel__total">{formatTokens(total)}</span>
           <span className="usage-panel__split">
             {formatTokens(inputTokens)} in · {formatTokens(outputTokens)} out
           </span>
-        )}
-      </div>
+        </div>
+      )}
       <div className="usage-panel__plan">
         {!reportsPlanUsage ? (
           <p className="usage-panel__note">This agent does not report plan usage.</p>
-        ) : planUsage.length === 0 ? (
-          <p className="usage-panel__note">Plan usage appears after the first turn.</p>
         ) : (
           planUsage.map((u) => <UsageMeter key={u.name} usage={u} now={now} />)
         )}

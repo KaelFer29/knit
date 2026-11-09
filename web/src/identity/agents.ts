@@ -24,10 +24,12 @@ export interface AgentIdentity {
   accentSoft: string;
   /** File name of the official logo inside `/brand/` (git-ignored, filled by the user). Absent when the mark is drawn in code. */
   logoFile?: string;
-  /** The official logo is a single-color mark that must flip with the theme (drawn black, shown white on dark). */
+  /** The official logo is a single-color mark drawn black; it is inverted where it sits on a dark surface. */
   monochrome?: boolean;
   /** One or two letters (or Claude's spark glyph) shown when the logo file is missing. */
   monogram: string;
+  /** A mark drawn in code that stands in for the logo file while it is missing, instead of the monogram. */
+  fallbackMark?: "pointer";
   /** Never draws a mark or loads a file: only the monogram (an agent the interface has no brand for). */
   monogramOnly?: boolean;
 }
@@ -38,7 +40,7 @@ export const AGENTS: Record<AgentId, AgentIdentity> = {
   claude: { id: "claude", label: "Claude", role: "planner", tagline: "planner", skin: "terminal", ...tokens("claude"), logoFile: "claude.svg", monogram: "✻" },
   // The orchestrator is part of Knit (the product), not a brand: its mark is drawn in code, so it needs no file.
   knit: { id: "knit", label: "Orchestrator", role: "orchestrator", tagline: "pipeline", skin: "pipeline", ...tokens("knit"), monogram: "O" },
-  cursor: { id: "cursor", label: "Cursor", role: "builder", tagline: "builder", skin: "editor", ...tokens("cursor"), logoFile: "cursor.svg", monochrome: true, monogram: "C" },
+  cursor: { id: "cursor", label: "Cursor", role: "builder", tagline: "builder", skin: "editor", ...tokens("cursor"), logoFile: "cursor.svg", monochrome: true, monogram: "C", fallbackMark: "pointer" },
 };
 
 /** The blocks of the canvas, left to right. */
