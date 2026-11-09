@@ -25,7 +25,7 @@ node dist/cli/index.js runs                      # list runs
 node dist/cli/index.js show <run-id>             # tasks, attempts, tokens, branches, PRs
 node dist/cli/index.js logs <run-id> --follow    # watch what the agent is doing, live
 node dist/cli/index.js clean <run-id>            # remove the run's worktrees
-node dist/cli/index.js ui [--port 4317]          # serve the web interface on 127.0.0.1 (view of the runs; its API can start, abort and resume them)
+node dist/cli/index.js ui [--port 4317]          # serve the web interface on 127.0.0.1 (see "Web interface" below)
 node dist/cli/index.js chat "Plan the board" --cwd ~/code/app    # one turn with Claude, recorded as a session
 node dist/cli/index.js chat "Split it in tasks" --session <id>   # next turn: Claude resumes the same conversation
 node dist/cli/index.js followup <run-id> T1 "Also cover the empty case"   # more work on a task's Cursor chat, verified again
@@ -38,6 +38,17 @@ Run it from inside the project you want to change: if the plan has no `Repo:`, t
 Exit codes: `0` run passed, `1` a task failed, `2` usage or plan error.
 
 `run` and `resume` are one-shot commands, not servers: they start, run the plan, write the history to SQLite and exit. Nothing listens in the background. The only long-lived command is `ui`, which you start yourself: it serves the web interface on `127.0.0.1` (see [docs/web-interface.md](docs/web-interface.md#knit-ui)).
+
+### Web interface
+
+`knit ui` serves the web app on `127.0.0.1` and prints its address with a launch token; it never opens a browser. It only reads the database, and starts Knit commands (runs, chat turns) as child processes. Pages, reached from the tabs at the top:
+
+- **Runs:** the list of runs with their status and token totals, a start form for a plan, and one run on a canvas (Claude, Knit and Cursor, live) with abort, resume and retry, expandable blocks for attempts, checks and diffs.
+- **Workspace:** chat sessions with Claude or Cursor, a per-turn profile, a usage panel, and the plan drafts of a session, which can be launched as runs.
+- **Configuration:** the Claude and Cursor configuration files (project and global), edited with a diff before saving and a backup of the previous version.
+- **Files:** a read-only explorer of a run's repository and task worktrees, at `/?view=files&run=<run-id>` (it has no tab yet).
+
+Requirements for the web app: Node 20.19 or newer to build it (Vite 7). Details and known limits in [docs/web-interface.md](docs/web-interface.md).
 
 ### Chat sessions
 
@@ -96,5 +107,5 @@ The implementer's prompt is self-contained (specs, allowed files, git rules), so
 - The agent runs with `--force`. `agent --sandbox enabled` was tried and did not stop writes outside the working directory, so it is not used. Knit detects writes inside the worktree and next to it, not elsewhere on disk, and not in files ignored by `.gitignore`.
 - Push and PR failures are warnings, not task failures; `resume --pr` retries them.
 - Sequential only: no parallel tasks; a task depends on at most one earlier task.
-- No planner or verifier agents yet; checks are the only verification.
-- No web board yet. Every run already stores the full agent timeline in SQLite (`agent_events`) and raw transcripts on disk for it; `logs --follow` is the terminal version.
+- Only Cursor implements tasks. Claude plans through `knit chat`, but it does not verify attempts: checks are the only verification.
+- The web interface has known limits (for example, no durable run-to-session link and check output not stored), listed in [docs/web-interface.md](docs/web-interface.md#known-limits-and-follow-ups).
