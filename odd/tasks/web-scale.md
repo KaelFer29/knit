@@ -13,10 +13,10 @@ Objective: make the runs list, the branches and the changed files of `knit ui` u
 
 | ID | Specs | What | Route | Status | Commit |
 | --- | --- | --- | --- | --- | --- |
-| L1 | S1-S4 | Pure list helpers (`paginate`, `matches`) and a `Pager` + `ListToolbar` molecule | inline | pending | |
-| L2 | S1 | Compact paginated runs picker with filters | inline | pending | |
-| L3 | S2 | Compact collapsible branch rows, paginated and filtered | inline | pending | |
-| L4 | S3 | Changed files: collapsed groups with counts, paginated | inline | pending | |
+| L1 | S1-S4 | Pure list helpers (`paginate`, `matchesQuery`, `useList`) and a `Pager` + `ListToolbar` molecule | inline | done (RED seen: module missing) | ee0009b |
+| L2 | S1 | Compact paginated runs picker with filters | inline | done (RED seen: 4 tests) | 70bed32 |
+| L3 | S2 | Compact collapsible branch rows, paginated and filtered | inline | done (RED seen: 3 tests) | 4ae44cc |
+| L4 | S3 | Changed files: collapsed groups with counts, paginated | inline | done (RED seen: 2 tests); only the page shown reads its diffs | see git log |
 
 Route evidence: sequential work, no Writer trigger applies.
 

@@ -62,9 +62,24 @@ describe("CursorPanel", () => {
     const groups = await screen.findAllByRole("region", { name: /^Changes of T\d/ });
     const started = runningRun.tasks.filter((t) => t.state !== "queued").map((t) => t.taskId);
     expect(groups.map((g) => g.getAttribute("aria-label"))).toEqual(started.map((id) => `Changes of ${id}`));
+    expect(within(groups[0]!).queryByText("src/webhooks/signature.ts")).toBeNull();
+    expect(await within(groups[0]!).findByText(/\d+ files?/)).toBeTruthy();
+    await user.click(within(groups[0]!).getAllByRole("button")[0]!);
     expect(await within(groups[0]!).findByText("src/webhooks/signature.ts")).toBeTruthy();
     expect(screen.queryByRole("tree")).toBeNull();
     expect(screen.queryByRole("region", { name: "Active task" })).toBeNull();
+  });
+
+  it("pages the task groups of Files and searches them by task or title", async () => {
+    const user = userEvent.setup();
+    const many = { ...runningRun, tasks: Array.from({ length: 9 }, (_, i) => ({ ...runningRun.tasks[0]!, taskId: `T${i + 1}`, title: `Title ${i + 1}`, state: "delivered" as const })), active: undefined };
+    const board = many as unknown as BoardModel;
+    render(<CursorPanel {...props(board, fixtureDetailSource(runningRun))} />);
+    await user.click(screen.getByRole("tab", { name: "Files" }));
+    expect(await screen.findAllByRole("region", { name: /^Changes of T\d/ })).toHaveLength(6);
+    expect(screen.getByText("1–6 of 9 tasks")).toBeTruthy();
+    await user.type(screen.getByRole("searchbox", { name: "Search changed tasks" }), "title 8");
+    expect(screen.getAllByRole("region", { name: /^Changes of T\d/ })).toHaveLength(1);
   });
 
   it("says so when no task has changed anything yet", async () => {
