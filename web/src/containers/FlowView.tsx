@@ -10,10 +10,13 @@ import { LiveStatus } from "../molecules/LiveStatus";
 import { FixtureSwitcher } from "../molecules/FixtureSwitcher";
 import { RunHeader } from "../molecules/RunHeader";
 import { FlowCanvas } from "../organisms/FlowCanvas";
+import { RunControlBar } from "./RunControlBar";
 
 interface Props {
   /** The URL query string. Defaults to the page's own. */
   search?: string;
+  /** The run to draw (from the `#/runs/<id>` route); wins over `?run=`. */
+  runId?: string;
 }
 
 /**
@@ -21,8 +24,8 @@ interface Props {
  * With `?run=<id>` the board is that run's, kept current from the live stream, and the pulses come from its events.
  * Without it the board is a fixture chosen with `?fixture=<name>` and the pulses come from the demo mode (`?demo=1`).
  */
-export function FlowView({ search = window.location.search }: Props) {
-  const params = parseFlowParams(search);
+export function FlowView({ search = window.location.search, runId }: Props) {
+  const params = { ...parseFlowParams(search), ...(runId === undefined ? {} : { run: runId }) };
   const live = useBoard(params.run);
   const fixture = ALL_FIXTURES[params.fixture];
   const board = params.run === undefined ? fixture : live.board;
@@ -40,6 +43,7 @@ export function FlowView({ search = window.location.search }: Props) {
       {board === undefined ? null : (
         <>
           <RunHeader board={board} />
+          {params.run !== undefined ? <RunControlBar board={board} /> : null}
           <FlowCanvas board={board} pulses={pulses} onPulseEnd={onPulseEnd} {...(renderDetail ? { renderDetail } : {})} />
         </>
       )}

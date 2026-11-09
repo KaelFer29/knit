@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { parseRoute, workspaceHash } from "./route";
+import { parseRoute, runsHash, workspaceHash } from "./route";
+
+describe("run routes", () => {
+  it("reads an optional run id after #/runs", () => {
+    expect(parseRoute("#/runs/run-1")).toEqual({ view: "runs", runId: "run-1" });
+    expect(parseRoute("#/runs/a%2Fb")).toEqual({ view: "runs", runId: "a/b" });
+    expect(parseRoute("#/runs/%E0%A4%A")).toEqual({ view: "runs" });
+    expect(parseRoute(runsHash("x y"))).toEqual({ view: "runs", runId: "x y" });
+    expect(runsHash()).toBe("#/runs");
+  });
+});
 
 describe("parseRoute", () => {
   it("defaults to the runs view", () => {

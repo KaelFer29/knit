@@ -1,0 +1,71 @@
+.start-run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+
+.start-run__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.start-run__path {
+  flex: 1 1 18rem;
+}
+
+.start-run__attempts {
+  width: 6.5rem;
+}
+
+.start-run input:not([type="checkbox"]) {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-0);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.start-run__check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.start-run__submit {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--text);
+  color: var(--surface-1);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.start-run__submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.start-run__error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--status-failed);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
