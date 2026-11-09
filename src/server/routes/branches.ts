@@ -125,10 +125,11 @@ export const branchesRoutes: RouteModule = ({ reader, branches, control: control
       handler: async ({ req, res, params }) => {
         const control = requireControl(controlDeps);
         const body = await readJsonBody(req);
-        rejectUnknown(body, ["model"]);
+        rejectUnknown(body, ["model", "template"]);
+        if (body.template !== undefined && (body.template !== true || body.model !== undefined)) throw new HttpError(400, "template must be true, and cannot be combined with a model");
         if (body.model !== undefined && (typeof body.model !== "string" || !isModelId(body.model))) throw new HttpError(400, "model must be an id from 'agent models': no spaces, and it cannot start with a dash");
         requireTask(params.id!, params.task!);
-        await act(control, res, params.id!, params.task!, "pr-draft", body.model === undefined ? [] : ["--model", body.model as string]);
+        await act(control, res, params.id!, params.task!, "pr-draft", body.template === true ? ["--template"] : body.model === undefined ? [] : ["--model", body.model as string]);
       },
     },
     {

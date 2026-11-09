@@ -224,6 +224,17 @@ describe("POST /api/runs/:id/tasks/:task/pr-draft and /pr", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("asks for the description built from the task, with no model, when template is true, and refuses anything else", async () => {
+    seed();
+    answer = { json: { ok: true, title: "Create prueba.md", body: "## Summary", model: "template" } };
+    const server = await launch();
+    expect((await request(server, "POST", draft, { template: true })).status).toBe(200);
+    expect(calls[0]!.args).toEqual(["branch", RUN, "T1", "pr-draft", "--template", "--json", "--data-dir", dataDir]);
+    const before = calls.length;
+    for (const body of [{ template: "yes" }, { template: false }, { template: true, model: "grok-4.7-high" }]) expect((await request(server, "POST", draft, body)).status, JSON.stringify(body)).toBe(400);
+    expect(calls).toHaveLength(before);
+  });
+
   it("opens the pull request with the title and body exactly as given, and returns its address", async () => {
     seed();
     answer = { json: { ok: true, url: "https://example.test/pull/7", base: "main", head: "docs/one" } };

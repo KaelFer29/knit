@@ -199,6 +199,27 @@ describe("knit branch pr-draft", () => {
     expect(existsSync(req.cwd)).toBe(false);
   });
 
+  it("builds the description from the task with --template, without calling any model", async () => {
+    const { runId } = await runPlan();
+    const d = draftAgent("Title: should not be used\n\nnope");
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "pr-draft", "--template", "--json"], c.io, d.deps())).toBe(0);
+    const out = JSON.parse(c.out().trim()) as { ok: boolean; title: string; body: string; model: string };
+    expect(out).toMatchObject({ ok: true, title: "Create a", model: "template" });
+    expect(out.body).toContain("## Summary");
+    expect(out.body).toContain("- ");
+    expect(out.body).toContain("src/a.txt");
+    expect(out.body).toContain("## Verification");
+    expect(d.seen.requests).toHaveLength(0);
+    expect(d.seen.options).toHaveLength(0);
+  });
+
+  it("refuses --template together with --model, and --template on other actions", async () => {
+    const { runId } = await runPlan();
+    expect(await main(["branch", runId, "T1", "pr-draft", "--template", "--model", "grok-4.7-high"], capture().io, draftAgent("x").deps())).toBe(2);
+    expect(await main(["branch", runId, "T1", "pr", "--template", "--title", "t", "--body", "b"], capture().io, deps())).toBe(2);
+  });
+
   it("uses the model it is given instead of the default", async () => {
     const { runId } = await runPlan();
     const d = draftAgent("Title: T\n\nB");

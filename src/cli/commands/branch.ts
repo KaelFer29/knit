@@ -7,7 +7,7 @@ import { isModelId } from "../../core/plan/parse-plan.js";
 import { GitBranchTools } from "../../adapters/vcs/git/git-branch-tools.js";
 import { GhPullRequests } from "../../adapters/vcs/github/gh-pull-requests.js";
 import { isBranchName } from "../../core/branches/pr-rules.js";
-import { buildPrDraftPrompt, parsePrDraft } from "../../core/branches/pr-draft.js";
+import { buildPrDraftPrompt, buildPrTemplate, parsePrDraft } from "../../core/branches/pr-draft.js";
 import { describeBranches, type BranchOverview } from "../../core/branches/overview.js";
 import type { BranchRef, BranchState, UndoMode } from "../../core/ports/branch-tools.js";
 import type { TaskRecord } from "../../core/ports/run-store.js";
@@ -54,6 +54,7 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
     title: { type: "string" },
     body: { type: "string" },
     base: { type: "string" },
+    template: { type: "boolean" },
   });
   const [runId, taskId, action] = positionals;
   if (positionals.length !== 3 || runId === undefined || taskId === undefined) throw new UsageError(`branch needs a run id, a task id and an action (${ACTIONS.join(", ")})`);
@@ -64,6 +65,7 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
   const mode = values.mode as UndoMode | undefined;
   if (action === "undo" && (mode === undefined || !MODES.includes(mode))) throw new UsageError(`undo needs --mode ${MODES.join("|")}`);
   if (values.model !== undefined && !isModelId(values.model)) throw new UsageError("--model must be an id from 'agent models': no spaces, and it cannot start with a dash");
+  if (values.template === true && (action !== "pr-draft" || values.model !== undefined)) throw new UsageError("--template only applies to pr-draft, and replaces --model");
   if (action === "pr") {
     if (values.title === undefined || values.body === undefined) throw new UsageError("pr needs --title and --body");
     if (values.title.trim() === "" || /[\r\n]/.test(values.title) || values.title.length > MAX_TITLE) throw new UsageError(`--title must be one line of at most ${MAX_TITLE} characters`);
@@ -110,7 +112,7 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
     if (mine === undefined) return fail(io, json, `${taskId} has not started, so it has no branch.`);
 
     if (action === "undo") return undo({ io, json, store, runId, taskId, task, ref, mine, mode: mode!, yes: values.yes === true, now, tools });
-    if (action === "pr-draft") return await prDraft({ io, json, task, ref, state: mine.state, tools, deps, model: values.model ?? PR_DRAFT_MODEL });
+    if (action === "pr-draft") return await prDraft({ io, json, task, ref, state: mine.state, tools, deps, model: values.model ?? PR_DRAFT_MODEL, template: values.template === true });
     const decision = mine.pr;
     if (!decision.ok) return fail(io, json, decision.reason);
 
@@ -181,6 +183,8 @@ interface DraftInput {
   tools: GitBranchTools;
   deps: CliDeps;
   model: string;
+  /** Build the text from the task, without a model. */
+  template: boolean;
 }
 
 /** Has the cheap model write a title and a body from the task and its diff. It runs in an empty scratch directory: it only writes text. */
@@ -189,7 +193,7 @@ async function prDraft(i: DraftInput): Promise<number> {
   if (!state.exists || i.ref === undefined) return fail(io, json, `The branch of ${task.taskId} no longer exists.`);
   if (state.ahead.length === 0) return fail(io, json, `${task.branch} has no commits after the start, so there is nothing to describe.`);
   const diff = i.tools.diff(i.ref, PR_DRAFT_DIFF_BYTES);
-  const prompt = buildPrDraftPrompt({
+  const input = {
     taskId: task.taskId,
     title: task.title,
     ...(task.goal ? { goal: task.goal } : {}),
@@ -198,7 +202,14 @@ async function prDraft(i: DraftInput): Promise<number> {
     stat: diff.stat,
     patch: diff.patch,
     truncated: diff.truncated,
-  });
+  };
+  if (i.template) {
+    // No model, no tokens: the orchestrator already knows everything a description needs.
+    const draft = buildPrTemplate(input);
+    report(io, json, { ok: true, ...draft, model: "template" }, [`Title: ${draft.title}`, "", draft.body]);
+    return 0;
+  }
+  const prompt = buildPrDraftPrompt(input);
   const options = { model: i.model };
   const agent = i.deps.agent ? i.deps.agent(options) : new CursorAgentRunner(options);
   const scratch = mkdtempSync(join(tmpdir(), "knit-prdraft-"));

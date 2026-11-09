@@ -62,6 +62,28 @@ export function buildPrDraftPrompt(input: PrDraftInput): string {
 
 const MAX_TITLE = 100;
 
+/**
+ * A pull request's title and description built from what Knit already knows (the task's goal and specs, its commits and
+ * the files it changed), with no model and so no tokens. The same sections every time; a model can improve it on request.
+ */
+export function buildPrTemplate(input: PrDraftInput): { title: string; body: string } {
+  const title = input.title.replace(/\s+/g, " ").trim().slice(0, MAX_TITLE).trim();
+  const stat = input.stat.trim();
+  const body = [
+    "## Summary",
+    (input.goal ?? "").trim() === "" ? title : input.goal!.trim(),
+    ...(input.specs.length > 0 ? ["", "## Specs", ...input.specs.map((s) => `- ${s.id}: ${s.text}`)] : []),
+    "",
+    "## Changes",
+    ...(input.commits.length > 0 ? input.commits.map((c) => `- ${c.subject}`) : ["- (no commits)"]),
+    ...(stat === "" ? [] : ["", "```", stat, "```"]),
+    "",
+    "## Verification",
+    `Passed Knit's checks for ${input.taskId}: the agent process, the files it touched, git hygiene and the task's own checks.`,
+  ].join("\n");
+  return { title, body };
+}
+
 /** Reads the model's answer: a `Title:` line and the rest as the body. A missing title falls back to the task's. */
 export function parsePrDraft(text: string, fallbackTitle: string): { title: string; body: string } {
   let t = text.trim();
