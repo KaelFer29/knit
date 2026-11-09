@@ -184,11 +184,11 @@ export function ClaudePanel({ agentId: panelAgent, board, runId, live: runIsLive
     }
   };
 
-  // The delivered tasks of a real run can be iterated on: the same branch, the same Cursor chat, a new attempt.
+  // The delivered and the failed tasks of a real run can be iterated on (a failed one is how it gets fixed): the same branch, the same Cursor chat, a new attempt.
   const targets = useMemo(
     () =>
       runIsLive && runId !== undefined && board !== undefined
-        ? board.tasks.filter((t) => t.state === "delivered" && t.branch !== undefined).map((t) => ({ taskId: t.taskId, title: t.title, branch: t.branch, goal: t.goal, specs: t.specs }))
+        ? board.tasks.filter((t) => (t.state === "delivered" || t.state === "failed") && t.branch !== undefined).map((t) => ({ taskId: t.taskId, title: t.title, branch: t.branch, goal: t.goal, specs: t.specs }))
         : [],
     [board, runId, runIsLive],
   );

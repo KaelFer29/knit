@@ -39,7 +39,7 @@ export function IterateBar({ tasks, selected, onSelect }: Props) {
             <>
               <span className="iterate-bar__title">Iterate on a task</span>
               <span className="iterate-bar__count">{tasks.length}</span>
-              <span className="iterate-bar__hint">Correct a delivered task in its own Cursor chat</span>
+              <span className="iterate-bar__hint">Correct a task in its own Cursor chat</span>
             </>
           ) : (
             <>

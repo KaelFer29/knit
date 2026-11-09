@@ -448,12 +448,20 @@ describe("ClaudePanel: iterating on a delivered task", () => {
     await user.click(within(screen.getByRole("list", { name: "Tasks to iterate on" })).getByRole("button", { name: new RegExp(target.taskId) }));
   };
 
-  it("lists the delivered tasks of the run, and only those", async () => {
-    const mixed = { ...board, tasks: board.tasks.map((t, i) => (i === 0 ? t : { ...t, state: "failed" as const })) };
+  it("lists the delivered and the failed tasks of the run, and not the ones still working", async () => {
+    const mixed = { ...board, tasks: board.tasks.map((t, i) => (i === 0 ? t : { ...t, state: "running" as const })) };
     const user = userEvent.setup();
     render(withRun({ board: mixed }));
     await openList(user);
     expect(within(screen.getByRole("list", { name: "Tasks to iterate on" })).getAllByRole("button")).toHaveLength(1);
+  });
+
+  it("offers a failed task too, since a follow-up is how it gets fixed", async () => {
+    const failed = { ...board, tasks: board.tasks.map((t, i) => (i === 0 ? { ...t, state: "failed" as const } : t)) };
+    const user = userEvent.setup();
+    render(withRun({ board: failed }));
+    await openList(user);
+    expect(within(screen.getByRole("list", { name: "Tasks to iterate on" })).getByRole("button", { name: new RegExp(target.taskId) })).toBeTruthy();
   });
 
   it("is not offered for a sample run or without a run", async () => {
