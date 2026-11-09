@@ -1,0 +1,163 @@
+.hop {
+  --hop-color: var(--border-strong);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-1);
+}
+
+.hop[data-status="active"] {
+  --hop-color: var(--status-running);
+}
+
+.hop[data-status="done"] {
+  --hop-color: var(--status-delivered);
+}
+
+.hop[data-status="failed"] {
+  --hop-color: var(--status-failed);
+}
+
+.hop__label {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-weight: 560;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hop__wire {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--hop-color);
+  opacity: 0.35;
+  overflow: hidden;
+}
+
+.hop[data-status="active"] .hop__wire,
+.hop[data-status="done"] .hop__wire,
+.hop[data-status="failed"] .hop__wire {
+  opacity: 1;
+}
+
+/* A bright segment travels along the wire while something is in flight. */
+.hop[data-status="active"] .hop__wire::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--surface-1), transparent);
+  animation: hop-flow 1.6s linear infinite;
+}
+
+.hop[data-hop="result"] .hop__wire::after {
+  animation-direction: reverse;
+}
+
+@keyframes hop-flow {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+.hop__stages {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hop__stage {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+.hop__stage[data-reached="true"] {
+  color: var(--text-muted);
+}
+
+.hop__dot {
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface-1);
+}
+
+.hop__stage[data-reached="true"] .hop__dot {
+  border-color: var(--hop-color);
+  background: var(--hop-color);
+}
+
+.hop__stage[data-current="true"] .hop__dot {
+  box-shadow: 0 0 0 3px var(--surface-0), 0 0 0 5px var(--hop-color);
+}
+
+.hop[data-status="active"] .hop__stage[data-current="true"] .hop__dot {
+  animation: hop-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes hop-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.hop__stage-name {
+  overflow-wrap: anywhere;
+}
+
+.hop__current {
+  margin: 0;
+  color: var(--hop-color);
+  font-size: var(--text-sm);
+  font-weight: 620;
+  text-align: center;
+}
+
+.hop[data-status="idle"] .hop__current {
+  color: var(--text-muted);
+}
+
+.hop__log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  list-style: none;
+  min-height: calc(3 * 1.5 * var(--text-xs) + 2 * var(--space-2));
+}
+
+.hop__line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hop[data-status="active"] .hop__wire::after,
+  .hop[data-status="active"] .hop__stage[data-current="true"] .hop__dot {
+    animation: none;
+  }
+}

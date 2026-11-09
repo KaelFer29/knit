@@ -1,0 +1,49 @@
+.pipeline {
+  container-type: inline-size;
+  width: 100%;
+  min-width: 0;
+}
+
+.pipeline__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.1fr);
+  grid-template-areas:
+    "claude plan knit prompt cursor"
+    ". . result result result";
+  column-gap: var(--space-3);
+  row-gap: var(--space-4);
+  align-items: start;
+}
+
+.pipeline__cell {
+  min-width: 0;
+}
+
+.pipeline__cell[data-area="claude"] {
+  grid-area: claude;
+}
+.pipeline__cell[data-area="plan"] {
+  grid-area: plan;
+  align-self: center;
+}
+.pipeline__cell[data-area="knit"] {
+  grid-area: knit;
+}
+.pipeline__cell[data-area="prompt"] {
+  grid-area: prompt;
+  align-self: center;
+}
+.pipeline__cell[data-area="cursor"] {
+  grid-area: cursor;
+}
+.pipeline__cell[data-area="result"] {
+  grid-area: result;
+}
+
+@container (max-width: 820px) {
+  .pipeline__grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "claude" "plan" "knit" "prompt" "cursor" "result";
+    row-gap: var(--space-2);
+  }
+}
