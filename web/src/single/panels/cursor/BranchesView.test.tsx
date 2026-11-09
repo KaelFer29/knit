@@ -395,9 +395,8 @@ describe("BranchesView", () => {
       await user.type(title, "Create prueba.md");
       await user.click(within(form).getByRole("button", { name: "Push and open pull request" }));
       await waitFor(() => expect(posts().at(-1)).toEqual({ method: "POST", url: "/api/runs/run-1/tasks/T1/pr", body: { title: "Create prueba.md", body: "## Summary\n- adds it" } }));
-      const done = await screen.findByRole("link", { name: "Pull request ↗" });
-      expect(done.getAttribute("href")).toBe("https://example.test/pull/7");
-      expect(screen.getByRole("status").textContent).not.toMatch(/opened/i);
+      // A short notice at the end of the tags, like the checkout one; the link is the row's "Pull request" tag.
+      expect(await screen.findByText("Pull request opened")).toBeTruthy();
     });
 
     it("builds the description from the task when the form opens, without asking a model", async () => {

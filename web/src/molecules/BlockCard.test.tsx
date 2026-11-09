@@ -14,6 +14,11 @@ describe("BlockCard model", () => {
     expect(screen.queryByText("Done")).toBeNull();
   });
 
+  it("gives the full model as a tooltip, since a long one is cut so it cannot push the rest of the block", () => {
+    render(<BlockCard identity={AGENTS.claude} view={view({ model: "claude-opus-5-5-high-fast-1m-thinking" })} details={details} open={false} onOpen={() => {}} />);
+    expect(screen.getByText("claude-opus-5-5-high-fast-1m-thinking").getAttribute("title")).toBe("claude-opus-5-5-high-fast-1m-thinking");
+  });
+
   it("keeps the status for a block with no model (the orchestrator)", () => {
     render(<BlockCard identity={AGENTS.knit} view={view({ status: "working" })} details={details} open={false} onOpen={() => {}} />);
     expect(screen.getByText("Working")).toBeTruthy();

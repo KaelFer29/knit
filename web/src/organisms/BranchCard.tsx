@@ -73,7 +73,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
   const [remote, setRemote] = useState<{ state: "loading" } | { state: "ready"; names: string[] } | { state: "failed"; message: string }>({ state: "loading" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const [result, setResult] = useState<{ text: string; url?: string }>();
+  const [result, setResult] = useState<{ text: string }>();
   const [draft, setDraft] = useState<{ state: "writing" | "ready" | "failed"; title: string; body: string; model: string; saved: boolean }>({ state: "writing", title: b.title, body: "", model: TEMPLATE, saved: false });
   const key = draftKey(runId, b.taskId, b.state.head);
   const titleId = useId();
@@ -160,7 +160,8 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
       const done = await actions.open(b.taskId, draft.title.trim(), draft.body, target === recommended ? undefined : target);
       setPanel(undefined);
       forgetDraft(key);
-      setResult({ text: "", url: done.url });
+      // The link is the "Pull request" tag of the row once the branch is read again; here only a short notice.
+      setFlash({ text: "Pull request opened", key: Date.now() });
       onChanged();
     } catch (err) {
       setError(messageOf(err));
@@ -442,13 +443,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
 
       {result ? (
         <p className="branch__result" role="status">
-          {result.url ? (
-            <a href={result.url} target="_blank" rel="noopener noreferrer">
-              Pull request ↗
-            </a>
-          ) : (
-            result.text
-          )}
+          {result.text}
         </p>
       ) : null}
         </div>

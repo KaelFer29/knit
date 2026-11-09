@@ -650,7 +650,12 @@
 
 /* A block's model, in its identity's own color, in place of the status pill. */
 .block__model {
-  flex: none;
+  /* A long id is cut with an ellipsis so it cannot push its neighbours; the full id is the tooltip. */
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 0.15rem var(--space-2);
   border-radius: 999px;
   background: var(--block-soft);
