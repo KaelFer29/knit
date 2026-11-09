@@ -5,11 +5,12 @@ Hexagonal: Knit's logic does not know which agent, git host or database it talks
 ```
 src/
   core/            pure logic, no I/O
-    ports/           interfaces the core needs (AgentRunner, Workspace, RunStore, ...)
+    ports/           interfaces the core needs (AgentRunner, Workspace, RunStore, RunReader, ...)
     plan/            parse and validate a plan file
     prompt/          render the implementer prompt (and retry feedback)
     verification/    acceptance rules: scope of changed files, git hygiene
     timeline/        normalize each agent's raw stream (Cursor, Claude) into one readable timeline
+    board/           pure view model of a run for the web interface (task states, queue, wires, totals)
     run/             the run loop and pull request text
   adapters/        implementations of the ports
     agents/cursor/   AgentRunner for the Cursor CLI
@@ -17,7 +18,7 @@ src/
     vcs/git/         Workspace (worktrees, branches, inspection, push)
     vcs/github/      PullRequests through the gh CLI
     checks/shell/    CheckRunner (bash)
-    storage/sqlite/  RunStore
+    storage/sqlite/  RunStore (read-write) and RunReader (read-only)
     storage/files/   TranscriptStore (raw JSONL)
     system/          process spawning with timeouts and group kill
   cli/             command line: wires adapters into the core
@@ -39,11 +40,14 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 | `Workspace` | worktree and branch per task, inspection, push | `vcs/git` |
 | `PullRequests` | open pull requests | `vcs/github` |
 | `RunStore` | persist runs (with a snapshot of the plan and the pid executing them), tasks, attempts, events | `storage/sqlite` |
+| `RunReader` | read side for the web interface: runs list, snapshot of a run, events and agent events after an id, over a read-only connection that never writes or migrates | `storage/sqlite` |
 | `TranscriptStore` | keep the raw agent stream | `storage/files` |
 
 ### Agent capabilities
 
 `AgentRunner.capabilities` (`resume`, `chooseModel`, `commandList`, `visibleReasoning`, `planUsage`, all booleans) states what an adapter supports, so a caller asks the runner and never branches on its name. It is optional: `capabilitiesOf(runner)` returns all-false for a runner that declares none, which keeps simple runners and test fakes unchanged. A runner ignores request fields its capabilities do not cover.
+
+`core/board` is data in, view model out: it takes the records a `RunReader` returns and builds what the page draws (see [web-interface.md](web-interface.md#read-side-and-board-view-model)). It imports only port types, so `web/` can `import type` it.
 
 ## Extending
 

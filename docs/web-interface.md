@@ -96,6 +96,60 @@ web/                        browser app (Vite + React + TypeScript), built to di
 - `server` knows HTTP and SSE, not SQLite. It receives a `RunReader`.
 - `web` never talks to SQLite or the file system; it only consumes the HTTP API. Inside it: container components fetch and subscribe, presentational components only render props (atomic design: atoms, molecules, organisms).
 
+## Read side and board view model
+
+Built in task T2. Two pieces: a port that reads the database, and a pure function that turns what it returns into the model the page draws.
+
+### `RunReader` port
+
+`src/core/ports/run-reader.ts`, implemented by `SqliteRunReader` (`src/adapters/storage/sqlite/run-reader.ts`) over a connection opened with `readonly: true` and `fileMustExist: true`. It never writes, never migrates and never changes `user_version`. It reads while another process writes (WAL), and an older database (schema 3) is read as it is: the columns added by schema 4 are absent and the matching fields stay absent on the returned records (timeline rows from before schema 4 report `agent: "cursor"`, as documented in [data-model.md](data-model.md)).
+
+| Method | Returns |
+| --- | --- |
+| `listRuns()` | `RunListItem[]`, newest first: the run, `taskCounts` (`total`, `pending`, `running`, `passed`, `failed`) and `inputTokens` / `outputTokens` summed over its attempts |
+| `getRunSnapshot(runId)` | `RunSnapshot` (run, tasks, attempts, lifecycle events, `lastEventId`, `lastAgentEventId`) read from one consistent point in time, or `undefined` for an unknown run |
+| `getEventsAfter(runId, afterId, limit?)` | lifecycle `events` with `id > afterId`, oldest first |
+| `getAgentEventsAfter(runId, afterId, { taskId?, attempt?, limit? })` | `agent_events` with `id > afterId`, oldest first, optionally for one task or one attempt |
+
+Every row of the two incremental tables carries its numeric `id`, so a caller resumes exactly where it stopped by passing the last id it saw (`lastEventId` and `lastAgentEventId` of a snapshot are the first resume points). The server turns those ids into SSE ids.
+
+### `BoardModel`
+
+`buildBoard({ run, tasks, attempts, events, agentEvents?, nowMs? })` in `src/core/board/` is pure: it imports nothing from Node or from adapters, never reads a clock (`nowMs` is passed in) and `web/` imports only its types. `agentEvents` is only read for the live line, so a recent window of the timeline is enough.
+
+| Field | Content |
+| --- | --- |
+| `nodes.claude` | `status` (always `done`: the plan was handed over), `planName`, `taskCount`, `hasPlanText` |
+| `nodes.knit` | `status`, `activeTaskId?` |
+| `nodes.cursor` | `status`, `activeTaskId?`, `attempt?` (only while the agent itself works) |
+| `wires` | `plan` (claude to knit, one strand per task), `prompt` (knit to cursor, one strand per task that was dispatched) and `result` (cursor to knit, one strand per task with a finished attempt); each with `active` and its `strands` (`taskId`, `state`) |
+| `queue` | queued tasks in execution order (`position`), each with its `dependsOn` |
+| `active` | the task being worked on: `taskId`, `title`, `state` (`running`, `retrying` or `verifying`), and the open `attempt` with its start time |
+| `delivery` | delivered tasks in execution order with `branch`, `commitSha` and `prUrl` |
+| `tasks` | every task: `state`, `position`, `goal?`, `dependsOn?`, `specs` (empty when unknown), branch and commit fields, `failureReason?`, `attempts`, `tokens`, `durationMs` |
+| `tasks[].attempts[]` | `attempt` (0 is setup), `status` (`running`, `verifying`, `passed`, `failed`, `interrupted`), `startedAt`, `durationMs`, tokens, `failedCheck?`, `scopeOk?` (the scope verdict), `checking?` |
+| `totals` | `tokens` per node (`claude`, `knit`, `cursor`), `elapsedMs`, `agentMs`, `attempts`, task counts per state |
+| `liveLine` | what is happening right now: `source`, `kind`, `text`, `ts`, `eventId?` |
+
+Runs created before schema 4 have no goal, specs, position, dependency or plan text. The model keeps the creation order as the position, returns `specs: []` and leaves `goal` and `dependsOn` absent and `hasPlanText` false, so they draw without a special case.
+
+### State mapping
+
+An attempt row is written only when the attempt ends, so a running attempt is known from lifecycle events: it is **open** when it has an `attempt.started` event and neither an `attempt.finished` event nor an attempt row. A repeated `attempt.started` for the same number (a resumed run reuses the number of an attempt that never finished) restarts it.
+
+| Task state | When |
+| --- | --- |
+| `queued` | task status `pending`. Tasks skipped after a failure stay queued |
+| `running` | task status `running`, run `running`, no check started in the open attempt and no earlier attempt (number 1 or more) failed. Includes setup and the moments before the first attempt |
+| `retrying` | task status `running`, run `running`, and an attempt numbered 1 or more has failed: the open attempt, or the gap before the next one, is a retry. A failed setup (attempt 0) fails the task, so it never counts |
+| `verifying` | the open attempt has a `check.started` event: the agent finished and Knit runs the checks. It wins over `retrying` |
+| `delivered` | task status `passed` |
+| `failed` | task status `failed`, or task status `running` while the run is no longer `running` (the run died mid-task; its open attempt shows as `interrupted`) |
+
+Nodes and wires follow from that. Knit is `working` while the run runs, `done` when it passed and `failed` when it failed. Cursor is `working` only while an open attempt is `running` (idle while Knit verifies or between attempts) and takes the run's final status when it ends. The `plan` wire is active while the run runs and tasks are still queued, `prompt` while the agent works and `result` while Knit verifies. Tokens of attempts are the builder agent's: `totals.tokens.cursor`; Knit never calls a model, and Claude's sessions are not attempts, so their totals stay zero until phase B records them.
+
+The live line is the newest agent event of the open attempt while the agent works (a tool call reads `read: src/a.ts`, other kinds show their text clipped to 160 characters) and the check command, attributed to `knit`, while the attempt is verifying. It is absent when the run is not running, when no attempt is open or when the attempt has no events yet.
+
 ## HTTP API
 
 | Route | Returns |
