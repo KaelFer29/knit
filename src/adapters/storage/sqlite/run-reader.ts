@@ -6,6 +6,7 @@ import type {
   RunReader,
   RunSnapshot,
   StoredAgentEvent,
+  StoredRun,
   StoredEvent,
   TaskCounts,
 } from "../../../core/ports/run-reader.js";
@@ -79,6 +80,11 @@ export class SqliteRunReader implements RunReader {
     }).deferred();
   }
 
+  getRun(runId: string): StoredRun | undefined {
+    const row = this.db.prepare(`SELECT * FROM runs WHERE id = ?`).get(runId) as Row | undefined;
+    return row ? toRun(row) : undefined;
+  }
+
   getRunSnapshot(runId: string): RunSnapshot | undefined {
     return this.db.transaction((): RunSnapshot | undefined => {
       const row = this.db.prepare(`SELECT * FROM runs WHERE id = ?`).get(runId) as Row | undefined;
@@ -130,19 +136,36 @@ export class SqliteRunReader implements RunReader {
     const rows = this.db
       .prepare(`SELECT * FROM agent_events WHERE ${where.join(" AND ")} ORDER BY id LIMIT @limit`)
       .all(params) as Row[];
-    return rows.map((e) =>
-      compact<StoredAgentEvent>({
-        id: e.id,
-        runId: e.run_id,
-        taskId: e.task_id,
-        attempt: e.attempt,
-        ts: e.ts,
-        kind: e.kind,
-        payload: parsePayload(e.payload),
-        agent: e.agent ?? LEGACY_AGENT,
-      }),
-    );
+    return rows.map(toAgentEvent);
   }
+
+  getLatestAgentEvents(runId: string, limit: number, filter: Omit<AgentEventFilter, "limit"> = {}): StoredAgentEvent[] {
+    const where = [
+      "run_id = @runId",
+      ...(filter.taskId !== undefined ? ["task_id = @taskId"] : []),
+      ...(filter.attempt !== undefined ? ["attempt = @attempt"] : []),
+    ];
+    const params: Record<string, unknown> = { runId, limit: Math.max(0, Math.floor(limit)) };
+    if (filter.taskId !== undefined) params.taskId = filter.taskId;
+    if (filter.attempt !== undefined) params.attempt = filter.attempt;
+    const rows = this.db
+      .prepare(`SELECT * FROM agent_events WHERE ${where.join(" AND ")} ORDER BY id DESC LIMIT @limit`)
+      .all(params) as Row[];
+    return rows.reverse().map(toAgentEvent);
+  }
+}
+
+function toAgentEvent(e: Row): StoredAgentEvent {
+  return compact<StoredAgentEvent>({
+    id: e.id,
+    runId: e.run_id,
+    taskId: e.task_id,
+    attempt: e.attempt,
+    ts: e.ts,
+    kind: e.kind,
+    payload: parsePayload(e.payload),
+    agent: e.agent ?? LEGACY_AGENT,
+  });
 }
 
 function toAttempt(a: Row): AttemptRecord {

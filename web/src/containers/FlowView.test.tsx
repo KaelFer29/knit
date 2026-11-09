@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ALL_FIXTURES } from "../fixtures/boards";
 import { FlowView } from "./FlowView";
 
 afterEach(() => vi.useRealTimers());
@@ -19,6 +20,22 @@ describe("FlowView", () => {
     const current = nav.querySelector("[aria-current='page']");
     expect(current?.textContent).toBe("Delivered");
     expect(current?.getAttribute("href")).toBe("?fixture=deliveredRun");
+  });
+
+  it("draws a live run from the API when the query names one", async () => {
+    const detail = { board: { ...ALL_FIXTURES.deliveredRun, planName: "live-plan" }, lastEventId: 1, lastAgentEventId: 1 };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => detail }));
+    vi.stubGlobal("EventSource", class { addEventListener() {} close() {} });
+    render(<FlowView search="?run=run-1" />);
+    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe("live-plan");
+    vi.unstubAllGlobals();
+  });
+
+  it("says why a live run could not be drawn", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404, statusText: "Not Found", json: async () => ({ error: "Run not found: nope" }) }));
+    render(<FlowView search="?run=nope" />);
+    expect((await screen.findByRole("alert")).textContent).toContain("Run not found: nope");
+    vi.unstubAllGlobals();
   });
 
   it("offers a link per fixture", () => {

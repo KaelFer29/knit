@@ -73,7 +73,7 @@ function openStream(deps: ServerDeps, { req, res, url, params }: RouteContext): 
         // The status is read before the rows: whatever the run wrote before it finished is then already readable.
         if (!finished && deps.now() - lastStatusCheck >= deps.statusIntervalMs) {
           lastStatusCheck = deps.now();
-          const status = reader.getRunSnapshot(runId)?.run.status;
+          const status = reader.getRun(runId)?.status;
           finalStatus = status;
           finished = status !== "running";
         }

@@ -117,6 +117,8 @@ Built in task T2. Two pieces: a port that reads the database, and a pure functio
 | --- | --- |
 | `listRuns()` | `RunListItem[]`, newest first: the run, `taskCounts` (`total`, `pending`, `running`, `passed`, `failed`) and `inputTokens` / `outputTokens` summed over its attempts |
 | `getRunSnapshot(runId)` | `RunSnapshot` (run, tasks, attempts, lifecycle events, `lastEventId`, `lastAgentEventId`) read from one consistent point in time, or `undefined` for an unknown run |
+| `getRun(runId)` | the `StoredRun` alone, or `undefined`: the cheap read for a status check |
+| `getLatestAgentEvents(runId, limit, { taskId?, attempt? })` | the newest `limit` agent events, oldest first |
 | `getEventsAfter(runId, afterId, limit?)` | lifecycle `events` with `id > afterId`, oldest first |
 | `getAgentEventsAfter(runId, afterId, { taskId?, attempt?, limit? })` | `agent_events` with `id > afterId`, oldest first, optionally for one task or one attempt |
 
@@ -218,11 +220,11 @@ The app asks for exactly these files and never commits them:
 
 ## Flow canvas (built)
 
-Built in task T5, on the fixtures: the circuit described in [Visual model](#visual-model) as a working picture. There is no live data yet; a later task replaces the fixture with the live board and the demo pulses with real events.
+Built in task T5, on the fixtures: the circuit described in [Visual model](#visual-model) as a working picture. Task T7 connects it to live data (see [Live data in the page](#live-data-in-the-page)).
 
 | Piece | Where | Notes |
 | --- | --- | --- |
-| `FlowView` (container) | `web/src/containers/FlowView.tsx` | Picks the board and the pulses and hands them down. Today: a fixture from `?fixture=<name>` and the demo pulses from `?demo=1`. This is the only place the live source replaces |
+| `FlowView` (container) | `web/src/containers/FlowView.tsx` | Picks the board and the pulses and hands them down. With `?run=<id>`: that run's board from `useBoard` and the pulses from its events. Otherwise a fixture from `?fixture=<name>` and the demo pulses from `?demo=1` |
 | `FlowCanvas` | `organisms/FlowCanvas.tsx` | Lays out Claude, Knit and Cursor and draws the board it is given, plus the pulses it is given. Presentational |
 | `AgentBlock` | `organisms/AgentBlock.tsx` | One identity block: logo (through `Logo`, with the monogram fallback), label, role, status badge from the node status, token total and, for the builder, the single live line. Renders from props and the identity, never from the agent's name |
 | `QueueLane`, `ActiveTask`, `DeliveryLane` | `organisms/` | Knit's input (queued tasks in execution order, a connector between neighbours that depend on each other, a fold behind "Show N more" past six), center (the running task, or the failed one, with its stage and the check being run) and output (a commit chip and a pull request chip per delivered task) |
@@ -241,6 +243,19 @@ Built in task T5, on the fixtures: the circuit described in [Visual model](#visu
 **Layout.** From a canvas width of 1120 px (a 1280 px window) the three blocks sit side by side; below it the same flow runs top to bottom (Claude, Knit, Cursor) with the wires recomputed, and nothing scrolls horizontally down to 768 px. The orientation is chosen in one place from the measured width and written to `data-layout`. Tab order follows the reading order: Claude, Knit, its queue, the running task, the delivered links, Cursor.
 
 **Viewing the fixtures.** `pnpm dev:web` (or a built `dist/web` served statically), then open `/?fixture=runningRun`. A switcher with the fixtures appears only when `fixture` is in the URL: `runningRun` (the default without the parameter), `retryingRun`, `verifyingRun`, `failedRun`, `deliveredRun`, `longQueueRun` and `legacyRun`. Add `&demo=1` for the pulses.
+
+### Live data in the page
+
+Built in task T7. `?run=<id>` draws a real run; with no `run` the page keeps showing the fixtures.
+
+| Piece | Where | Notes |
+| --- | --- | --- |
+| `useBoard(runId)` | `web/src/live/useBoard.ts` | Container hook. Fetches `GET /api/runs/:id` (the server derives the board), opens the stream right after that snapshot (`?after=<lastEventId>.<lastAgentEventId>`) and refetches the board at most every 400 ms while rows arrive. Returns `board`, `connection`, `error`, `pulses`, `onPulseEnd`. Closes the stream on `done` (after one last refetch) and on unmount |
+| `openRunStream` | `web/src/api/stream.ts` | `EventSource` wrapper for `event`, `agent_event` and `done`. It remembers the last message id; if the browser keeps retrying it sends `Last-Event-ID` itself, and if the browser gives up (`readyState` closed) the wrapper reopens with `?after=<last id>` after a growing delay (1 s up to 15 s). No gap, no duplicate |
+| `pulseForEvent` | `web/src/live/pulses.ts` | `task.started` pulses the plan wire (`dispatched`), `attempt.started` the prompt wire and `attempt.finished` the result wire, each on the task's strand. Other events make no pulse |
+| `LiveStatus` | `web/src/molecules/LiveStatus.tsx` | One quiet line: loading, "reconnecting", or the load error. Silent while everything works |
+
+Reduced motion is handled by the canvas (static highlight instead of a travelling dot), so live pulses need nothing extra. `RunReader` gained `getRun(runId)` (the run row alone, used by the stream for its status check instead of a full snapshot) and `getLatestAgentEvents(runId, limit, { taskId?, attempt? })` (the newest rows, oldest first; `GET /api/runs/:id` reads 20 of them for the live line instead of the whole attempt).
 
 ## HTTP API
 

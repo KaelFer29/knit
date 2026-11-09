@@ -15,6 +15,12 @@ describe("parseFlowParams", () => {
     expect(parseFlowParams("?fixture=nope")).toEqual({ fixture: DEFAULT_FIXTURE, switcher: true, demo: false });
   });
 
+  it("reads the run to draw live from run=", () => {
+    expect(parseFlowParams("?run=abc").run).toBe("abc");
+    expect(parseFlowParams("?run=").run).toBeUndefined();
+    expect(parseFlowParams("").run).toBeUndefined();
+  });
+
   it("turns the demo pulses on with demo=1", () => {
     expect(parseFlowParams("?fixture=retryingRun&demo=1").demo).toBe(true);
     expect(parseFlowParams("?demo=1").demo).toBe(true);

@@ -148,6 +148,31 @@ describe("SqliteRunReader", () => {
     expect(r.getAgentEventsAfter("run-1", 4)).toEqual([]);
   });
 
+  it("reads one run alone, undefined when unknown", () => {
+    store.createRun(RUN);
+    store.finishRun("run-1", "passed", "2026-11-08T10:05:00.000Z");
+    expect(open().getRun("run-1")).toMatchObject({ id: "run-1", status: "passed", finishedAt: "2026-11-08T10:05:00.000Z" });
+    expect(reader!.getRun("nope")).toBeUndefined();
+  });
+
+  it("returns the latest agent events, oldest first, optionally for one attempt", () => {
+    store.createRun(RUN);
+    store.recordAgentEvent(agentEvent("T1", 1, "a"));
+    store.recordAgentEvent(agentEvent("T2", 1, "b"));
+    store.recordAgentEvent(agentEvent("T1", 1, "c"));
+    store.recordAgentEvent(agentEvent("T1", 2, "d"));
+    store.recordAgentEvent(agentEvent("T1", 1, "e"));
+    const r = open();
+
+    expect(r.getLatestAgentEvents("run-1", 2).map((e) => e.kind)).toEqual(["d", "e"]);
+    expect(r.getLatestAgentEvents("run-1", 10, { taskId: "T1", attempt: 1 }).map((e) => e.kind)).toEqual(["a", "c", "e"]);
+    expect(r.getLatestAgentEvents("run-1", 2, { taskId: "T1", attempt: 1 }).map((e) => [e.id, e.agent])).toEqual([
+      [3, "cursor"],
+      [5, "cursor"],
+    ]);
+    expect(r.getLatestAgentEvents("nope", 3)).toEqual([]);
+  });
+
   it("sees rows written by the store after the reader was opened", () => {
     store.createRun(RUN);
     store.recordAgentEvent(agentEvent("T1", 1, "prompt"));
