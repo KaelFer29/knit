@@ -68,12 +68,10 @@ describe("SingleView", () => {
   });
 
   it("follows the most recent run when none is picked", async () => {
-    const list = { runs: [
-      { run: { id: "old", planName: "old", planPath: "p", startedAt: "2026-01-01T00:00:00Z", status: "passed" }, taskCounts: { total: 1, pending: 0, running: 0, passed: 1, failed: 0 }, inputTokens: 0, outputTokens: 0 },
-      { run: { id: "new", planName: "new", planPath: "p", startedAt: "2026-02-01T00:00:00Z", status: "passed" }, taskCounts: { total: 1, pending: 0, running: 0, passed: 1, failed: 0 }, inputTokens: 0, outputTokens: 0 },
-    ] };
+    // The server answers newest first, and the page asks for just one run: the newest.
+    const newest = { run: { id: "new", planName: "new", planPath: "p", startedAt: "2026-02-01T00:00:00Z", status: "passed" }, taskCounts: { total: 1, pending: 0, running: 0, passed: 1, failed: 0 }, inputTokens: 0, outputTokens: 0 };
     const fetchMock = vi.fn(async (url: string) => {
-      if (url === "/api/runs") return reply(list);
+      if (url.startsWith("/api/runs?")) return reply({ runs: [newest], total: 2 });
       if (url.startsWith("/api/runs/new")) return reply({ board: { ...ALL_FIXTURES.deliveredRun, planName: "newest-plan" }, lastEventId: 1, lastAgentEventId: 1 });
       return reply({ sessions: [], agents: [] });
     });
@@ -81,6 +79,7 @@ describe("SingleView", () => {
     vi.stubGlobal("EventSource", class { addEventListener() {} close() {} });
     render(<SingleView search="" />);
     expect((await screen.findAllByText("newest-plan")).length).toBeGreaterThan(0);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith("/api/runs?") && String(url).includes("limit=1"))).toBe(true);
   });
 
   it("opens a modal from a block over the pipeline, closes on Escape and returns the focus", async () => {

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentView, SessionDetail, SessionEvent, SessionListEntry } from "../../../sessions/types";
+import { resetSessionTitles } from "../../../sessions/useSessionTitles";
 import { ClaudePanel } from "./ClaudePanel";
 
 const PROPS = { board: undefined, runId: undefined, live: false, renderDetail: undefined, selectRun: () => {}, agentId: "alpha" };
@@ -82,6 +83,7 @@ beforeEach(() => {
     b1: detail("b1", "beta"),
   };
   window.localStorage.clear();
+  resetSessionTitles();
   window.location.hash = "";
   stubFetch();
 });
@@ -336,7 +338,10 @@ describe("ClaudePanel: plan handoff", () => {
 });
 
 describe("ClaudePanel: the session bar", () => {
-  beforeEach(() => window.localStorage.clear());
+  beforeEach(() => {
+    window.localStorage.clear();
+    resetSessionTitles();
+  });
 
   it("shows the title with the history and new-session buttons at the right end, and no working directory", async () => {
     render(panel());

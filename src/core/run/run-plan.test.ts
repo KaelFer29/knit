@@ -139,6 +139,7 @@ function harness(options: Options = {}) {
   };
   const pullRequests: PullRequests = {
     preflight: () => void preflights++,
+    status: () => ({ state: "open", base: "main" }),
     create: (input) => {
       if (options.prThrows) throw new Error("gh exploded");
       created.push(input);
@@ -564,7 +565,7 @@ describe("runPlan: push and pull requests", () => {
   });
 
   it("rejects before creating the run when preflight fails", async () => {
-    const failing: PullRequests = { preflight: () => { throw new Error("gh not logged in"); }, create: () => ({ url: "x" }) };
+    const failing: PullRequests = { preflight: () => { throw new Error("gh not logged in"); }, create: () => ({ url: "x" }), status: () => ({ state: "open", base: "main" }), };
     const run = runPlan(plan(), {
       agent: { run: async () => { throw new Error("must not run"); } },
       checks: { run: async () => { throw new Error("must not run"); } },

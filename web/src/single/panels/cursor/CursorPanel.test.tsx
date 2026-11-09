@@ -48,31 +48,28 @@ describe("CursorPanel", () => {
     expect(spy).toHaveBeenCalledWith("T1");
   });
 
-  it("shows the latest task when nothing is active", () => {
-    render(<CursorPanel {...props(deliveredRun)} />);
-    expect(screen.queryByRole("region", { name: "Active task" })).toBeNull();
-    expect(screen.getByRole("region", { name: "Latest task" })).toBeTruthy();
-  });
-
-  it("shows in Files only what Cursor changed, grouped by task, and no repository explorer", async () => {
-    const user = userEvent.setup();
+  it("has only the Agent and Branches tabs: a task's changes live in its own detail", () => {
     render(<CursorPanel {...props(runningRun)} />);
-    expect(screen.getByRole("tab", { name: "Agent" }).getAttribute("aria-selected")).toBe("true");
-    await user.click(screen.getByRole("tab", { name: "Files" }));
-    const groups = await screen.findAllByRole("region", { name: /^Changes of T\d/ });
-    const started = runningRun.tasks.filter((t) => t.state !== "queued").map((t) => t.taskId);
-    expect(groups.map((g) => g.getAttribute("aria-label"))).toEqual(started.map((id) => `Changes of ${id}`));
-    expect(await within(groups[0]!).findByText("src/webhooks/signature.ts")).toBeTruthy();
-    expect(screen.queryByRole("tree")).toBeNull();
-    expect(screen.queryByRole("region", { name: "Active task" })).toBeNull();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Agent", "Branches"]);
+    expect(screen.queryByRole("tab", { name: "Files" })).toBeNull();
   });
 
-  it("says so when no task has changed anything yet", async () => {
+  it("collapses every task when nothing is active, the latest first, and opens none by itself", () => {
+    render(<CursorPanel {...props(deliveredRun)} />);
+    const rows = within(screen.getByRole("region", { name: "History" })).getAllByRole("button", { name: /^T\d/ });
+    expect(rows[0]!.textContent).toContain(deliveredRun.tasks[deliveredRun.tasks.length - 1]!.taskId);
+    expect(rows.every((r) => r.getAttribute("aria-expanded") === "false")).toBe(true);
+  });
+
+  it("pages a long history and searches it by task or title", async () => {
     const user = userEvent.setup();
-    const queued = { ...runningRun, tasks: runningRun.tasks.map((t) => ({ ...t, state: "queued" as const })), active: undefined };
-    render(<CursorPanel {...props(queued as BoardModel)} />);
-    await user.click(screen.getByRole("tab", { name: "Files" }));
-    expect(await screen.findByText(/has not changed any file yet/i)).toBeTruthy();
+    const many = { ...runningRun, tasks: Array.from({ length: 12 }, (_, i) => ({ ...runningRun.tasks[0]!, taskId: `T${i + 1}`, title: `Title ${i + 1}`, state: "delivered" as const })), active: undefined } as unknown as BoardModel;
+    render(<CursorPanel {...props(many, fixtureDetailSource(runningRun))} />);
+    const history = screen.getByRole("region", { name: "History" });
+    expect(within(history).getAllByRole("button", { name: /^T\d/ })).toHaveLength(8);
+    expect(screen.getByText("1–8 of 12 tasks")).toBeTruthy();
+    await user.type(screen.getByRole("searchbox", { name: "Search tasks" }), "title 3");
+    expect(within(history).getAllByRole("button", { name: /^T\d/ })).toHaveLength(1);
   });
 
   it("has a Branches tab that says it needs a real run when it shows sample data", async () => {

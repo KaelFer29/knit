@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { FsPlanDrafts } from "../../adapters/system/plan-drafts.js";
 import { FsFileTree } from "../../adapters/system/file-tree.js";
 import { GitBranchTools } from "../../adapters/vcs/git/git-branch-tools.js";
+import { GhPullRequests } from "../../adapters/vcs/github/gh-pull-requests.js";
 import { GitTaskDiff } from "../../adapters/vcs/git/task-diff.js";
 import { GitFileActivity } from "../../adapters/vcs/git/file-activity.js";
 import { SqliteRunReader } from "../../adapters/storage/sqlite/run-reader.js";
@@ -158,6 +159,7 @@ export async function uiCommand(args: string[], io: CliIo, deps: CliDeps, env: N
       plans: new FsPlanDrafts(),
       taskDiff: deps.taskDiff ?? new GitTaskDiff(),
       branches: new GitBranchTools(deps.gitArgs ? { gitArgs: deps.gitArgs } : {}),
+      pullRequests: new GhPullRequests(),
       fileActivity: deps.fileActivity ?? new GitFileActivity(),
       ...(control ? { control } : {}),
     });

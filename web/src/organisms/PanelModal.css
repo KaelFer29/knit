@@ -95,19 +95,19 @@
   font-weight: 500;
 }
 
-/* The orchestrator's modal: warm white with light brown lines; the panels inside read the same tokens. */
+/* The orchestrator's modal: white with a faint green, flat; the panels inside read these surfaces. */
 .modal__dialog[data-agent="knit"] {
   --surface-1: var(--knit-canvas);
-  --surface-2: #f8f6f2;
-  --surface-3: #f0ece5;
+  --surface-2: #f1f7f6;
+  --surface-3: #e6efed;
   --border: var(--knit-line);
-  --border-strong: #e0d6c6;
+  --border-strong: #c9dbd8;
   border-color: var(--knit-line);
 }
 
 .modal__dialog[data-agent="knit"] .modal__head {
   border-bottom-color: var(--knit-line);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 6%, transparent), transparent 55%), var(--knit-canvas);
+  background: var(--knit-canvas);
 }
 
 /* Cursor's modal mixes its two looks: a black title bar with its mark in white over a light body that carries the mark faintly. */

@@ -1,3 +1,4 @@
+import { parsePlan } from "../plan/parse-plan.js";
 import type { StoredRun } from "../ports/run-reader.js";
 import type { AttemptRecord, EventRecord, TaskRecord } from "../ports/run-store.js";
 import { liveLineOf, type TimelineEntry } from "./live-line.js";
@@ -51,7 +52,8 @@ export function buildBoard(input: BoardInput): BoardModel {
     .map((record, index) => ({ record, position: record.position ?? index + 1, index }))
     .sort((a, b) => a.position - b.position || a.index - b.index);
 
-  const tasks = order.map(({ record, position }) => buildTask(record, position, input, traces.get(record.taskId), live));
+  const models = modelsOf(run.planText);
+  const tasks = order.map(({ record, position }) => buildTask(record, position, input, traces.get(record.taskId), live, models.get(record.taskId)));
 
   const queue: QueueItem[] = tasks
     .filter((t) => t.state === "queued")
@@ -110,12 +112,28 @@ function nodeStatus(run: StoredRun, whileRunning: NodeStatus): NodeStatus {
   return whileRunning;
 }
 
+/** The `Model:` line of each task in the plan the run stored. Pure: a plan that does not parse names no models. */
+function modelsOf(planText: string | undefined): Map<string, string> {
+  const models = new Map<string, string>();
+  if (planText === undefined) return models;
+  let tasks: ReturnType<typeof parsePlan>["tasks"];
+  try {
+    tasks = parsePlan(planText).tasks;
+  } catch {
+    // A stored plan that no longer parses names no models; the board still draws the run.
+    return models;
+  }
+  for (const task of tasks) if (task.model !== undefined) models.set(task.id, task.model);
+  return models;
+}
+
 function buildTask(
   record: TaskRecord,
   position: number,
   input: BoardInput,
   trace: TaskTrace | undefined,
   live: boolean,
+  model: string | undefined,
 ): TaskView {
   const rows = input.attempts.filter((a) => a.taskId === record.taskId);
   const attempts: AttemptView[] = rows.map((a) => ({
@@ -179,6 +197,7 @@ function buildTask(
     position,
     ...(record.goal !== undefined ? { goal: record.goal } : {}),
     ...(record.dependsOn !== undefined ? { dependsOn: record.dependsOn } : {}),
+    ...(model !== undefined ? { model } : {}),
     specs: record.specs ?? [],
     ...(record.branch !== undefined ? { branch: record.branch } : {}),
     ...(record.startSha !== undefined ? { startSha: record.startSha } : {}),

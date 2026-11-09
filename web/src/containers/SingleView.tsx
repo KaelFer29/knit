@@ -10,9 +10,11 @@ import { AppShell } from "../organisms/AppShell";
 import { PipelineStage } from "../organisms/PipelineStage";
 import { PanelModal } from "../organisms/PanelModal";
 import { runsHash, useRoute } from "../route";
-import { useRuns } from "../runs/useRuns";
+import { useRunsPage } from "../runs/useRuns";
 import { deriveBlocks, deriveDetails, deriveHops, deriveStages } from "../single/pipeline";
 import { PANELS, type PanelId } from "../single/panels/registry";
+import { usePlanUsage } from "../sessions/usePlanUsage";
+import { useSessionTitles } from "../sessions/useSessionTitles";
 import { useWorkspace } from "../sessions/useWorkspace";
 import { useLatestSession } from "../single/useLatestSession";
 import { createRenderDetail } from "./detailRenderer";
@@ -35,14 +37,18 @@ export function SingleView({ search = window.location.search, actions }: Props) 
   const query = new URLSearchParams(search);
   const fixtureMode = params.run === undefined && (query.has("fixture") || query.has("demo"));
   const route = useRoute();
-  const { runs } = useRuns();
-  const recent = useMemo(() => (runs === undefined ? undefined : [...runs].sort((a, b) => b.run.startedAt.localeCompare(a.run.startedAt))[0]?.run.id), [runs]);
+  // Only the newest run is needed here: the server returns runs newest first and the page asks for one.
+  const { runs } = useRunsPage({ limit: 1, offset: 0 });
+  const recent = runs?.[0]?.run.id;
   const runId = route.runId ?? params.run ?? (fixtureMode ? undefined : recent);
 
   const live = useBoard(runId);
   const board = runId === undefined ? (fixtureMode ? ALL_FIXTURES[params.fixture] : undefined) : live.board;
   const workspace = useWorkspace(!fixtureMode);
-  const session = useLatestSession(!fixtureMode || runId !== undefined);
+  const latest = useLatestSession(!fixtureMode || runId !== undefined);
+  const { titleOf } = useSessionTitles();
+  // The block shows the name the person gave the conversation, not the one Claude derived from its first prompt.
+  const session = useMemo(() => (latest === undefined ? undefined : { ...latest, title: titleOf(latest.id, latest.title) }), [latest, titleOf]);
   const detailSource = useMemo(() => {
     if (board === undefined) return undefined;
     if (runId === undefined) return fixtureDetailSource(board);
@@ -53,7 +59,9 @@ export function SingleView({ search = window.location.search, actions }: Props) 
   const blocks = useMemo(() => deriveBlocks(board, session), [board, session]);
   const hops = useMemo(() => deriveHops(board, session), [board, session]);
   const stages = useMemo(() => deriveStages(board), [board]);
-  const details = useMemo(() => deriveDetails(board, session), [board, session]);
+  // Plan usage is read from the agent while the page is open, not taken from the last turn's stored figures.
+  const usage = usePlanUsage("claude", !fixtureMode, 30_000);
+  const details = useMemo(() => deriveDetails(board, session, usage.windows.length > 0 ? usage.windows : undefined), [board, session, usage.windows]);
 
   const [open, setOpen] = useState<PanelId>();
   const toggle = useCallback((id: PanelId) => setOpen((current) => (current === id ? undefined : id)), []);

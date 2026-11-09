@@ -5,6 +5,7 @@
  */
 import type { BoardModel, NodeStatus } from "@board";
 import { formatDuration, formatTokens } from "../flow/format";
+import { modelInfo } from "../sessions/models";
 
 export type HopId = "plan" | "prompt" | "result";
 export type HopStatus = "idle" | "active" | "done" | "failed";
@@ -28,6 +29,7 @@ export interface HopView {
 
 /** What the page knows about the latest Claude session. */
 export interface SessionGlimpse {
+  id: string;
   status: "idle" | "running";
   title: string;
   lastPrompt?: string;
@@ -65,7 +67,19 @@ export interface BlockView {
   status: NodeStatus;
   headline: string;
   lines: string[];
+  /** The model the block runs on, shown in place of the status. Absent for a block with no model (the orchestrator). */
+  model?: string;
 }
+
+/** A plan-usage window as the usage endpoint reads it: what it is called, how full it is. */
+export interface LiveWindow {
+  label: string;
+  /** 0 to 100. */
+  percent: number;
+}
+
+/** The model a block shows: the name the picker gives a known id, the id itself otherwise, and the agent's default when none is set. */
+const modelName = (id: string | undefined): string => (id === undefined ? "Default" : modelInfo(id).name);
 
 const MAX_LINE = 72;
 const MAX_LINES = 3;
@@ -225,10 +239,10 @@ export function deriveHops(board: BoardModel | undefined, session: SessionGlimps
 export function deriveBlocks(board: BoardModel | undefined, session: SessionGlimpse | undefined): Record<"claude" | "knit" | "cursor", BlockView> {
   const claude: BlockView =
     session !== undefined
-      ? { status: session.status === "running" ? "working" : board?.nodes.claude.status ?? "idle", headline: clip(session.title, 40), lines: tidy(session.lines.slice(-MAX_LINES).reverse()) }
+      ? { status: session.status === "running" ? "working" : board?.nodes.claude.status ?? "idle", headline: clip(session.title, 40), lines: tidy(session.lines.slice(-MAX_LINES).reverse()), model: modelName(session.model) }
       : board !== undefined
-        ? { status: board.nodes.claude.status, headline: board.planName, lines: tidy([`${plural(board.nodes.claude.taskCount, "task")} planned`]) }
-        : { status: "idle", headline: "No session yet", lines: [] };
+        ? { status: board.nodes.claude.status, headline: board.planName, lines: tidy([`${plural(board.nodes.claude.taskCount, "task")} planned`]), model: "No session" }
+        : { status: "idle", headline: "No session yet", lines: [], model: "No session" };
 
   if (board === undefined) {
     return {
@@ -256,6 +270,8 @@ export function deriveBlocks(board: BoardModel | undefined, session: SessionGlim
       active?.title,
       liveLine !== undefined && liveLine.source !== "knit" ? liveLine.text : undefined,
     ]),
+    // The model of the task Cursor is on, else of the last task it was given; the plan's `Model:` line decides it.
+    model: modelName((active === undefined ? board.tasks[board.tasks.length - 1] : board.tasks.find((t) => t.taskId === active.taskId))?.model),
   };
   return { claude, knit, cursor };
 }
@@ -263,14 +279,18 @@ export function deriveBlocks(board: BoardModel | undefined, session: SessionGlim
 const WINDOW_LABEL: Record<string, string> = { five_hour: "5-hour limit", seven_day: "Weekly limit" };
 
 /** The facts behind each block's "details" expansion. Unknown values say so; nothing is guessed. */
-export function deriveDetails(board: BoardModel | undefined, session: SessionGlimpse | undefined): Record<"claude" | "knit" | "cursor", BlockDetails> {
+export function deriveDetails(board: BoardModel | undefined, session: SessionGlimpse | undefined, live?: LiveWindow[]): Record<"claude" | "knit" | "cursor", BlockDetails> {
   const claudeFacts: DetailFact[] = [{ label: "Model", value: session === undefined ? "No session" : (session.model ?? "Default") }];
   if (session?.contextTokens !== undefined) claudeFacts.push({ label: "Context", value: `${formatTokens(session.contextTokens)} tokens` });
   if (session?.turns !== undefined) claudeFacts.push({ label: "Turns", value: String(session.turns) });
   if (board !== undefined) claudeFacts.push({ label: "Plan", value: board.planName });
   const claude: BlockDetails = {
     facts: claudeFacts,
-    meters: (session?.planUsage ?? []).map((w) => ({ label: WINDOW_LABEL[w.name] ?? w.name.replace(/_/g, " "), ratio: Math.max(0, Math.min(1, w.utilization)) })),
+    // The live windows (read from the agent when the page asks) win over the figures stored with the last turn.
+    meters:
+      live !== undefined && live.length > 0
+        ? live.map((w) => ({ label: w.label, ratio: Math.max(0, Math.min(1, w.percent / 100)) }))
+        : (session?.planUsage ?? []).map((w) => ({ label: WINDOW_LABEL[w.name] ?? w.name.replace(/_/g, " "), ratio: Math.max(0, Math.min(1, w.utilization)) })),
     agents: session?.agents ?? [],
   };
   if (board === undefined) {

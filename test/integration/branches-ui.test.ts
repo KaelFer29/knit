@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SqliteRunReader } from "../../src/adapters/storage/sqlite/run-reader.js";
 import { SqliteRunStore } from "../../src/adapters/storage/sqlite/run-store.js";
+import type { PullRequests } from "../../src/core/ports/pull-requests.js";
 import { GitBranchTools } from "../../src/adapters/vcs/git/git-branch-tools.js";
 import { lazyRunReader, startServer, type RunningServer, type SpawnRequest, type Spawner } from "../../src/server/index.js";
 
@@ -49,13 +50,14 @@ const spawner: Spawner = (request) => {
   return { pid: 4242, exited: Promise.resolve(answer.code ?? 0) };
 };
 
-async function launch(opts: { control?: boolean; branches?: boolean; timeoutMs?: number } = {}): Promise<RunningServer> {
+async function launch(opts: { control?: boolean; branches?: boolean; timeoutMs?: number; pulls?: PullRequests } = {}): Promise<RunningServer> {
   const reader = lazyRunReader(() => new SqliteRunReader(dbPath()));
   const server = await startServer({
     reader,
     port: 0,
     staticDir: join(scratch, "no-web"),
     ...(opts.branches === false ? {} : { branches: new GitBranchTools({ gitArgs: GIT_ARGS }) }),
+    ...(opts.pulls ? { pullRequests: opts.pulls } : {}),
     ...(opts.control === false ? {} : { control: { dataDir, spawn: spawner, ...(opts.timeoutMs ? { actionTimeoutMs: opts.timeoutMs } : {}) } }),
   });
   servers.push(server);
@@ -224,6 +226,39 @@ describe("POST /api/runs/:id/tasks/:task/pr-draft and /pr", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("lists the branches origin has, for choosing where a pull request goes", async () => {
+    seed();
+    const bare = join(scratch, "origin.git");
+    git(scratch, "init", "-q", "--bare", bare);
+    git(repo, "remote", "add", "origin", bare);
+    git(repo, "push", "-q", "origin", "main", "docs/one");
+    const server = await launch();
+    const reply = await request(server, "GET", `/api/runs/${RUN}/remote-branches`);
+    expect(reply.status).toBe(200);
+    expect(reply.json()).toEqual({ branches: ["docs/one", "main"] });
+    expect((await request(server, "GET", `/api/runs/${RUN}/remote-branches`, {}, false)).status).toBe(401);
+    expect((await request(server, "GET", "/api/runs/nope/remote-branches")).status).toBe(404);
+    expect((await request(await launch({ branches: false }), "GET", `/api/runs/${RUN}/remote-branches`)).status).toBe(503);
+  });
+
+  it("explains why the branches of origin cannot be listed when there is no origin", async () => {
+    seed();
+    const reply = await request(await launch(), "GET", `/api/runs/${RUN}/remote-branches`);
+    expect(reply.status).toBe(502);
+    expect(reply.json().error).toMatch(/origin/i);
+  });
+
+  it("asks for the description built from the task, with no model, when template is true, and refuses anything else", async () => {
+    seed();
+    answer = { json: { ok: true, title: "Create prueba.md", body: "## Summary", model: "template" } };
+    const server = await launch();
+    expect((await request(server, "POST", draft, { template: true })).status).toBe(200);
+    expect(calls[0]!.args).toEqual(["branch", RUN, "T1", "pr-draft", "--template", "--json", "--data-dir", dataDir]);
+    const before = calls.length;
+    for (const body of [{ template: "yes" }, { template: false }, { template: true, model: "grok-4.7-high" }]) expect((await request(server, "POST", draft, body)).status, JSON.stringify(body)).toBe(400);
+    expect(calls).toHaveLength(before);
+  });
+
   it("opens the pull request with the title and body exactly as given, and returns its address", async () => {
     seed();
     answer = { json: { ok: true, url: "https://example.test/pull/7", base: "main", head: "docs/one" } };
@@ -231,6 +266,17 @@ describe("POST /api/runs/:id/tasks/:task/pr-draft and /pr", () => {
     expect(reply.status).toBe(200);
     expect(reply.json()).toMatchObject({ ok: true, url: "https://example.test/pull/7" });
     expect(calls[0]!.args).toEqual(["branch", RUN, "T1", "pr", "--title=Add prueba.md", "--body=## Summary\n- adds it; `rm -rf /` stays text", "--json", "--data-dir", dataDir]);
+  });
+
+  it("passes the branch to open the pull request into as one argument, and refuses what is not a branch name", async () => {
+    seed();
+    answer = { json: { ok: true, url: "https://example.test/pull/7", base: "release/1.2", head: "docs/one" } };
+    const server = await launch();
+    expect((await request(server, "POST", pr, { title: "t", body: "b", base: "release/1.2" })).status).toBe(200);
+    expect(calls[0]!.args).toEqual(["branch", RUN, "T1", "pr", "--title=t", "--body=b", "--base=release/1.2", "--json", "--data-dir", dataDir]);
+    const before = calls.length;
+    for (const base of ["--force", "a b", 7, ""]) expect((await request(server, "POST", pr, { title: "t", body: "b", base })).status, String(base)).toBe(400);
+    expect(calls).toHaveLength(before);
   });
 
   it("passes a title or a body that starts with a dash as one argument, so the command does not read it as an option", async () => {
@@ -257,5 +303,36 @@ describe("POST /api/runs/:id/tasks/:task/pr-draft and /pr", () => {
       expect((await request(server, "POST", pr, body)).status).toBe(400);
     }
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("GET /api/runs/:id/branches with a pull request", () => {
+  const PR = "https://github.com/acme/demo/pull/7";
+  const pulls = (state: "open" | "merged" | "closed", base = "main"): PullRequests => ({
+    preflight: () => {},
+    create: () => ({ url: PR }),
+    status: () => ({ state, base }),
+  });
+
+  it("says whether the pull request is open or merged, and into which branch", async () => {
+    seed();
+    const store = new SqliteRunStore(dbPath());
+    store.upsertTask({ runId: RUN, taskId: "T1", title: "Create prueba.md", status: "passed", branch: "docs/one", worktree, startSha, position: 1, prUrl: PR });
+    store.close();
+    const reply = await request(await launch({ pulls: pulls("merged", "release/1.2") }), "GET", `/api/runs/${RUN}/branches`);
+    expect(reply.status).toBe(200);
+    expect(reply.json().branches[0]).toMatchObject({ prUrl: PR, prState: { state: "merged", base: "release/1.2" } });
+  });
+
+  it("still lists the branch when GitHub cannot be asked: no state, the address kept", async () => {
+    seed();
+    const store = new SqliteRunStore(dbPath());
+    store.upsertTask({ runId: RUN, taskId: "T1", title: "Create prueba.md", status: "passed", branch: "docs/one", worktree, startSha, position: 1, prUrl: PR });
+    store.close();
+    const broken: PullRequests = { preflight: () => {}, create: () => ({ url: PR }), status: () => { throw new Error("no network"); } };
+    const reply = await request(await launch({ pulls: broken }), "GET", `/api/runs/${RUN}/branches`);
+    expect(reply.status).toBe(200);
+    expect(reply.json().branches[0].prUrl).toBe(PR);
+    expect(reply.json().branches[0].prState).toBeUndefined();
   });
 });

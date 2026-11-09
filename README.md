@@ -26,8 +26,8 @@ node dist/cli/index.js show <run-id>             # tasks, attempts, tokens, bran
 node dist/cli/index.js logs <run-id> --follow    # watch what the agent is doing, live
 node dist/cli/index.js clean <run-id>            # remove the run's worktrees
 node dist/cli/index.js branch <run-id> T1 undo --mode revert          # say what undoing a task would do (add --yes to do it; also reset, delete)
-node dist/cli/index.js branch <run-id> T1 pr-draft                    # a cheap model writes the title and body of the task's pull request
-node dist/cli/index.js branch <run-id> T1 pr --title "..." --body "..."   # push the branch and open the pull request
+node dist/cli/index.js branch <run-id> T1 pr-draft                    # the title and body of the task's pull request; add --template to build them from the task with no model
+node dist/cli/index.js branch <run-id> T1 pr --title "..." --body "..." [--base <branch>]   # push the branch and open the pull request (into the recommended branch, or --base)
 node dist/cli/index.js ui [--port 4317]          # serve the web interface on 127.0.0.1 (see "Web interface" below)
 node dist/cli/index.js chat "Plan the board" --cwd ~/code/app    # one turn with Claude, recorded as a session
 node dist/cli/index.js chat "Split it in tasks" --session <id>   # next turn: Claude resumes the same conversation

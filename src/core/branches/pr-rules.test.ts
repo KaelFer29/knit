@@ -25,9 +25,15 @@ const ctx = (over: Partial<PrContext> = {}): PrContext => ({
 
 describe("decidePr", () => {
   it("allows a passed task with commits and says where it will go", () => {
-    expect(decidePr(ctx())).toEqual({ ok: true, base: "main", head: "docs/one", effects: expect.any(Array) });
+    expect(decidePr(ctx())).toEqual({ ok: true, base: "main", head: "docs/one", options: ["main"], effects: expect.any(Array) });
     const d = decidePr(ctx());
     if (d.ok) expect(d.effects.join(" ")).toMatch(/pushes docs\/one to origin.*pull request.*main/is);
+  });
+
+  it("says the branch is already on origin when it is, so nobody expects a first push", () => {
+    const d = decidePr(ctx({ state: state({ pushed: true }) }));
+    expect(d).toMatchObject({ ok: true });
+    if (d.ok) expect(d.effects[0]).toMatch(/already on origin.*never forced/i);
   });
 
   it("refuses while the run is running", () => {
@@ -66,5 +72,44 @@ describe("decidePr", () => {
 
   it("refuses to open a pull request over uncommitted work it would leave out, and says so", () => {
     expect(decidePr(ctx({ state: state({ dirty: true }) }))).toMatchObject({ ok: false, reason: expect.stringContaining("uncommitted") });
+  });
+
+  describe("choosing where the pull request goes", () => {
+    const stacked = ctx({
+      task: { taskId: "T2", branch: "docs/two", dependsOn: "T1", status: "passed" },
+      tasks: [{ taskId: "T1", branch: "docs/one" }, { taskId: "T2", branch: "docs/two", dependsOn: "T1" }, { taskId: "T3", branch: "docs/three" }],
+      parentState: state({ pushed: true }),
+    });
+
+    it("recommends the parent's branch for a stacked task and offers the run's base and the other branches", () => {
+      expect(decidePr(stacked)).toMatchObject({ ok: true, base: "docs/one", options: ["docs/one", "main", "docs/three"] });
+    });
+
+    it("recommends the run's base for a plain task and offers the other tasks' branches, never its own", () => {
+      const plain = ctx({ tasks: [{ taskId: "T1", branch: "docs/one" }, { taskId: "T2", branch: "docs/two" }] });
+      expect(decidePr(plain)).toMatchObject({ ok: true, base: "main", options: ["main", "docs/two"] });
+    });
+
+    it("targets the branch asked for and says so in what it will do", () => {
+      const d = decidePr({ ...stacked, requestedBase: "main" });
+      expect(d).toMatchObject({ ok: true, base: "main", head: "docs/two" });
+      if (d.ok) expect(d.effects.join(" ")).toMatch(/pull request from docs\/two into main/);
+    });
+
+    it("does not need the parent on origin when the pull request goes elsewhere", () => {
+      expect(decidePr({ ...stacked, parentState: state({ pushed: false }), requestedBase: "main" })).toMatchObject({ ok: true, base: "main" });
+      expect(decidePr({ ...stacked, parentState: state({ pushed: false }), requestedBase: "docs/one" })).toMatchObject({ ok: false, reason: expect.stringContaining("T1") });
+    });
+
+    it("accepts a branch that is not in the suggestions, as long as it is a branch name", () => {
+      expect(decidePr(ctx({ requestedBase: "release/1.2" }))).toMatchObject({ ok: true, base: "release/1.2" });
+    });
+
+    it("refuses what is not a branch name, and a pull request into its own branch", () => {
+      for (const bad of ["", "  ", "--force", "-x", "a b", "a..b", "a@{1}", "main\nx", "x".repeat(201), "/a", "a/", "a.lock"]) {
+        expect(decidePr(ctx({ requestedBase: bad }))).toMatchObject({ ok: false, reason: expect.stringContaining("branch name") });
+      }
+      expect(decidePr(ctx({ requestedBase: "docs/one" }))).toMatchObject({ ok: false, reason: expect.stringContaining("its own branch") });
+    });
   });
 });

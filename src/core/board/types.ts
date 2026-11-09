@@ -48,6 +48,8 @@ export interface TaskView {
   /** Absent on runs created before schema 4. */
   goal?: string;
   dependsOn?: string;
+  /** The model the plan chose for the builder (its `Model:` line); absent when the plan names none, or the run has no plan text. */
+  model?: string;
   /** Empty on runs created before schema 4. */
   specs: TaskSpec[];
   branch?: string;

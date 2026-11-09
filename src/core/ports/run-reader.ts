@@ -60,9 +60,26 @@ export interface AgentEventFilter {
   limit?: number;
 }
 
+/** What a page of runs is asked for. */
+export interface RunSearch {
+  limit: number;
+  offset: number;
+  /** Words that must each appear in the plan name or the id, in any case. */
+  text?: string;
+  status?: "running" | "passed" | "failed";
+}
+
+/** A page of runs, newest first, and how many runs match in all. */
+export interface RunPage {
+  items: RunListItem[];
+  total: number;
+}
+
 export interface RunReader {
   /** Runs, newest first. */
   listRuns(): RunListItem[];
+  /** One page of the runs that match, newest first; the total counts every match, not just the page. */
+  searchRuns(search: RunSearch): RunPage;
   /** One run alone, without its tasks or events: the cheap read for a status check. */
   getRun(runId: string): StoredRun | undefined;
   getRunSnapshot(runId: string): RunSnapshot | undefined;

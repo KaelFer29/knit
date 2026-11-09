@@ -363,3 +363,48 @@ describe("task details", () => {
     expect(b.tasks[0]!.attempts.map((a) => [a.attempt, a.setup])).toEqual([[0, true], [1, false], [2, false]]);
   });
 });
+
+describe("the model of each task, from the plan the run stored", () => {
+  const PLAN = `# Plan: demo
+
+## T1: First
+
+Branch: feat/one
+Model: composer-2.5-fast
+Goal: first.
+Specs:
+- S1: first spec.
+Allowed files:
+- src/a.ts
+Checks:
+- true
+
+## T2: Second
+
+Branch: feat/two
+Depends: T1
+Goal: second.
+Specs:
+- S1: second spec.
+Allowed files:
+- src/b.ts
+Checks:
+- true
+`;
+
+  it("gives each task the model its plan names, and none when the plan names none", () => {
+    const b = board({ run: run({ planText: PLAN }), tasks: [task("T1"), task("T2")] });
+    expect(b.tasks.find((t) => t.taskId === "T1")!.model).toBe("composer-2.5-fast");
+    expect(b.tasks.find((t) => t.taskId === "T2")!.model).toBeUndefined();
+  });
+
+  it("names no models for a stored plan that does not parse, and still draws the run", () => {
+    const b = board({ run: run({ planText: "not a plan" }), tasks: [task("T1")] });
+    expect(b.tasks[0]!.model).toBeUndefined();
+  });
+
+  it("has no model for any task when the run has no plan text", () => {
+    const b = board({ tasks: [task("T1")] });
+    expect(b.tasks[0]!.model).toBeUndefined();
+  });
+});

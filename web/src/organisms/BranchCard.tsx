@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import { ApiError } from "../api/client";
+import { Chevron } from "../atoms/Chevron";
 import { StatusBadge } from "../atoms/StatusBadge";
 import type { BranchView, PrDraft, PrResult, UndoMode, UndoResult } from "../branches/types";
 import { draftKey, draftOnce, forgetDraft, loadDraft, saveDraft } from "../branches/draftCache";
@@ -7,9 +8,11 @@ import { Popover } from "../molecules/Popover";
 import "./BranchCard.css";
 
 export interface BranchActions {
+  /** The branches origin has now, asked each time the pull request form opens. */
+  remote: () => Promise<string[]>;
   undo: (taskId: string, mode: UndoMode) => Promise<UndoResult>;
-  draft: (taskId: string) => Promise<PrDraft>;
-  open: (taskId: string, title: string, body: string) => Promise<PrResult>;
+  draft: (taskId: string, how: "template" | "model") => Promise<PrDraft>;
+  open: (taskId: string, title: string, body: string, into?: string) => Promise<PrResult>;
 }
 
 const UNDO: Record<UndoMode, { menu: string; hint: string; title: (branch: string) => string; confirm: string; done: (branch: string, taskId: string) => string }> = {
@@ -39,6 +42,8 @@ const UNDO: Record<UndoMode, { menu: string; hint: string; title: (branch: strin
 const messageOf = (err: unknown): string => (err instanceof ApiError || err instanceof Error ? err.message : String(err));
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
 const DRAFT_MODEL = "composer-2.5-fast";
+/** What the server calls a description built from the task, with no model. */
+const TEMPLATE = "template";
 
 type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | undefined;
 
@@ -47,12 +52,17 @@ type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | undefined;
  * exactly what it will do; a pull request is drafted by a cheap model and edited before anything is pushed. The card
  * only renders and holds the state of its own forms; the actions come from the container.
  */
-export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: string; branch: BranchView; actions: BranchActions; onChanged: () => void }) {
+export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen = false }: { runId: string; branch: BranchView; actions: BranchActions; onChanged: () => void; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const sectionId = useId();
   const [panel, setPanel] = useState<Panel>();
+  /** The branch typed in the form; undefined until the person edits it, so the recommended one stays the default. */
+  const [into, setInto] = useState<string>();
+  const [remote, setRemote] = useState<{ state: "loading" } | { state: "ready"; names: string[] } | { state: "failed"; message: string }>({ state: "loading" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [result, setResult] = useState<{ text: string; url?: string }>();
-  const [draft, setDraft] = useState<{ state: "writing" | "ready" | "failed"; title: string; body: string; model: string; saved: boolean }>({ state: "writing", title: b.title, body: "", model: DRAFT_MODEL, saved: false });
+  const [draft, setDraft] = useState<{ state: "writing" | "ready" | "failed"; title: string; body: string; model: string; saved: boolean }>({ state: "writing", title: b.title, body: "", model: TEMPLATE, saved: false });
   const key = draftKey(runId, b.taskId, b.state.head);
   const titleId = useId();
   const bodyId = useId();
@@ -77,11 +87,14 @@ export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: st
     }
   };
 
-  /** Asks the model, or joins the call already running for this state of the branch; the answer is saved. */
-  const askModel = (): void => {
+  /**
+   * Gets the description: built from the task (no model, no tokens), or written by the model when the person asks.
+   * Joins the call already running for this state of the branch; the answer is saved.
+   */
+  const askDraft = (how: "template" | "model"): void => {
     setError(undefined);
-    setDraft({ state: "writing", title: b.title, body: "", model: DRAFT_MODEL, saved: false });
-    draftOnce(key, () => actions.draft(b.taskId)).then(
+    setDraft({ state: "writing", title: b.title, body: "", model: how === "template" ? TEMPLATE : DRAFT_MODEL, saved: false });
+    draftOnce(key, () => actions.draft(b.taskId, how), how).then(
       (d) => setDraft({ state: "ready", title: d.title || b.title, body: d.body, model: d.model, saved: false }),
       (err: unknown) => {
         setDraft((current) => ({ ...current, state: "failed" }));
@@ -94,10 +107,16 @@ export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: st
   const startPr = (): void => {
     setResult(undefined);
     setError(undefined);
+    setInto(undefined);
+    setRemote({ state: "loading" });
+    actions.remote().then(
+      (names) => setRemote({ state: "ready", names }),
+      (err: unknown) => setRemote({ state: "failed", message: messageOf(err) }),
+    );
     setPanel({ kind: "pr" });
     const saved = loadDraft(key);
     if (saved) setDraft({ state: "ready", title: saved.title, body: saved.body, model: saved.model, saved: true });
-    else askModel();
+    else askDraft("template");
   };
 
   const edit = (next: { title?: string; body?: string }): void => {
@@ -110,10 +129,11 @@ export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: st
     setBusy(true);
     setError(undefined);
     try {
-      const done = await actions.open(b.taskId, draft.title.trim(), draft.body);
+      const target = baseValue.trim();
+      const done = await actions.open(b.taskId, draft.title.trim(), draft.body, target === recommended ? undefined : target);
       setPanel(undefined);
       forgetDraft(key);
-      setResult({ text: `Opened ${done.url}`, url: done.url });
+      setResult({ text: "", url: done.url });
       onChanged();
     } catch (err) {
       setError(messageOf(err));
@@ -124,18 +144,36 @@ export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: st
 
   const { state } = b;
   const prReason = b.pr.ok ? undefined : b.pr.reason;
+  const recommended = b.pr.ok ? b.pr.base : "";
+  const head = b.pr.ok ? b.pr.head : b.branch;
+  // Where a pull request can go: what origin has right now (GitHub needs the base there); the suggestions when origin cannot be asked.
+  const candidates = remote.state === "ready" ? remote.names.filter((n) => n !== head) : remote.state === "failed" ? (b.pr.ok ? b.pr.options : []) : [];
+  const recommendedThere = candidates.includes(recommended);
+  const baseValue = into ?? (recommendedThere ? recommended : "");
+  const intoId = useId();
 
   return (
     <section className="branch" aria-label={`Branch ${b.branch}`} data-status={b.status}>
-      <header className="branch__head">
+      <button type="button" className="branch__toggle" aria-expanded={open} aria-controls={open ? sectionId : undefined} onClick={() => setOpen((v) => !v)} title={b.title}>
         <span className="branch__id">{b.taskId}</span>
-        <span className="branch__title">{b.title}</span>
+        <span className="branch__name">
+          <span aria-hidden="true">⎇ </span>
+          {b.branch}
+        </span>
+        {b.prState?.state === "merged" ? (
+          <span className="branch__pr" data-state="merged">
+            Merged into {b.prState.base}
+          </span>
+        ) : b.prState?.state === "closed" ? (
+          <span className="branch__pr" data-state="closed">
+            Closed without merging
+          </span>
+        ) : null}
         <StatusBadge state={b.status === "passed" ? "delivered" : b.status === "failed" ? "failed" : "running"} />
-      </header>
-      <p className="branch__name">
-        <span aria-hidden="true">⎇ </span>
-        {b.branch}
-      </p>
+        <Chevron />
+      </button>
+      {open ? (
+        <div className="branch__body-wrap" id={sectionId}>
       <ul className="branch__chips" aria-label="State of the branch">
         <li>{plural(state.ahead.length, "commit")}</li>
         <li data-tone={state.pushed ? "ok" : undefined}>{state.pushed ? "On origin" : "Local only"}</li>
@@ -143,9 +181,9 @@ export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: st
         {state.dirty ? <li data-tone="warn">Uncommitted changes</li> : null}
         {!state.exists ? <li data-tone="warn">Branch is gone</li> : null}
         {b.prUrl ? (
-          <li data-tone="ok">
+          <li data-tone={b.prState?.state === "merged" ? "merged" : b.prState?.state === "closed" ? "warn" : "ok"}>
             <a href={b.prUrl} target="_blank" rel="noopener noreferrer">
-              Pull request ↗
+              {b.prState?.state === "merged" ? "Merged ↗" : b.prState?.state === "closed" ? "Closed ↗" : "Pull request ↗"}
             </a>
           </li>
         ) : null}
@@ -241,20 +279,32 @@ export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: st
           aria-busy={draft.state === "writing"}
           onSubmit={(e) => {
             e.preventDefault();
-            if (draft.title.trim() !== "" && !busy && draft.state !== "writing") void sendPr();
+            if (draft.title.trim() !== "" && baseValue.trim() !== "" && !busy && draft.state !== "writing") void sendPr();
           }}
         >
           {draft.state === "writing" ? (
             <p className="branch__panel-note branch__writing" role="status">
-              <span className="branch__spinner" role="progressbar" aria-label={`Writing the description with ${draft.model}`} />
-              Writing the description with {draft.model}… this takes a few seconds.
+              <span className="branch__spinner" role="progressbar" aria-label={draft.model === TEMPLATE ? "Preparing the description" : `Writing the description with ${draft.model}`} />
+              {draft.model === TEMPLATE ? "Preparing the description…" : `Writing the description with ${draft.model}… this takes a few seconds.`}
             </p>
           ) : (
             <p className="branch__panel-note">
-              {draft.state === "failed" ? "Write the description yourself, or ask the model again." : draft.saved ? `Saved description (written by ${draft.model}). Edit it, or write it again.` : `Description written by ${draft.model}. Edit it before sending.`}{" "}
-              <button type="button" className="branch__link" disabled={busy} onClick={askModel}>
-                Write it again
-              </button>
+              {draft.state === "failed"
+                ? "Write the description yourself, or ask the model."
+                : draft.model === TEMPLATE
+                  ? "Description built from the task: summary, specs, commits and files. Edit it before sending."
+                  : draft.saved
+                    ? `Saved description (written by ${draft.model}). Edit it, or write it again.`
+                    : `Description written by ${draft.model}. Edit it before sending.`}{" "}
+              {draft.model === TEMPLATE && draft.state === "ready" ? (
+                <button type="button" className="branch__link" disabled={busy} onClick={() => askDraft("model")}>
+                  Improve with the model
+                </button>
+              ) : (
+                <button type="button" className="branch__link" disabled={busy} onClick={() => askDraft("model")}>
+                  Write it again
+                </button>
+              )}
             </p>
           )}
           <label className="branch__label" htmlFor={titleId}>
@@ -266,11 +316,33 @@ export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: st
           </label>
           <textarea id={bodyId} className="branch__field branch__body" rows={8} value={draft.body} disabled={draft.state === "writing"} placeholder={draft.state === "writing" ? "…" : undefined} onChange={(e) => edit({ body: e.target.value })} />
           {b.pr.ok ? (
-            <ul className="branch__effects">
-              {b.pr.effects.map((e) => (
-                <li key={e}>{e}</li>
-              ))}
-            </ul>
+            <>
+              <label className="branch__label" htmlFor={intoId}>
+                Into branch
+              </label>
+              <select id={intoId} className="branch__field" value={baseValue} disabled={busy || remote.state === "loading"} onChange={(e) => setInto(e.target.value)}>
+                {remote.state === "loading" ? <option value="">Reading the branches of origin…</option> : null}
+                {remote.state !== "loading" && !recommendedThere ? (
+                  <option value="" disabled>
+                    Choose a branch…
+                  </option>
+                ) : null}
+                {recommendedThere ? <option value={recommended}>{recommended} (recommended)</option> : null}
+                {candidates
+                  .filter((n) => n !== recommended)
+                  .map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+              </select>
+              {remote.state === "failed" ? <p className="branch__panel-note">Could not read the branches of origin: {remote.message}</p> : null}
+              {remote.state === "ready" && !recommendedThere ? <p className="branch__panel-note">The recommended branch {recommended} is not on origin. Choose where to open the pull request.</p> : null}
+              <ul className="branch__effects">
+                <li>{b.pr.effects[0]}</li>
+                <li>{`Opens a pull request from ${b.pr.head} into ${baseValue.trim() === "" ? "…" : baseValue.trim()}.`}</li>
+              </ul>
+            </>
           ) : null}
           {error ? (
             <p className="branch__error" role="alert">
@@ -278,7 +350,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: st
             </p>
           ) : null}
           <div className="branch__row">
-            <button type="submit" className="branch__primary" disabled={busy || draft.state === "writing" || draft.title.trim() === ""}>
+            <button type="submit" className="branch__primary" disabled={busy || draft.state === "writing" || draft.title.trim() === "" || baseValue.trim() === ""}>
               {busy ? "Working…" : "Push and open pull request"}
             </button>
             <button type="button" className="branch__ghost" disabled={busy} onClick={close}>
@@ -291,16 +363,15 @@ export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: st
       {result ? (
         <p className="branch__result" role="status">
           {result.url ? (
-            <>
-              Opened{" "}
-              <a href={result.url} target="_blank" rel="noopener noreferrer">
-                {result.url}
-              </a>
-            </>
+            <a href={result.url} target="_blank" rel="noopener noreferrer">
+              Pull request ↗
+            </a>
           ) : (
             result.text
           )}
         </p>
+      ) : null}
+        </div>
       ) : null}
     </section>
   );

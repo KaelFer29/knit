@@ -1,1 +1,32 @@
-/* The picker and the start form are styled by single/panels/knit/KnitPanel.css. */
+/* The picker's section is styled by single/panels/knit/KnitPanel.css; this file holds only what the list adds. */
+.runs-filter {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.runs-filter__chip {
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.runs-filter__chip[aria-pressed="true"] {
+  border-bottom-color: var(--agent-knit);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.runs-filter__chip:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.runs-compact {
+  gap: 0;
+}

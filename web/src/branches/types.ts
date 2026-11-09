@@ -3,7 +3,7 @@
 export type UndoMode = "revert" | "reset" | "delete";
 
 export type Decision = { ok: true; effects: string[] } | { ok: false; reason: string };
-export type PrDecision = { ok: true; base: string; head: string; effects: string[] } | { ok: false; reason: string };
+export type PrDecision = { ok: true; base: string; head: string; /** Branches worth suggesting as a target, the recommended one first. */ options: string[]; effects: string[] } | { ok: false; reason: string };
 
 export interface BranchState {
   exists: boolean;
@@ -22,6 +22,8 @@ export interface BranchView {
   branch: string;
   startSha: string;
   prUrl?: string;
+  /** Read from GitHub when the list is built: absent when GitHub cannot be asked right now. */
+  prState?: { state: "open" | "merged" | "closed"; base: string };
   state: BranchState;
   undo: Record<UndoMode, Decision>;
   pr: PrDecision;

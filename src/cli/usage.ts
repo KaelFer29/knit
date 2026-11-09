@@ -15,9 +15,9 @@ export const USAGE = `Usage:
   ${PROGRAM_NAME} clean <run-id> [options]    Remove the worktrees of a run (branches are kept)
   ${PROGRAM_NAME} branch <run-id> <task-id> undo --mode <revert|reset|delete> [options]
                                               Take back what a task did on its branch (says what it would do until --yes)
-  ${PROGRAM_NAME} branch <run-id> <task-id> pr-draft [options]
-                                              Have a cheap model write the title and body of a pull request for the task
-  ${PROGRAM_NAME} branch <run-id> <task-id> pr --title <t> --body <b> [options]
+  ${PROGRAM_NAME} branch <run-id> <task-id> pr-draft [--template] [options]
+                                              Write the title and body of a pull request for the task (--template: from the task itself, no model)
+  ${PROGRAM_NAME} branch <run-id> <task-id> pr --title <t> --body <b> [--base <branch>] [options]
                                               Push the task branch and open its pull request
   ${PROGRAM_NAME} ui [options]                Serve the web interface on 127.0.0.1 and print its address (Ctrl+C to stop)
 
@@ -74,11 +74,13 @@ Options for branch undo:
   --yes                      Do it; without it the command only prints what it would do and changes nothing
   --json                     Print one JSON line (used by the web interface)
   --data-dir <dir>
-  pr-draft: --model <id> picks the model (default composer-2.5-fast, see 'agent models'). It writes text only, in an empty
+  pr-draft: --template builds the text from the task's goal and specs, with no model and no tokens (the commits and files are on the pull request)
+  (the same sections every time; it cannot be combined with --model). Without it, --model <id> picks the model (default composer-2.5-fast, see 'agent models'). It writes text only, in an empty
   scratch directory, from the task, its commits and a cut of its diff.
   pr: pushes the branch to origin (never forced) and opens the pull request into the run's base branch, or into the parent
-  task's branch when the task depends on another (that branch must be on origin first). Only for a task that passed, with
-  commits and no pull request yet; the address is kept with the task. Checks the GitHub CLI before pushing anything.
+  task's branch when the task depends on another (that branch must be on origin first). --base <branch> opens it into
+  another branch instead (a plain branch name; GitHub refuses one that is not on origin). Only for a task that passed, with
+  commits and no pull request yet; the address is kept with the task. Checks the GitHub CLI and that the base branch is on origin before pushing anything.
   A title or body that starts with a dash has to be written --title="-fix typo" and --body="- adds it", or it reads as an option.
   undo: refused (exit 1) while the run is still running, for a branch that is gone, with uncommitted changes (revert), after
   a rewritten history (reset), or when another task is stacked on the branch (reset, delete). A remote is never touched.

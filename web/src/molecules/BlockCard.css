@@ -314,7 +314,7 @@
   color: var(--claude-ink-muted);
 }
 
-/* ---- Orchestrator: a delivery pipeline in light brown on warm white. ---- */
+/* ---- Orchestrator: a delivery pipeline in faint green on white. ---- */
 .block[data-skin="pipeline"] .block__frame {
   border-color: var(--knit-line);
   background: var(--knit-canvas);
@@ -646,4 +646,17 @@
   .block:hover .block__frame {
     transform: none;
   }
+}
+
+/* A block's model, in its identity's own color, in place of the status pill. */
+.block__model {
+  flex: none;
+  padding: 0.15rem var(--space-2);
+  border-radius: 999px;
+  background: var(--block-soft);
+  color: var(--block-accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
 }

@@ -39,7 +39,6 @@
 }
 
 .knit-panel__link:hover {
-  border-color: var(--border-strong);
   color: var(--text);
 }
 
@@ -72,19 +71,25 @@
   font-weight: 600;
 }
 
-/* The run on top, then the queue beside run control and the runs list. */
-.knit-panel__stages,
-.knit-panel__empty {
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface-1);
+/* One column: the run with its tasks nested under it, then the runs list. Flat: hairlines, no boxes or shadows. */
+.knit-panel__run {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.knit-panel__stages {
+  padding: var(--space-3) 0;
+  border-block: 1px solid var(--border);
 }
 
 .knit-panel__empty {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  padding: var(--space-4) 0;
+  border-block: 1px solid var(--border);
 }
 
 .knit-panel__empty .stage-track {
@@ -93,28 +98,30 @@
 
 .knit-panel__empty-title {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 650;
   letter-spacing: -0.02em;
 }
 
-.knit-panel__cols {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-
-.knit-panel__side {
+/* The tasks hang from the run by a line, so they read as parts of it. */
+.knit-panel__tasks {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
+  margin: 0 0 0 var(--space-2);
+  padding: 0 0 0 var(--space-4);
+  border-left: 1px solid var(--border-strong);
+  list-style: none;
 }
 
-@media (min-width: 900px) {
-  .knit-panel__cols:not([data-empty]) {
-    grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 1fr);
-  }
+.knit-panel__tasks > li {
+  position: relative;
+}
 
+.knit-panel__tasks > li::before {
+  content: "";
+  position: absolute;
+  top: 1.15rem;
+  left: calc(var(--space-4) * -1);
+  width: var(--space-3);
+  border-top: 1px solid var(--border-strong);
 }

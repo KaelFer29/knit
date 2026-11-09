@@ -15,7 +15,7 @@ const branch = (over: Record<string, unknown> = {}) => ({
   startSha: "aaaaaaa",
   state: { exists: true, head: "bbbbbbb", historyIntact: true, pushed: false, hasWorktree: true, dirty: false, ahead: [{ sha: "b1", subject: "docs: add prueba.md" }] },
   undo: { revert: ok, reset: { ok: true, effects: ["Moves docs/one back to the commit the task started from. 1 commit leaves the branch."] }, delete: { ok: true, effects: ["Deletes the branch docs/one and its worktree.", "1 commit of the task is lost from this repository."] } },
-  pr: { ok: true, base: "main", head: "docs/one", effects: ["Pushes docs/one to origin, without forcing.", "Opens a pull request from docs/one into main."] },
+  pr: { ok: true, base: "main", head: "docs/one", options: ["main", "docs/two"], effects: ["Pushes docs/one to origin, without forcing.", "Opens a pull request from docs/one into main."] },
   ...over,
 });
 
@@ -27,6 +27,7 @@ interface Call {
 let calls: Call[];
 let listing: { branches: unknown[] };
 let replies: Record<string, { status: number; body: unknown }>;
+let remote: string[];
 
 beforeEach(() => {
   window.sessionStorage.clear();
@@ -34,12 +35,17 @@ beforeEach(() => {
   calls = [];
   listing = { branches: [branch()] };
   replies = {};
+  remote = ["docs/one", "docs/two", "main"];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string, init?: { method?: string; body?: string }) => {
       const url = String(input);
       const method = init?.method ?? "GET";
       calls.push({ method, url, ...(init?.body ? { body: JSON.parse(init.body) } : {}) });
+      if (method === "GET" && url.endsWith("/remote-branches")) {
+        const refused = replies["GET remote-branches"];
+        return new Response(JSON.stringify(refused ? refused.body : { branches: remote }), { status: refused?.status ?? 200 });
+      }
       const forced = replies[`${method} ${url.replace(/^\/api\/runs\/run-1\/tasks\/T1\//, "")}`];
       const body = forced ? forced.body : url.endsWith("/branches") ? { runId: "run-1", runStatus: "passed", base: "main", ...listing } : {};
       return new Response(JSON.stringify(body), { status: forced?.status ?? 200 });
@@ -56,11 +62,98 @@ describe("BranchesView", () => {
     show();
     const card = await screen.findByRole("region", { name: "Branch docs/one" });
     expect(within(card).getByText("T1")).toBeTruthy();
-    expect(within(card).getByText("Create prueba.md")).toBeTruthy();
+    expect(within(card).getByText("docs/one")).toBeTruthy();
+    expect(within(card).queryByText("Create prueba.md")).toBeNull();
     expect(within(card).getByText("1 commit")).toBeTruthy();
     expect(within(card).getByText("Local only")).toBeTruthy();
     expect(within(card).getByText("docs: add prueba.md")).toBeTruthy();
     expect((within(card).getByRole("button", { name: "Open pull request" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  describe("pull request state", () => {
+    const PR = "https://github.com/acme/demo/pull/7";
+
+    it("shows a merged pull request in purple, and into which branch it was merged", async () => {
+      listing = { branches: [branch({ prUrl: PR, prState: { state: "merged", base: "release/1.2" }, state: { ...branch().state, pushed: true } })] };
+      show();
+      const card = await screen.findByRole("region", { name: "Branch docs/one" });
+      const pill = within(card).getByText("Merged into release/1.2");
+      expect(pill.getAttribute("data-state")).toBe("merged");
+      expect(within(card).getByRole("link", { name: "Merged ↗" }).getAttribute("href")).toBe(PR);
+    });
+
+    it("says when a pull request was closed without merging, and when it is still open", async () => {
+      listing = { branches: [branch({ prUrl: PR, prState: { state: "closed", base: "main" }, state: { ...branch().state, pushed: true } })] };
+      const first = show();
+      expect(await screen.findByText("Closed without merging")).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Closed ↗" })).toBeTruthy();
+      first.unmount();
+      listing = { branches: [branch({ prUrl: PR, prState: { state: "open", base: "main" }, state: { ...branch().state, pushed: true } })] };
+      show();
+      expect(await screen.findByRole("link", { name: "Pull request ↗" })).toBeTruthy();
+      expect(screen.queryByText(/Merged into/)).toBeNull();
+    });
+  });
+
+  describe("with many branches", () => {
+    const many = (n: number) => Array.from({ length: n }, (_, i) => branch({ taskId: `T${i + 1}`, title: `Task number ${i + 1}`, branch: `feat/b${i + 1}` }));
+
+    it("shows each as one collapsed row and opens its commits and actions on demand", async () => {
+      listing = { branches: many(3) };
+      const user = userEvent.setup();
+      show();
+      const row = await screen.findByRole("region", { name: "Branch feat/b2" });
+      expect(within(row).getByText("feat/b2")).toBeTruthy();
+      expect(within(row).queryByText("1 commit")).toBeNull();
+      expect(within(row).queryByText("docs: add prueba.md")).toBeNull();
+      expect(within(row).queryByRole("button", { name: "Open pull request" })).toBeNull();
+      const toggle = within(row).getByRole("button", { name: /T2/ });
+      expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      await user.click(toggle);
+      expect(toggle.getAttribute("aria-expanded")).toBe("true");
+      expect(within(row).getByText("docs: add prueba.md")).toBeTruthy();
+      expect(within(row).getByText("1 commit")).toBeTruthy();
+      expect(within(row).getByText("Local only")).toBeTruthy();
+      expect(within(row).getByText("Has a worktree")).toBeTruthy();
+      expect(within(row).getByRole("button", { name: "Open pull request" })).toBeTruthy();
+      await user.click(toggle);
+      expect(within(row).queryByText("docs: add prueba.md")).toBeNull();
+    });
+
+    it("opens a lone branch by itself, since there is nothing to scan", async () => {
+      show();
+      expect(await screen.findByText("docs: add prueba.md")).toBeTruthy();
+    });
+
+    it("shows one page of branches and moves through the rest", async () => {
+      listing = { branches: many(8) };
+      const user = userEvent.setup();
+      show();
+      expect(await screen.findAllByRole("region", { name: /^Branch / })).toHaveLength(6);
+      expect(screen.getByText("1–6 of 8 branches")).toBeTruthy();
+      await user.click(screen.getByRole("button", { name: "Next page" }));
+      expect(screen.getAllByRole("region", { name: /^Branch / })).toHaveLength(2);
+    });
+
+    it("searches by task, title or branch name", async () => {
+      listing = { branches: many(8) };
+      const user = userEvent.setup();
+      show();
+      await screen.findAllByRole("region", { name: /^Branch / });
+      await user.type(screen.getByRole("searchbox", { name: "Search branches" }), "b7");
+      expect(screen.getAllByRole("region", { name: /^Branch / })).toHaveLength(1);
+      expect(screen.getByRole("region", { name: "Branch feat/b7" })).toBeTruthy();
+      await user.clear(screen.getByRole("searchbox", { name: "Search branches" }));
+      await user.type(screen.getByRole("searchbox", { name: "Search branches" }), "zzz");
+      expect(screen.getByText("No branch matches this search.")).toBeTruthy();
+    });
+  });
+
+  it("does not repeat the branch name below the row, and has no note about where pull requests go", async () => {
+    show();
+    const card = await screen.findByRole("region", { name: "Branch docs/one" });
+    expect(within(card).getAllByText("docs/one")).toHaveLength(1);
+    expect(screen.queryByText(/Nothing is pushed until you press the button/)).toBeNull();
   });
 
   it("says when there is nothing to show yet", async () => {
@@ -84,6 +177,64 @@ describe("BranchesView", () => {
     const button = (await screen.findByRole("button", { name: "Open pull request" })) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(screen.getByText(/did not pass its checks/)).toBeTruthy();
+  });
+
+  describe("where the pull request goes", () => {
+    const open = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      return form;
+    };
+    const into = (form: HTMLElement) => within(form).getByRole("combobox", { name: "Into branch" }) as HTMLSelectElement;
+    const optionsOf = (select: HTMLSelectElement) => Array.from(select.options).map((o) => o.textContent);
+
+    it("lists the branches origin has in a dropdown, the recommended one first and chosen, and never the branch itself", async () => {
+      remote = ["docs/one", "docs/two", "main", "release/1.2"];
+      const user = userEvent.setup();
+      show();
+      const form = await open(user);
+      await waitFor(() => expect(optionsOf(into(form))).toEqual(["main (recommended)", "docs/two", "release/1.2"]));
+      expect(into(form).value).toBe("main");
+      expect(calls.some((c) => c.method === "GET" && c.url === "/api/runs/run-1/remote-branches")).toBe(true);
+      await user.selectOptions(into(form), "docs/two");
+      expect(within(form).getByText("Opens a pull request from docs/one into docs/two.")).toBeTruthy();
+    });
+
+    it("sends the branch only when it was changed, and keeps the old request when it was not", async () => {
+      const user = userEvent.setup();
+      replies["POST pr"] = { status: 200, body: { ok: true, url: "https://example.test/pull/7", base: "docs/two", head: "docs/one" } };
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Add prueba.md", body: "- adds it", model: "template" } };
+      show();
+      const form = await open(user);
+      await within(form).findByDisplayValue("- adds it");
+      await waitFor(() => expect(into(form).options.length).toBeGreaterThan(1));
+      await user.selectOptions(into(form), "docs/two");
+      await user.click(within(form).getByRole("button", { name: "Push and open pull request" }));
+      await waitFor(() => expect(posts().find((c) => c.url.endsWith("/pr"))?.body).toEqual({ title: "Add prueba.md", body: "- adds it", base: "docs/two" }));
+    });
+
+    it("asks to choose when the recommended branch is not on origin, and cannot be sent until one is chosen", async () => {
+      remote = ["docs/one", "release/1.2"];
+      const user = userEvent.setup();
+      show();
+      const form = await open(user);
+      await waitFor(() => expect(within(form).getByText(/main is not on origin/)).toBeTruthy());
+      expect(into(form).value).toBe("");
+      expect(optionsOf(into(form))).toEqual(["Choose a branch…", "release/1.2"]);
+      expect((within(form).getByRole("button", { name: "Push and open pull request" }) as HTMLButtonElement).disabled).toBe(true);
+      await user.selectOptions(into(form), "release/1.2");
+      await waitFor(() => expect((within(form).getByRole("button", { name: "Push and open pull request" }) as HTMLButtonElement).disabled).toBe(false));
+    });
+
+    it("falls back to the suggested branches and says so when origin cannot be asked", async () => {
+      replies["GET remote-branches"] = { status: 502, body: { error: "Could not ask origin which branches it has: no network" } };
+      const user = userEvent.setup();
+      show();
+      const form = await open(user);
+      await waitFor(() => expect(within(form).getByText(/no network/)).toBeTruthy());
+      expect(optionsOf(into(form))).toEqual(["main (recommended)", "docs/two"]);
+      expect(into(form).value).toBe("main");
+    });
   });
 
   describe("undo", () => {
@@ -156,10 +307,39 @@ describe("BranchesView", () => {
       await user.type(title, "Create prueba.md");
       await user.click(within(form).getByRole("button", { name: "Push and open pull request" }));
       await waitFor(() => expect(posts().at(-1)).toEqual({ method: "POST", url: "/api/runs/run-1/tasks/T1/pr", body: { title: "Create prueba.md", body: "## Summary\n- adds it" } }));
-      expect((await screen.findByRole("status")).textContent).toContain("https://example.test/pull/7");
+      const done = await screen.findByRole("link", { name: "Pull request ↗" });
+      expect(done.getAttribute("href")).toBe("https://example.test/pull/7");
+      expect(screen.getByRole("status").textContent).not.toMatch(/opened/i);
     });
 
-    it("shows that it is working while the model writes: a spinner, a busy form and fields that wait", async () => {
+    it("builds the description from the task when the form opens, without asking a model", async () => {
+      const user = userEvent.setup();
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Create prueba.md", body: "## Summary\nCreate a file.", model: "template" } };
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      await waitFor(() => expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("## Summary\nCreate a file."));
+      expect(posts().filter((p) => p.url.endsWith("pr-draft")).map((p) => p.body)).toEqual([{ template: true }]);
+      expect(within(form).getByText(/built from the task/i)).toBeTruthy();
+      expect(within(form).queryByText(/composer/i)).toBeNull();
+    });
+
+    it("improves the description with the model only when asked, and says which model wrote it", async () => {
+      const user = userEvent.setup();
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Create prueba.md", body: "from the task", model: "template" } };
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      await waitFor(() => expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("from the task"));
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Add prueba.md", body: "polished", model: "composer-2.5-fast" } };
+      await user.click(within(form).getByRole("button", { name: "Improve with the model" }));
+      await waitFor(() => expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("polished"));
+      expect(posts().filter((p) => p.url.endsWith("pr-draft")).map((p) => p.body)).toEqual([{ template: true }, {}]);
+      expect(within(form).getByText(/written by composer-2.5-fast/i)).toBeTruthy();
+      expect(within(form).queryByRole("button", { name: "Improve with the model" })).toBeNull();
+    });
+
+    it("shows that it is working while the description is prepared: a spinner, a busy form and fields that wait", async () => {
       const user = userEvent.setup();
       let release: () => void = () => {};
       const gate = new Promise<void>((r) => (release = r));
@@ -176,7 +356,7 @@ describe("BranchesView", () => {
       await user.click(await screen.findByRole("button", { name: "Open pull request" }));
       const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
       expect(form.getAttribute("aria-busy")).toBe("true");
-      expect(within(form).getByRole("progressbar", { name: /writing the description/i })).toBeTruthy();
+      expect(within(form).getByRole("progressbar", { name: /preparing the description/i })).toBeTruthy();
       expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).disabled).toBe(true);
       expect((within(form).getByRole("button", { name: "Push and open pull request" }) as HTMLButtonElement).disabled).toBe(true);
       release();

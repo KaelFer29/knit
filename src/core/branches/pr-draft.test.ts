@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPrDraftPrompt, parsePrDraft, prBaseOf } from "./pr-draft.js";
+import { buildPrDraftPrompt, buildPrTemplate, parsePrDraft, prBaseOf } from "./pr-draft.js";
 
 describe("prBaseOf", () => {
   const tasks = [
@@ -74,5 +74,57 @@ describe("parsePrDraft", () => {
   it("never returns an empty title", () => {
     expect(parsePrDraft("Title:   \n\nbody", "Fallback").title).toBe("Fallback");
     expect(parsePrDraft("", "Fallback")).toEqual({ title: "Fallback", body: "" });
+  });
+});
+
+describe("buildPrTemplate", () => {
+  const input = {
+    taskId: "T1",
+    title: "Create prueba.md",
+    goal: "Create a minimal document at the repository root.",
+    specs: [{ id: "S1", text: "The file is named prueba.md" }],
+    commits: [{ sha: "b1", subject: "docs: add prueba.md" }, { sha: "b2", subject: "docs: fix the heading" }],
+    stat: " prueba.md | 3 +++\n 1 file changed, 3 insertions(+)",
+    patch: "diff --git a/prueba.md b/prueba.md",
+    truncated: false,
+  };
+
+  it("uses the task's title and builds the same fixed sections every time, without a model", () => {
+    const t = buildPrTemplate(input);
+    expect(t.title).toBe("Create prueba.md");
+    expect(t.body).toBe(
+      [
+        "## Summary",
+        "Create a minimal document at the repository root.",
+        "",
+        "## Specs",
+        "- S1: The file is named prueba.md",
+        "",
+        "## Verification",
+        "Passed Knit's checks for T1: the agent process, the files it touched, git hygiene and the task's own checks.",
+      ].join("\n"),
+    );
+  });
+
+  it("has no Changes section: the commits and the file stats are not repeated in the body", () => {
+    const body = buildPrTemplate(input).body;
+    expect(body).not.toContain("## Changes");
+    expect(body).not.toContain("file changed");
+    expect(body).not.toContain("docs: add prueba.md");
+  });
+
+  it("falls back to the title when the task has no goal, and skips the Specs section when there are none", () => {
+    const t = buildPrTemplate({ ...input, goal: undefined as never, specs: [] });
+    expect(t.body).toContain("## Summary\nCreate prueba.md\n");
+    expect(t.body).not.toContain("## Specs");
+  });
+
+  it("keeps a title to one line of at most 100 characters", () => {
+    expect(buildPrTemplate({ ...input, title: "x".repeat(150) }).title).toHaveLength(100);
+    expect(buildPrTemplate({ ...input, title: "a\nb" }).title).toBe("a b");
+  });
+
+  it("says when there are no file stats instead of printing an empty block", () => {
+    expect(buildPrTemplate({ ...input, stat: "  " }).body).not.toContain("```");
   });
 });
