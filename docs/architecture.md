@@ -25,6 +25,11 @@ src/
   cli/             command line: wires adapters into the core
     commands/        one module per command
     support/         argument parsing, paths, formatting
+web/               browser app (Vite + React + TypeScript), built to dist/web; talks only to the HTTP API
+  src/identity/      agent identities: label, role, brand tokens, logo file
+  src/fixtures/      typed BoardModel samples the canvas is drawn from until it has live data
+  src/atoms, molecules, organisms/   presentational components; containers (App) own state
+  src/styles/        design tokens (light and dark) and base styles
 test/integration/  tests that cross layers (CLI against real git and SQLite)
 ```
 
@@ -53,6 +58,10 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 ### Server
 
 `src/server` is a driving adapter, like the CLI: it turns HTTP requests into calls on the `RunReader` port. It is built from small parts: `security.ts` (the guard every request passes), `router.ts` (method and path matching), `routes/<name>.ts` (one module per group of routes, each a function from the server's dependencies to a list of routes), `static.ts` (built app and SPA fallback) and `server.ts` (wires them on `127.0.0.1`). `lazy-reader.ts` wraps any `RunReader` for a database that does not exist yet. Details in [web-interface.md](web-interface.md#http-api).
+
+## The web app
+
+`web/` is outside the hexagon: it is a separate program with its own `web/tsconfig.json` (DOM, bundler resolution, no Node types) and its own build. Its only link to `src/` is `import type` through the `@board` alias, which points at `src/core/board/index.ts`; types are erased at build time, so no runtime code crosses over. `pnpm typecheck` checks both programs, `pnpm test` runs the web tests in a jsdom project next to the Node tests, and `pnpm build` writes the CLI to `dist/cli` and the app to `dist/web`. See [web-interface.md](web-interface.md#web-app-scaffold).
 
 ## Extending
 

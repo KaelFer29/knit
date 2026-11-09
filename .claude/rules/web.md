@@ -13,6 +13,7 @@ Design: `docs/web-interface.md`. Active work: `odd/tasks/web-interface.md`.
 - The server binds to `127.0.0.1`, requires the launch token on every request and checks `Origin`/`Host` on every `POST`. Never relax these.
 - `web/` talks only to the HTTP API; never to SQLite or the file system.
 - View state (queued, running, retrying, verifying, delivered) is computed in `src/core/board/` as pure functions with unit tests, not inside components.
+- Import board types with `import type { ... } from "@board"` (alias to `src/core/board/index.ts`, set in `web/tsconfig.json`). It is type-only on purpose: Vite has no alias for it, so a runtime import would fail the build. `web/` has no Node types, so a Node import fails `pnpm typecheck`.
 - Container components fetch and subscribe; presentational components only render props. Organize as atoms, molecules, organisms.
 - Agent output is untrusted: render as text, sanitize any Markdown, never set raw HTML.
 - Color only for agent identity and status; spacing, color and type come from design tokens. Every animation honors `prefers-reduced-motion`.

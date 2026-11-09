@@ -1,6 +1,6 @@
 # Web interface
 
-> **Partly built.** This is the agreed design for `knit ui`. Built so far: the read side (T2) and the server with `knit ui` (T3: read routes, live stream, static files, security). Not built yet: the web app itself, run control and everything from phase B on. Progress and open decisions are tracked in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md). Sections say "built" when they are.
+> **Partly built.** This is the agreed design for `knit ui`. Built so far: the read side and board view model (T2), the server with `knit ui` (T3: read routes, live stream, static files, security) and the app scaffold (T4, see [Web app scaffold](#web-app-scaffold)). Not built yet: the flow canvas, run control and everything from phase B on. Progress and open decisions are tracked in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md). Sections say "built" when they are.
 
 A local web app that joins Claude and Cursor into one workflow and is the single place to review everything.
 
@@ -165,6 +165,46 @@ knit ui [--port <n>] [--data-dir <dir>]
 
 It prints one line, `http://127.0.0.1:<port>/?token=<token>`, and keeps running until `SIGINT` or `SIGTERM`, then closes its connections and exits with 0. It never opens a browser: open the address yourself. The host is not configurable. If `knit.db` does not exist yet, the server still starts (the runs list is empty) and opens the database, read-only, as soon as `knit run` creates it.
 
+## Web app scaffold
+
+Built in task T4: the skeleton of the browser app with its look and its identities, and no live data yet.
+
+| Piece | Where | Notes |
+| --- | --- | --- |
+| App | `web/` (Vite 7, React 19, TypeScript) | `web/index.html` is the entry; builds to `dist/web` |
+| Design tokens | `web/src/styles/tokens.css` | CSS custom properties: neutral surfaces and text, status colors (queued, running, retrying, verifying, delivered, failed), agent colors, type scale, spacing, radius, elevation, motion durations |
+| Themes | `tokens.css`, `web/src/theme/` | Light by default, dark under `prefers-color-scheme`, and `data-theme="light"` or `"dark"` on `<html>` overrides the system. The toggle offers light, dark and system and stores the choice under the `localStorage` key `knit.theme` (every storage access is guarded; the page works when storage is blocked). The stored theme is applied in `main.tsx` before the first render |
+| Identities | `web/src/identity/agents.ts` | Claude (planner), Knit (orchestrator) and Cursor (builder): label, role, brand color tokens, logo file, monogram. Components receive an identity and never branch on the agent's name |
+| Logo | `web/src/atoms/Logo.tsx` | Loads `/brand/<file>`; shows the monogram while it loads and keeps it when the file is missing or fails. Knit's own mark (`atoms/KnitMark.tsx`, two interlocked threads) is drawn in code |
+| Shell | `web/src/App.tsx`, `organisms/AppShell.tsx` | Header with the Knit mark and name and the theme toggle; skip link; an empty `main#canvas` that the flow canvas will fill |
+| API client | `web/src/api/client.ts` | `apiGet` with same-origin credentials and `ApiError`; no routes are called yet |
+| Fixtures | `web/src/fixtures/boards.ts` | Typed `BoardModel` samples (running, retrying, verifying, failed, delivered, a long queue, and a run from before schema 4) that the canvas is drawn from until it is wired to live data |
+
+Scripts (all from the repository root):
+
+| Script | Does |
+| --- | --- |
+| `pnpm dev:web` | Vite dev server on `127.0.0.1`, with `/api` proxied to `http://127.0.0.1:4317` |
+| `pnpm typecheck` | `tsc --noEmit` for `src/` and `test/`, then for `web/` (`web/tsconfig.json`) |
+| `pnpm test` | Vitest with two projects: `node` (`src/**`, `test/**`) and `web` (`web/src/**/*.test.{ts,tsx}`, jsdom) |
+| `pnpm build` | `tsc -p tsconfig.build.json` (CLI to `dist/cli`), then `vite build` (app to `dist/web`). `prebuild` clears `dist` first |
+
+The web dependencies (React, Vite, jsdom, Testing Library, `playwright-core`) are all dev dependencies: the app is bundled into static files, so the installed CLI needs none of them. Vite 7 needs Node 20.19 or newer, stricter than the package's `engines` (`>=20`); the CLI itself still runs on any Node 20.
+
+To look at the app, run `pnpm build`, serve `dist/web` and take screenshots with the installed Chromium through `playwright-core` (`executablePath` of the Playwright cache, `--no-sandbox`).
+
+### Logo files
+
+The app asks for exactly these files and never commits them:
+
+| Identity | File | Notes |
+| --- | --- | --- |
+| Claude | `web/public/brand/claude.svg` | the official mark, in its own colors |
+| Cursor | `web/public/brand/cursor.svg` | a single-color mark drawn dark; the app inverts it to light in the dark theme |
+| Knit | none | original mark drawn in code |
+
+`web/public/brand/` is git-ignored; Vite serves it at `/brand/` and copies it into `dist/web/brand/` on build. A missing or unreadable file leaves the monogram in place.
+
 ## HTTP API
 
 Built in task T3 (`src/server/`). Every route is a `GET` for now; the `POST` routes of the next tasks sit behind the same [security guard](#security).
@@ -255,4 +295,4 @@ Built in task T3 (`src/server/security.ts`, applied to every request before rout
 
 ## Brand assets
 
-Blocks use the official Claude and Cursor logos and brand styles. The logo files are trademarks of their owners and are not committed: they live in `web/public/brand/` (git-ignored), filled by the user from the official press kits. When a file is missing, the block falls back to a monogram. Names, brand colors and styles live in one identity module, never in components. Knit gets its own original mark.
+Blocks use the official Claude and Cursor logos and brand styles. The logo files are trademarks of their owners and are not committed: they live in `web/public/brand/` (git-ignored), filled by the user from the official press kits. When a file is missing, the block falls back to a monogram. Names, brand colors and styles live in one identity module, never in components. Knit gets its own original mark. The expected file names are listed under [Logo files](#logo-files).
