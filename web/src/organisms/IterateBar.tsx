@@ -43,10 +43,10 @@ export function IterateBar({ tasks, selected, onSelect }: Props) {
             </>
           ) : (
             <>
-              <span className="iterate-bar__title">Iterating on {target.taskId}</span>
+              <span className="iterate-bar__title">Next correction for {target.taskId}</span>
               {target.branch === undefined ? null : <span className="iterate-bar__branch">{target.branch}</span>}
               <span className="iterate-bar__dest">
-                <span aria-hidden="true">→</span> to the orchestrator
+                <span aria-hidden="true">→</span> sent to the orchestrator only when you press Send
               </span>
             </>
           )}

@@ -13,10 +13,10 @@ describe("RouteSwitch", () => {
 
   it("can be disabled with the reason, and then does nothing", async () => {
     const onChange = vi.fn();
-    render(<RouteSwitch on={false} onChange={onChange} disabled reason="Off while iterating on T1" />);
+    render(<RouteSwitch on={false} onChange={onChange} disabled reason="Off while a correction for T1 is prepared" />);
     const button = screen.getByRole("switch", { name: "Send to the orchestrator" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
-    expect(button.getAttribute("title")).toBe("Off while iterating on T1");
+    expect(button.getAttribute("title")).toBe("Off while a correction for T1 is prepared");
     await userEvent.setup().click(button);
     expect(onChange).not.toHaveBeenCalled();
   });

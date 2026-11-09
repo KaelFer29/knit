@@ -470,7 +470,7 @@ describe("ClaudePanel: iterating on a delivered task", () => {
     const user = userEvent.setup();
     render(withRun());
     await choose(user);
-    expect(screen.getByText(new RegExp(`Iterating on ${target.taskId}`))).toBeTruthy();
+    expect(screen.getByText(new RegExp(`Next correction for ${target.taskId}`))).toBeTruthy();
     await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "The heading is wrong");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(posted).toHaveLength(1));
@@ -485,7 +485,7 @@ describe("ClaudePanel: iterating on a delivered task", () => {
     render(withRun());
     await choose(user);
     await user.click(screen.getByRole("button", { name: "Stop iterating" }));
-    expect(screen.queryByText(new RegExp(`Iterating on ${target.taskId}`))).toBeNull();
+    expect(screen.queryByText(new RegExp(`Next correction for ${target.taskId}`))).toBeNull();
     await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "Next step");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(posted).toHaveLength(1));
@@ -536,7 +536,7 @@ describe("ClaudePanel: iterating on a delivered task", () => {
     const off = screen.getByRole("switch", { name: "Send to the orchestrator" }) as HTMLButtonElement;
     expect(off.disabled).toBe(true);
     expect(off.getAttribute("aria-checked")).toBe("false");
-    expect(off.getAttribute("title")).toMatch(new RegExp(`iterating on ${target.taskId}`, "i"));
+    expect(off.getAttribute("title")).toMatch(new RegExp(`correction for ${target.taskId}`, "i"));
     await user.click(screen.getByRole("button", { name: "Stop iterating" }));
     expect((screen.getByRole("switch", { name: "Send to the orchestrator" }) as HTMLButtonElement).disabled).toBe(false);
   });

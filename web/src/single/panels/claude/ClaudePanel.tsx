@@ -327,7 +327,7 @@ export function ClaudePanel({ agentId: panelAgent, board, runId, live: runIsLive
             routing={{
               on: routeOn && target === undefined,
               onChange: setRouteOn,
-              ...(target === undefined ? {} : { disabled: true, reason: `Off while iterating on ${target.taskId}: its correction already goes to the orchestrator.` }),
+              ...(target === undefined ? {} : { disabled: true, reason: `Off while a correction for ${target.taskId} is prepared: it goes to the orchestrator only when you send it.` }),
             }}
             onKnitCommand={onKnitCommand}
             busy={sending || running}
