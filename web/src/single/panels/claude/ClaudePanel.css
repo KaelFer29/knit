@@ -263,9 +263,24 @@
 
 /* Iterating on a delivered task: the bar, and the instruction Claude wrote under it. No line of its own: the bar has its border. */
 .claude-panel__iterate {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   /* No side padding: the bar takes the same width as the composer box under it. */
   padding: var(--space-2) 0 0;
+  /* Solid, so it reads as a bar and the chat above does not look cut by an invisible edge. */
+  background: var(--claude-canvas);
+}
+
+/* The chat and the usage column fade into the bar instead of ending on a hard line. */
+.claude-panel__iterate::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  height: var(--space-6);
+  background: linear-gradient(to top, var(--claude-canvas), transparent);
+  pointer-events: none;
 }
