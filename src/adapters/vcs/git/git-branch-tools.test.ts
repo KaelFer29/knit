@@ -282,3 +282,69 @@ describe("GitBranchTools.remoteBranches", () => {
     expect(() => tools.remoteBranches(repo)).toThrow(/origin/i);
   });
 });
+
+describe("GitBranchTools.checkout", () => {
+  const head = (): string => git(repo, "rev-parse", "--abbrev-ref", "HEAD");
+
+  it("frees the worktree and switches the repository to the branch, which keeps its commits", () => {
+    const { ref, path } = worktree();
+    commit(path, "a.txt", "a\n", "feat: add a");
+    expect(tools.checkout(ref)).toEqual({ freedWorktree: true });
+    expect(existsSync(path)).toBe(false);
+    expect(head()).toBe("feat/one");
+    expect(readFileSync(join(repo, "a.txt"), "utf8")).toBe("a\n");
+    expect(tools.state({ ...ref, worktree: undefined })).toMatchObject({ exists: true, hasWorktree: false, checkedOut: true });
+  });
+
+  it("is not forced by git alone: the same branch cannot be in two places, which is why the worktree goes first", () => {
+    const { ref } = worktree();
+    expect(() => git(repo, "checkout", "feat/one")).toThrow(/already used by worktree/);
+    tools.checkout(ref);
+    expect(head()).toBe("feat/one");
+  });
+
+  it("works when the worktree is already gone, and does nothing when the repository is already on the branch", () => {
+    const { ref, path } = worktree();
+    commit(path, "a.txt", "a\n", "feat: add a");
+    git(repo, "worktree", "remove", path);
+    expect(tools.checkout({ ...ref, worktree: undefined })).toEqual({ freedWorktree: false });
+    expect(head()).toBe("feat/one");
+    expect(tools.checkout({ ...ref, worktree: undefined })).toEqual({ freedWorktree: false });
+  });
+
+  it("refuses, and touches nothing, when the repository has uncommitted changes (tracked or new files)", () => {
+    const { ref, path } = worktree();
+    commit(path, "a.txt", "a\n", "feat: add a");
+    const before = head();
+    writeFileSync(join(repo, "README.md"), "changed\n");
+    expect(() => tools.checkout(ref)).toThrow(/uncommitted changes/);
+    rmSync(join(repo, "README.md"));
+    git(repo, "checkout", "--", ".");
+    writeFileSync(join(repo, "new.txt"), "x\n");
+    expect(() => tools.checkout(ref)).toThrow(/uncommitted changes/);
+    expect(existsSync(path)).toBe(true);
+    expect(head()).toBe(before);
+  });
+
+  it("refuses, and keeps the worktree, when the worktree has uncommitted changes", () => {
+    const { ref, path } = worktree();
+    commit(path, "a.txt", "a\n", "feat: add a");
+    writeFileSync(join(path, "wip.txt"), "wip\n");
+    expect(() => tools.checkout(ref)).toThrow(/worktree.*uncommitted changes/i);
+    expect(existsSync(join(path, "wip.txt"))).toBe(true);
+    expect(head()).not.toBe("feat/one");
+  });
+
+  it("refuses a branch that is checked out in another worktree than the task's", () => {
+    const { ref } = worktree();
+    expect(() => tools.checkout({ ...ref, worktree: join(scratch, "elsewhere") })).toThrow(/checked out at/);
+  });
+
+  it("says so when the branch does not exist", () => {
+    const { ref } = worktree();
+    git(repo, "worktree", "remove", ref.worktree!);
+    git(repo, "branch", "-D", "feat/one");
+    expect(() => tools.checkout({ ...ref, worktree: undefined })).toThrow(/no longer exists/);
+  });
+});
+

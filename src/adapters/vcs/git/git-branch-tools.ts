@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, realpathSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
 import type { BranchDiff, BranchEditor, BranchInspector, BranchRef, BranchState } from "../../../core/ports/branch-tools.js";
 
 export interface GitBranchToolsOptions {
@@ -58,6 +58,37 @@ export class GitBranchTools implements BranchInspector, BranchEditor {
     return undefined;
   }
 
+  /** Whether two paths are the same directory, through links. */
+  private samePath(a: string, b: string): boolean {
+    const real = (p: string): string => {
+      try {
+        return realpathSync(p);
+      } catch {
+        return resolve(p);
+      }
+    };
+    return real(a) === real(b);
+  }
+
+  checkout(ref: BranchRef): { freedWorktree: boolean } {
+    if (!this.exists(ref.repo, ref.branch)) throw new Error(`The branch ${ref.branch} no longer exists`);
+    const at = this.checkedOutAt(ref.repo, ref.branch);
+    if (at !== undefined && this.samePath(at, ref.repo)) return { freedWorktree: false };
+    if (this.git(ref.repo, ["status", "--porcelain"]) !== "") {
+      throw new Error("Your repository has uncommitted changes. Commit or stash them first, so switching branches cannot touch them");
+    }
+    let freedWorktree = false;
+    if (at !== undefined) {
+      if (ref.worktree === undefined || !this.samePath(at, ref.worktree)) throw new Error(`${ref.branch} is checked out at ${at}`);
+      if (this.git(at, ["status", "--porcelain"]) !== "") throw new Error("The worktree has uncommitted changes. Commit or discard them first, so removing it loses nothing");
+      // Never forced: git itself refuses to remove a worktree that holds anything it would lose.
+      this.git(ref.repo, ["worktree", "remove", at]);
+      freedWorktree = true;
+    }
+    this.git(ref.repo, ["checkout", ref.branch]);
+    return { freedWorktree };
+  }
+
   state(ref: BranchRef): BranchState {
     if (!this.exists(ref.repo, ref.branch)) return { exists: false, historyIntact: true, ahead: [], pushed: false, hasWorktree: false, dirty: false };
     const head = this.git(ref.repo, ["rev-parse", `refs/heads/${ref.branch}`]);
@@ -77,6 +108,7 @@ export class GitBranchTools implements BranchInspector, BranchEditor {
       head,
       historyIntact,
       ahead,
+      checkedOut: ((at) => at !== undefined && this.samePath(at, ref.repo))(this.checkedOutAt(ref.repo, ref.branch)),
       pushed: this.ok(ref.repo, ["show-ref", "--verify", "--quiet", `refs/remotes/origin/${ref.branch}`]),
       hasWorktree,
       dirty: hasWorktree && this.git(ref.worktree!, ["status", "--porcelain"]) !== "",

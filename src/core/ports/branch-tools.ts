@@ -26,6 +26,8 @@ export interface BranchState {
   ahead: BranchCommit[];
   /** A branch with this name is on `origin`. */
   pushed: boolean;
+  /** The branch is the one the user's own repository is on right now (not a task worktree). */
+  checkedOut?: boolean;
   hasWorktree: boolean;
   /** Uncommitted changes in the worktree. */
   dirty: boolean;
@@ -53,6 +55,12 @@ export interface BranchEditor {
   revert(ref: BranchRef): { sha: string };
   /** Moves the branch back to the start commit. The commits after it leave the branch (the reflog still has them for a while). */
   reset(ref: BranchRef): void;
+  /**
+   * Frees the task's worktree (never forced) and switches the user's repository to the branch, so it can be tested
+   * there; the branch and its commits stay. Refuses when the repository or the worktree has uncommitted changes, or when
+   * the branch is checked out somewhere else. Does nothing when the repository is already on the branch.
+   */
+  checkout(ref: BranchRef): { freedWorktree: boolean };
   /** A branch with this name is on `origin` right now (asks the remote). Throws when the remote cannot be reached. */
   onOrigin(repo: string, branch: string): boolean;
   /** Pushes the branch to `origin` with its upstream. Never forced: a remote branch that moved on is an error. */

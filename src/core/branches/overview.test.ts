@@ -57,4 +57,16 @@ describe("describeBranches", () => {
     expect(b!.undo.delete).toEqual({ ok: false, reason: "The run is still running. Abort it first." });
     expect(b!.pr.ok).toBe(false);
   });
+
+  it("decides whether the branch can be tested in the user's repository, naming the branch to go back to", () => {
+    const [b] = describeBranches(run, [t1], () => state());
+    expect(b!.checkout).toMatchObject({ ok: true });
+    if (b!.checkout.ok) expect(b!.checkout.effects.join(" ")).toMatch(/git checkout main/);
+  });
+
+  it("refuses to test a branch while the run is running or when the repository is already on it", () => {
+    expect(describeBranches({ ...run, status: "running" }, [t1], () => state())[0]!.checkout).toMatchObject({ ok: false });
+    expect(describeBranches(run, [t1], () => state({ checkedOut: true, hasWorktree: false }))[0]!.checkout).toMatchObject({ ok: false, reason: expect.stringContaining("already on") });
+  });
 });
+
