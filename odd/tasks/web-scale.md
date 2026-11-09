@@ -17,6 +17,7 @@ Objective: make the runs list, the branches and the changed files of `knit ui` u
 - **S12. Dropdown and hierarchy.** "en vez de escribir manualmente las ramas de las PRs [...] deberia salir un desplegable con todas las ramas disponibles [...] Actualizadas." and "la jerarquía en las tareas desplegables de Cursor siguen igual, no se ve como dentro del desplegable como si fueran parte y el texto de resumen no se ve apegado el título y se ve igual de grande. El de orquestador se ve bien, pero sigue habiendo demasiada separación entre el texto resumen de la tarea y el título." Note: the list is origin's branches, not `git branch` (local), because GitHub needs the base on origin.
 - **S13. Pull request state and body.** "no me gusta el texto o aviso 'Opened …' basta con la etiqueta"; "veo innecesario el apartado de cambios en el cuerpo de la PR, lo quitaría"; "debería salir que fue mergeada con el mismo estilo de GitHub, en morado [...] de que permita saberse de alguna manera a que rama se mergeó."
 - **S14. Blocks and numbers.** "los estados de los bloques, ¿Qué aportan realmente el estado de Done? [...] mejor mostrar sus modelos." "la barra verde [...] yo la quitaría" "al dejar el mouse encima en tokens o attempts, mostraría una pequeña descripción." "el uso [de Claude] muestra un uso anterior no actualizado." "Pull request ↗ a pesar de ya estar mergeado." "el apartado de cambios [...] se ve mal y como solapado."
+- **S15. Task labels and server paging.** "actualicemos los estados con etiquetas de las tareas en el modal del orquestador y finalicemos con las paginaciones por el lado del servidor."
 - **S4. Overall.** "necesito full flexibilidad y visibilidad clara, solo lo que me interesa, no ruido visual." Nothing new is shown by default beyond what identifies and states each item.
 
 ## Tasks
@@ -37,6 +38,7 @@ Objective: make the runs list, the branches and the changed files of `knit ui` u
 | L11 | S12 | PR target as a dropdown of the branches origin has (`GET /api/runs/:id/remote-branches`, `git ls-remote`); tighter detail under task titles, checked in Chromium on fixtures | inline | done (RED seen: 3 adapter, 2 route, 4 page tests) | see git log |
 | L12 | S13 | Merged/closed state of the pull request on the branch (purple pill, target branch), result shows only the link, body without the Changes section | inline | done (RED seen: 3 core/adapter/server, 3 web tests) | see git log |
 | L13 | S14 | Blocks show their model; live plan usage; orchestrator without the progress bar, numbers explained on hover; diff without its box; merged chip in the link | inline | done (RED seen: 1 core, 9 web tests); the diff and blocks checked in Chromium on fixtures | see git log |
+| L14 | S15 | PR state label on the tasks of the orchestrator modal; the runs list paged, searched and filtered on the server (`RunReader.searchRuns`, `GET /api/runs?limit&offset&q&status`) | inline | done (RED seen: 6 reader, 4 route, 4 web, 3 task tests) | see git log |
 
 Route evidence: sequential work, no Writer trigger applies.
 

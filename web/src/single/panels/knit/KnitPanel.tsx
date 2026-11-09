@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { RunControlBar } from "../../../containers/RunControlBar";
 import { RunsView } from "../../../containers/RunsView";
 import { StageTrack } from "../../../molecules/StageTrack";
+import { usePrStates } from "../../../branches/usePrStates";
 import { TaskCard } from "../../../molecules/TaskCard";
 import { deriveStages } from "../../pipeline";
 import type { PanelProps } from "../registry";
@@ -15,6 +16,8 @@ import "./KnitPanel.css";
  */
 export function KnitPanel({ board, runId, live, renderDetail, selectRun }: PanelProps) {
   const stages = useMemo(() => deriveStages(board), [board]);
+  // The state of the pull requests comes from GitHub, so it is asked only for a real run that has at least one.
+  const prStates = usePrStates(runId, live && board !== undefined && board.tasks.some((t) => t.prUrl !== undefined));
   return (
     <div className="knit-panel">
       {board === undefined ? (
@@ -33,7 +36,7 @@ export function KnitPanel({ board, runId, live, renderDetail, selectRun }: Panel
           <ol className="knit-panel__tasks" aria-label="Tasks of this run">
             {board.tasks.map((task) => (
               <li key={task.taskId}>
-                <TaskCard task={{ ...task, attempts: task.attempts.filter((a) => !a.setup).length }} renderDetail={renderDetail} />
+                <TaskCard task={{ ...task, attempts: task.attempts.filter((a) => !a.setup).length }} pr={prStates[task.taskId]} renderDetail={renderDetail} />
               </li>
             ))}
           </ol>

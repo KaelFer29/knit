@@ -99,4 +99,31 @@ describe("KnitPanel", () => {
     }
     expect(summary.getByText("Attempts").closest("dt")?.getAttribute("title")).toMatch(/failed check/i);
   });
+
+  it("labels each task with the state of its pull request, read only when a task has one", async () => {
+    const withPr = { ...ALL_FIXTURES.deliveredRun, tasks: ALL_FIXTURES.deliveredRun.tasks.map((t, i) => (i === 0 ? { ...t, prUrl: "https://example.test/pull/7" } : t)) };
+    const first = withPr.tasks[0]!.taskId;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith("/branches")) return reply(200, { branches: [{ taskId: first, prUrl: "https://example.test/pull/7", prState: { state: "merged", base: "release/1.2" } }] });
+      return reply(200, { runs: [], total: 0 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<KnitPanel {...props(withPr as typeof ALL_FIXTURES.deliveredRun)} />);
+    expect(await screen.findByText("Merged into release/1.2")).toBeTruthy();
+    expect(screen.getAllByText(/Merged into/)).toHaveLength(1);
+  });
+
+  it("does not ask for the branches when no task has a pull request, or for a sample run", async () => {
+    const fetchMock = vi.fn(async (_url: string) => reply(200, { runs: [], total: 0 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const bare = { ...ALL_FIXTURES.failedRun, tasks: ALL_FIXTURES.failedRun.tasks.map((t) => ({ ...t, prUrl: undefined })) };
+    const { unmount } = render(<KnitPanel {...props(bare as typeof ALL_FIXTURES.failedRun)} />);
+    await screen.findByText("No runs yet");
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/branches"))).toBe(false);
+    unmount();
+    const withPr = { ...ALL_FIXTURES.deliveredRun, tasks: ALL_FIXTURES.deliveredRun.tasks.map((t) => ({ ...t, prUrl: "https://example.test/pull/7" })) };
+    render(<KnitPanel {...props(withPr as typeof ALL_FIXTURES.deliveredRun, false)} />);
+    await screen.findByText("No runs yet");
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/branches"))).toBe(false);
+  });
 });

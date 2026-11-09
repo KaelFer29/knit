@@ -76,4 +76,21 @@ describe("TaskCard", () => {
     expect(screen.getByText("2 attempts").getAttribute("title")).toMatch(/failed check/i);
     expect(screen.getByText("T3", { exact: false }).closest("[title]")?.getAttribute("title")).toMatch(/branch/i);
   });
+
+  it("labels a task whose pull request was merged, in purple, with the branch it went into", () => {
+    render(<TaskCard task={{ ...task, state: "delivered" }} pr={{ state: "merged", base: "main" }} />);
+    const pill = screen.getByText("Merged into main");
+    expect(pill.getAttribute("data-state")).toBe("merged");
+    expect(pill.getAttribute("title")).toMatch(/pull request/i);
+  });
+
+  it("labels a closed pull request, and an open one, and shows nothing when its state is not known", () => {
+    const { rerender } = render(<TaskCard task={task} pr={{ state: "closed", base: "main" }} />);
+    expect(screen.getByText("PR closed").getAttribute("data-state")).toBe("closed");
+    rerender(<TaskCard task={task} pr={{ state: "open", base: "main" }} />);
+    expect(screen.getByText("PR open").getAttribute("data-state")).toBe("open");
+    rerender(<TaskCard task={task} />);
+    expect(screen.queryByText(/PR /)).toBeNull();
+    expect(screen.queryByText(/Merged/)).toBeNull();
+  });
 });

@@ -91,3 +91,27 @@
     white-space: normal;
   }
 }
+
+/* The state of the task's pull request, in GitHub's colors: purple once merged. */
+.task-card__pr {
+  padding: 0.1rem var(--space-2);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.task-card__pr[data-state="merged"] {
+  background: var(--status-merged-soft);
+  color: var(--status-merged);
+}
+
+.task-card__pr[data-state="closed"] {
+  background: var(--status-failed-soft);
+  color: var(--status-failed);
+}
+
+.task-card__pr[data-state="open"] {
+  background: var(--status-delivered-soft);
+  color: var(--status-delivered);
+}

@@ -248,7 +248,8 @@ Since the single view, the runs list, the picker and run control live in the orc
 
 Every list that can grow is compact, paged and searchable (`web/src/lists/`, feature `odd/tasks/web-scale.md`). `paginate` and `matchesQuery` are pure (a page out of range clamps to the nearest valid one; the search needs every word, ignores case and accents); `useList` holds the search, an optional extra filter and the page, and goes back to page 1 when the search changes; `molecules/ListToolbar` and `molecules/Pager` render them (the pager renders nothing when everything fits one page).
 
-- **Runs picker** (orchestrator panel): one line per run (status, plan, id, `passed/total`, tokens), 8 per page, search by plan or id and status chips (All, Running, Failed, Passed). The list endpoint still returns every run; paging is in the page.
+- **Runs picker** (orchestrator panel): one line per run (status, plan, id, `passed/total`, tokens), 8 per page, search by plan or id and status chips (All, Running, Failed, Passed). The server pages, searches and filters (`GET /api/runs?limit=8&offset=0&q=&status=`), so the page reads eight runs at a time however many the project has; the search waits 250 ms after the last key. Task counts and tokens are read only for the runs of the page.
+- **Tasks of the orchestrator modal** carry the state of their pull request next to their status: a purple "Merged into <branch>", a red "PR closed", a green "PR open". It is read from the branches route (which asks GitHub, with a cache), only for a real run in which a task has a pull request, every 10 s.
 - **Branches** (Cursor modal): one collapsed row per branch (task, title, commits and where it is, status); commits and actions open on demand; 6 per page, search by task, title or branch. A lone branch opens itself.
 - **Tasks of the Cursor modal**: the active task is open; the others are collapsed rows, newest first, 8 per page, searchable by task or title once there are more than 8.
 
@@ -325,7 +326,7 @@ Built in tasks T3 (read routes) and T8 (run control, `src/server/routes/control.
 
 | Route | Returns |
 | --- | --- |
-| `GET /api/runs` | `{ runs }`: `RunListItem[]`, newest first, with status, task counts and token totals |
+| `GET /api/runs` | `?limit=` (1 to 200, default 50), `?offset=`, `?q=` (words that must each be in the plan name or the id, any case) and `?status=` (`running`, `passed`, `failed`); anything else is `400` | `{ runs, total }`: one page of `RunListItem[]`, newest first, with status, task counts and token totals, and how many runs match in all (`RunReader.searchRuns`) |
 | `GET /api/runs/:id` | the `RunSnapshot` (`run`, `tasks`, `attempts`, `events`, `lastEventId`, `lastAgentEventId`) plus `board`, the `BoardModel` built by `core/board`. The plan text is `run.planText` |
 | `GET /api/runs/:id/tasks/:task/attempts/:n/timeline` | `{ runId, taskId, attempt, events }`: the agent timeline of one attempt (lazy, for expanded blocks). An attempt without entries is an empty list |
 | `GET /api/runs/:id/roots` | `{ roots }`: what the explorer may show, `repo` (the run's repository) and one entry per task that has a worktree (id is the task id) |

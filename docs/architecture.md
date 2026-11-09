@@ -52,7 +52,7 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 | `TaskDiff` | read side of a task's code change: files, counts and hunks between its start commit and its commit, in its worktree | `vcs/git` |
 | `FileActivity` | read side of the files a task worktree has changed now (git status), for the web interface; the files a timeline touched are derived in `core/timeline` | `vcs/git` |
 | `SessionReader` | read side of the chat sessions for the web interface: sessions with turn counts and token totals, turns, timeline entries after an id; read-only, a database without session tables has none | `storage/sqlite` |
-| `RunReader` | read side for the web interface: runs list, snapshot of a run, events and agent events after an id, over a read-only connection that never writes or migrates | `storage/sqlite` |
+| `RunReader` | read side for the web interface: runs list (and a page of it, searched and filtered, with the total), snapshot of a run, events and agent events after an id, over a read-only connection that never writes or migrates | `storage/sqlite` |
 | `PlanDrafts` | read-only detection of the draft plans in `docs/plans/` of a repository (`PLAN_DIR`), each validated with the plan parser; used by the web interface | `system` |
 | `FileTree` | read-only listing and text of files under a root (the repository or a task worktree), confined to that root | `system` |
 | `ConfigFiles` | read and write the allow-listed Claude and Cursor configuration files by opaque id, with a hash check and a backup of the replaced version; used by the configuration editor | `system` |
