@@ -156,6 +156,50 @@ beforeEach(() => {
 afterEach(() => rmSync(scratch, { recursive: true, force: true }));
 
 describe("knit followup that passes", () => {
+  describe("when the worktree of the task is gone", () => {
+    const head = (): string => git(repo, "rev-parse", "--abbrev-ref", "HEAD");
+
+    it("recreates it from the branch, says so, and carries on with the same chat", async () => {
+      const runId = await runPlanFirst();
+      const worktree = readRun(runId).detail.tasks[0]!.worktree!;
+      git(repo, "worktree", "remove", "--force", worktree);
+      expect(existsSync(worktree)).toBe(false);
+      const seen = newSeen();
+      const c = capture();
+      expect(await main(["followup", runId, "T1", "please EDIT the file"], c.io, depsFor(seen)), c.err()).toBe(0);
+      expect(c.out()).toMatch(/Recreated the worktree of T1/);
+      expect(existsSync(join(worktree, ".git"))).toBe(true);
+      expect(seen.requests[0]).toMatchObject({ cwd: worktree, resumeSessionId: "chat-1" });
+    });
+
+    it("after the branch was tested in the user's repository: asks to switch back first, and works once it is", async () => {
+      const runId = await runPlanFirst();
+      const worktree = readRun(runId).detail.tasks[0]!.worktree!;
+      expect(await main(["branch", runId, "T1", "checkout", "--yes"], capture().io, depsFor(newSeen()))).toBe(0);
+      expect(head()).toBe("feat/create-a");
+
+      const blocked = capture();
+      expect(await main(["followup", runId, "T1", "please EDIT the file"], blocked.io, depsFor(newSeen()))).toBe(1);
+      expect(blocked.err()).toMatch(/feat\/create-a is checked out at .*git checkout <other>/s);
+      expect(existsSync(worktree)).toBe(false);
+
+      git(repo, "checkout", "main");
+      const ok = capture();
+      expect(await main(["followup", runId, "T1", "please EDIT the file"], ok.io, depsFor(newSeen())), ok.err()).toBe(0);
+      expect(existsSync(join(worktree, ".git"))).toBe(true);
+    });
+
+    it("refuses with the reason when the branch is gone too", async () => {
+      const runId = await runPlanFirst();
+      const worktree = readRun(runId).detail.tasks[0]!.worktree!;
+      git(repo, "worktree", "remove", "--force", worktree);
+      git(repo, "branch", "-D", "feat/create-a");
+      const c = capture();
+      expect(await main(["followup", runId, "T1", "please EDIT the file"], c.io, depsFor(newSeen()))).toBe(1);
+      expect(c.err()).toMatch(/no longer exists/);
+    });
+  });
+
   it("warns when the chat it resumed has passed 70% of its window, and records the context and that the chat was resumed", async () => {
     const runId = await runPlanFirst();
     const c = capture();
@@ -359,9 +403,11 @@ describe("knit followup that is refused", () => {
     untouched(runId);
   });
 
-  it("refuses when the task's worktree is gone", async () => {
+  it("refuses when the task's worktree is gone and cannot be recreated because its branch is gone too", async () => {
     const runId = await runPlanFirst();
     rmSync(readRun(runId).detail.tasks[0]!.worktree!, { recursive: true, force: true });
+    git(repo, "worktree", "prune");
+    git(repo, "branch", "-D", "feat/create-a");
     const { seen } = await refused([runId, "T1", "EDIT it"], /worktree/);
     expect(seen.requests).toEqual([]);
     untouched(runId);

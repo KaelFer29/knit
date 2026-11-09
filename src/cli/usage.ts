@@ -66,8 +66,9 @@ Options for followup:
   The agent resumes the task's chat (agent --resume) inside the task's own worktree, with your prompt as typed. Knit then
   verifies the result like an attempt of the run: scope, git hygiene and the task's checks, against the plan snapshot stored
   with the run. The outcome is recorded as the task's next attempt and the turn as part of a session. Refused (exit 1) while
-  the run is still running, when the worktree is gone, when no attempt recorded a chat id, or for a run from before plan
-  snapshots. Exit code 0 when the verification passed, 1 otherwise, 2 for usage mistakes. When the chat has passed 70% of its
+  the run is still running, when no attempt recorded a chat id, when the worktree is gone and cannot be recreated, or for a
+  run from before plan snapshots. A worktree that is gone (cleaned, or freed to test the branch) is recreated from the
+  branch, which holds everything the agent made; if your repository is on that branch, switch it away first. Exit code 0 when the verification passed, 1 otherwise, 2 for usage mistakes. When the chat has passed 70% of its
   window (200k unless the task's model says another), a note says so: another follow-up keeps adding to the same chat.
 
 Options for branch undo:

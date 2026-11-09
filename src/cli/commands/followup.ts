@@ -53,8 +53,8 @@ function refusalOf(detail: RunDetail, task: TaskRecord): string | undefined {
   if (run.planText === undefined) {
     return `Run ${run.id} predates plan snapshots, so Knit has no plan to verify the follow-up against. Start a new run.`;
   }
-  if (!task.worktree || !existsSync(join(task.worktree, ".git"))) {
-    return `The worktree of ${task.taskId} is not on disk${task.worktree ? ` (${task.worktree})` : ""}, so there is nowhere to continue its chat.`;
+  if (!task.worktree || !task.branch || !task.startSha) {
+    return `Task ${task.taskId} has no worktree recorded, so there is nowhere to continue its chat.`;
   }
   if (chatIdOf(detail, task.taskId) === undefined) {
     return `Task ${task.taskId} has no recorded attempt with an agent session id, so there is no chat to resume.`;
@@ -144,11 +144,22 @@ export async function followupCommand(args: string[], io: CliIo, deps: CliDeps, 
   }
 
   const dataDir = dataDirOf(values, env);
+  const workspace = new GitWorkspace({ root: join(dataDir, "worktrees"), ...(deps.gitArgs ? { gitArgs: deps.gitArgs } : {}) });
+  // The worktree is gone when the branch was tested in the user's repository, or cleaned: it is recreated from the
+  // branch, which holds everything the agent made. This is checked before anything is opened or recorded.
+  if (!existsSync(join(task.worktree!, ".git"))) {
+    try {
+      workspace.restore({ repo: detail.run.repo, path: task.worktree!, branch: task.branch!, startSha: task.startSha! });
+    } catch (err) {
+      io.err(`The worktree of ${taskId} is not on disk and could not be recreated: ${(err as Error).message}\n`);
+      return 1;
+    }
+    io.out(`Recreated the worktree of ${taskId} at ${task.worktree} from its branch ${task.branch}.\n`);
+  }
   const dbPath = join(dataDir, DB_FILENAME);
   const runStore = new SqliteRunStore(dbPath);
   const sessionStore = new SqliteSessionStore(dbPath);
   const now = deps.now ?? (() => new Date());
-  const workspace = new GitWorkspace({ root: join(dataDir, "worktrees"), ...(deps.gitArgs ? { gitArgs: deps.gitArgs } : {}) });
   const profile: AgentProfile = values.model ? { model: values.model } : {};
 
   let turn: TurnRecord | undefined;

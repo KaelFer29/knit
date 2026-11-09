@@ -216,3 +216,51 @@ describe("GitWorkspace cleanup", () => {
     expect(ws.deleteBranch(repo, "feat/none")).toBe(false);
   });
 });
+
+describe("GitWorkspace.restore", () => {
+  const input = (w: { path: string; branch: string; startSha: string }) => ({ repo, path: w.path, branch: w.branch, startSha: w.startSha });
+
+  it("recreates the worktree of an existing branch at the same path, with the commits the agent made", () => {
+    const w = prepare();
+    agentCommit(w.path, "src/a.txt", "feat: add a");
+    git(repo, "worktree", "remove", w.path);
+    expect(existsSync(w.path)).toBe(false);
+    const back = ws.restore(input(w));
+    expect(back).toEqual({ path: w.path, branch: "feat/one", startSha: w.startSha });
+    expect(existsSync(join(w.path, "src/a.txt"))).toBe(true);
+    expect(git(w.path, "rev-parse", "--abbrev-ref", "HEAD")).toBe("feat/one");
+  });
+
+  it("works after the worktree folder was deleted by hand, which leaves a stale registration", () => {
+    const w = prepare();
+    rmSync(w.path, { recursive: true, force: true });
+    expect(ws.restore(input(w)).path).toBe(w.path);
+    expect(existsSync(join(w.path, ".git"))).toBe(true);
+  });
+
+  it("gives a workspace the run loop can use: what it changes is measured from the restored folder", () => {
+    const w = prepare();
+    git(repo, "worktree", "remove", w.path);
+    const back = ws.restore(input(w));
+    agentCommit(back.path, "src/b.txt", "feat: add b");
+    expect(ws.changedPaths(back)).toEqual(["src/b.txt"]);
+    expect(ws.outsideChanges(back)).toEqual([]);
+    expect(ws.inspect(back).commits.map((c) => c.subject)).toEqual(["feat: add b"]);
+  });
+
+  it("refuses, and says how to free the branch, when the user's repository is on it", () => {
+    const w = prepare();
+    git(repo, "worktree", "remove", w.path);
+    git(repo, "checkout", "feat/one");
+    expect(() => ws.restore(input(w))).toThrow(/feat\/one is checked out at .*git checkout <other>/s);
+    expect(existsSync(w.path)).toBe(false);
+  });
+
+  it("refuses a branch that no longer exists", () => {
+    const w = prepare();
+    git(repo, "worktree", "remove", w.path);
+    git(repo, "branch", "-D", "feat/one");
+    expect(() => ws.restore(input(w))).toThrow(/no longer exists/);
+  });
+});
+

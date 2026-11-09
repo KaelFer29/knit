@@ -7,6 +7,7 @@ import type {
   CommitInfo,
   GitInspection,
   PrepareWorkspaceInput,
+  RestoreWorkspaceInput,
   TaskWorkspace,
   Workspace,
 } from "../../../core/ports/workspace.js";
@@ -107,6 +108,33 @@ export class GitWorkspace implements Workspace {
   attach(input: AttachWorkspaceInput): TaskWorkspace | undefined {
     if (!existsSync(join(input.path, ".git"))) return undefined;
     const parent = dirname(input.path);
+    this.baselines.set(input.path, { parent, entries: snapshotDir(parent) });
+    return { path: input.path, branch: input.branch, startSha: input.startSha };
+  }
+
+  /** Where the branch is checked out, in the main checkout or any worktree. */
+  private checkedOutAt(repo: string, branch: string): string | undefined {
+    let path: string | undefined;
+    for (const line of this.git(repo, ["worktree", "list", "--porcelain"]).split("\n")) {
+      if (line.startsWith("worktree ")) path = line.slice("worktree ".length);
+      else if (line === `branch refs/heads/${branch}`) return path;
+    }
+    return undefined;
+  }
+
+  restore(input: RestoreWorkspaceInput): TaskWorkspace {
+    if (!this.branchExists(input.repo, input.branch)) {
+      throw new Error(`The branch ${input.branch} no longer exists in ${input.repo}, so the worktree of the task cannot be recreated.`);
+    }
+    // A folder deleted by hand leaves a registration that would make `worktree add` refuse.
+    this.gitOk(input.repo, ["worktree", "prune"]);
+    const at = this.checkedOutAt(input.repo, input.branch);
+    if (at !== undefined) {
+      throw new Error(`${input.branch} is checked out at ${at}. Switch that checkout to another branch (git checkout <other>) and try again: a branch can only be checked out in one place.`);
+    }
+    const parent = dirname(input.path);
+    mkdirSync(parent, { recursive: true });
+    this.git(input.repo, ["worktree", "add", input.path, input.branch]);
     this.baselines.set(input.path, { parent, entries: snapshotDir(parent) });
     return { path: input.path, branch: input.branch, startSha: input.startSha };
   }
