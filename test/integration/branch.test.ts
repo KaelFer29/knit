@@ -207,8 +207,8 @@ describe("knit branch pr-draft", () => {
     const out = JSON.parse(c.out().trim()) as { ok: boolean; title: string; body: string; model: string };
     expect(out).toMatchObject({ ok: true, title: "Create a", model: "template" });
     expect(out.body).toContain("## Summary");
-    expect(out.body).toContain("- ");
-    expect(out.body).toContain("src/a.txt");
+    expect(out.body).not.toContain("## Changes");
+    expect(out.body).not.toContain("src/a.txt");
     expect(out.body).toContain("## Verification");
     expect(d.seen.requests).toHaveLength(0);
     expect(d.seen.options).toHaveLength(0);
@@ -260,6 +260,7 @@ describe("knit branch pr", () => {
     preflight: () => {
       if (preflightError) throw new Error(preflightError);
     },
+    status: () => ({ state: "open", base: "main" }),
     create: (input) => {
       calls.push(input);
       return { url: "https://example.test/pull/7" };

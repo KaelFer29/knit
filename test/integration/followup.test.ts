@@ -113,7 +113,7 @@ function depsFor(seen: Seen, capabilities: AgentCapabilities | null = RESUMES): 
 /** Runs the plan once with an agent that finishes the task, so there is a worktree, an attempt and a chat id. */
 async function runPlanFirst(sessionId: string | null = "chat-1"): Promise<string> {
   const c = capture();
-  const code = await main(["run", planPath], c.io, { agent: () => runAgent(sessionId), gitArgs: GIT_ARGS, cwd: scratch, env: { KNIT_HOME: dataDir }, pullRequests: { preflight: () => {}, create: () => ({ url: "" }) } });
+  const code = await main(["run", planPath], c.io, { agent: () => runAgent(sessionId), gitArgs: GIT_ARGS, cwd: scratch, env: { KNIT_HOME: dataDir }, pullRequests: { preflight: () => {}, create: () => ({ url: "" }), status: () => ({ state: "open", base: "main" }), } });
   expect(code).toBe(0);
   const list = capture();
   await main(["runs"], list.io, { env: { KNIT_HOME: dataDir }, cwd: scratch });

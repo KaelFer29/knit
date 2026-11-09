@@ -69,3 +69,23 @@ describe("GhPullRequests.create", () => {
     expect(() => gh({ FAKE_GH_MODE: "fail" }).create({ repo, ...INPUT })).toThrow(/not allowed/);
   });
 });
+
+describe("GhPullRequests.status", () => {
+  const URL_ = "https://github.com/acme/demo/pull/7";
+
+  it("reads whether the PR is open, merged or closed, and the branch it targets", () => {
+    expect(gh({ FAKE_GH_PR_STATE: "MERGED", FAKE_GH_PR_BASE: "release/1.2" }).status(repo, URL_)).toEqual({ state: "merged", base: "release/1.2" });
+    expect(gh({ FAKE_GH_PR_STATE: "CLOSED" }).status(repo, URL_)).toEqual({ state: "closed", base: "main" });
+    expect(gh().status(repo, URL_)).toEqual({ state: "open", base: "main" });
+  });
+
+  it("asks gh for the PR at that address, not for the branch", () => {
+    gh().status(repo, URL_);
+    const call = JSON.parse(readFileSync(log, "utf8").trim().split("\n").at(-1)!) as string[];
+    expect(call).toEqual(["pr", "view", URL_, "--json", "state,baseRefName"]);
+  });
+
+  it("throws with gh's message when it cannot read the PR", () => {
+    expect(() => gh({ FAKE_GH_VIEW_FAIL: "1" }).status(repo, "https://github.com/acme/demo/pull/999")).toThrow(/Could not resolve/);
+  });
+});

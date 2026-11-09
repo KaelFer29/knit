@@ -1,3 +1,4 @@
+import type { PullRequests } from "../core/ports/pull-requests.js";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { FileTree } from "../core/ports/file-tree.js";
 import type { PlanDrafts } from "../core/ports/plan-drafts.js";
@@ -35,6 +36,8 @@ export interface ServerOptions {
   taskDiff?: TaskDiff;
   /** Reads the state of the branches the tasks created. Without it the branches route answers 503. */
   branches?: BranchInspector;
+  /** Reads the state of the pull requests (open, merged, closed) the branches list shows. Without it the list has no state. */
+  pullRequests?: PullRequests;
   /** Draft plan detection. Without it the plans route answers 503. */
   plans?: PlanDrafts;
   /** Reads the files a task worktree has changed. Without it the activity route leaves the worktree list out. */
@@ -68,6 +71,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     ...(options.files ? { files: options.files } : {}),
     ...(options.taskDiff ? { taskDiff: options.taskDiff } : {}),
     ...(options.branches ? { branches: options.branches } : {}),
+    ...(options.pullRequests ? { pullRequests: options.pullRequests } : {}),
     ...(options.plans ? { plans: options.plans } : {}),
     ...(options.fileActivity ? { fileActivity: options.fileActivity } : {}),
   };

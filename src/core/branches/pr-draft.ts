@@ -63,20 +63,15 @@ export function buildPrDraftPrompt(input: PrDraftInput): string {
 const MAX_TITLE = 100;
 
 /**
- * A pull request's title and description built from what Knit already knows (the task's goal and specs, its commits and
- * the files it changed), with no model and so no tokens. The same sections every time; a model can improve it on request.
+ * A pull request's title and description built from what Knit already knows (the task's goal and specs), with no model
+ * and so no tokens. The commits and the changed files are on the pull request itself, so they are not repeated here. The same sections every time; a model can improve it on request.
  */
 export function buildPrTemplate(input: PrDraftInput): { title: string; body: string } {
   const title = input.title.replace(/\s+/g, " ").trim().slice(0, MAX_TITLE).trim();
-  const stat = input.stat.trim();
   const body = [
     "## Summary",
     (input.goal ?? "").trim() === "" ? title : input.goal!.trim(),
     ...(input.specs.length > 0 ? ["", "## Specs", ...input.specs.map((s) => `- ${s.id}: ${s.text}`)] : []),
-    "",
-    "## Changes",
-    ...(input.commits.length > 0 ? input.commits.map((c) => `- ${c.subject}`) : ["- (no commits)"]),
-    ...(stat === "" ? [] : ["", "```", stat, "```"]),
     "",
     "## Verification",
     `Passed Knit's checks for ${input.taskId}: the agent process, the files it touched, git hygiene and the task's own checks.`,

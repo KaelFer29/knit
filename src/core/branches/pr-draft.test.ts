@@ -100,18 +100,17 @@ describe("buildPrTemplate", () => {
         "## Specs",
         "- S1: The file is named prueba.md",
         "",
-        "## Changes",
-        "- docs: add prueba.md",
-        "- docs: fix the heading",
-        "",
-        "```",
-        "prueba.md | 3 +++\n 1 file changed, 3 insertions(+)",
-        "```",
-        "",
         "## Verification",
         "Passed Knit's checks for T1: the agent process, the files it touched, git hygiene and the task's own checks.",
       ].join("\n"),
     );
+  });
+
+  it("has no Changes section: the commits and the file stats are not repeated in the body", () => {
+    const body = buildPrTemplate(input).body;
+    expect(body).not.toContain("## Changes");
+    expect(body).not.toContain("file changed");
+    expect(body).not.toContain("docs: add prueba.md");
   });
 
   it("falls back to the title when the task has no goal, and skips the Specs section when there are none", () => {

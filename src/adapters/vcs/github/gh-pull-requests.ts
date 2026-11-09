@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import type { CreatePullRequestInput, PullRequests } from "../../../core/ports/pull-requests.js";
+import type { CreatePullRequestInput, PullRequestStatus, PullRequests } from "../../../core/ports/pull-requests.js";
 
 export interface GhOptions {
   /** Binary to run. Default: `gh`. */
@@ -64,6 +64,14 @@ export class GhPullRequests implements PullRequests {
       if (url) return { url };
     }
     throw new Error(`gh pr create failed: ${r.stderr.trim() || r.stdout.trim()}`);
+  }
+
+  status(repo: string, url: string): PullRequestStatus {
+    const r = this.gh(["pr", "view", url, "--json", "state,baseRefName"], repo);
+    if (r.status !== 0) throw new Error(`gh pr view failed: ${r.stderr.trim() || r.stdout.trim() || "no answer"}`);
+    const parsed = JSON.parse(r.stdout) as { state?: string; baseRefName?: string };
+    const state = parsed.state === "MERGED" ? "merged" : parsed.state === "CLOSED" ? "closed" : "open";
+    return { state, base: parsed.baseRefName ?? "" };
   }
 }
 

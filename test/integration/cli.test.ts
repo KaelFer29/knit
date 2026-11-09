@@ -59,6 +59,7 @@ const writingAgent: AgentRunner = {
 const prCalls: CreatePullRequestInput[] = [];
 const fakePrs: PullRequests = {
   preflight: () => {},
+  status: () => ({ state: "open", base: "main" }),
   create: (input) => {
     prCalls.push(input);
     return { url: "https://example.test/pull/1" };
@@ -253,7 +254,7 @@ describe("cli push and pull requests", () => {
   });
 
   it("exits 2 before doing any work when PRs cannot be opened", async () => {
-    const failing: PullRequests = { preflight: () => { throw new Error("GitHub CLI is not logged in. Run: gh auth login"); }, create: () => ({ url: "x" }) };
+    const failing: PullRequests = { preflight: () => { throw new Error("GitHub CLI is not logged in. Run: gh auth login"); }, create: () => ({ url: "x" }), status: () => ({ state: "open", base: "main" }), };
     const c = capture();
     expect(await main(["run", planPath, "--pr"], c.io, { ...baseDeps(), pullRequests: failing })).toBe(2);
     expect(c.err.join("")).toContain("gh auth login");

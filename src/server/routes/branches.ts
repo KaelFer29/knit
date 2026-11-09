@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { isModelId } from "../../core/plan/parse-plan.js";
 import { describeBranches } from "../../core/branches/overview.js";
 import { isBranchName } from "../../core/branches/pr-rules.js";
+import type { PullRequestStatus, PullRequests } from "../../core/ports/pull-requests.js";
 import type { UndoMode } from "../../core/ports/branch-tools.js";
 import { HttpError, sendJson } from "../http.js";
 import type { ControlDeps, RouteModule } from "../types.js";
@@ -47,7 +48,25 @@ function rejectUnknown(body: Record<string, unknown>, allowed: string[]): void {
  * through the spawner, like abort and resume: the server never touches git or GitHub to change anything. The decisions
  * come from the same pure function the command uses, and the command checks them again before it acts.
  */
-export const branchesRoutes: RouteModule = ({ reader, branches, control: controlDeps }) => {
+/** How long an open pull request's state is kept before GitHub is asked again. Merged and closed ones do not change. */
+const OPEN_TTL_MS = 20_000;
+
+export const branchesRoutes: RouteModule = ({ reader, branches, pullRequests, control: controlDeps }) => {
+  /** Pull request states already read, by address: GitHub is asked again only for the open ones, and only after a while. */
+  const prStates = new Map<string, { status: PullRequestStatus; at: number }>();
+  const prStateOf = (repo: string, url: string): PullRequestStatus | undefined => {
+    if (!pullRequests) return undefined;
+    const known = prStates.get(url);
+    if (known && (known.status.state !== "open" || Date.now() - known.at < OPEN_TTL_MS)) return known.status;
+    try {
+      const status = pullRequests.status(repo, url);
+      prStates.set(url, { status, at: Date.now() });
+      return status;
+    } catch {
+      // GitHub cannot be asked right now: the branch is listed without a state, with its address.
+      return undefined;
+    }
+  };
   /** `<run>/<task>` pairs with an action in flight: two at once on one branch could undo and push at the same time. */
   const busy = new Set<string>();
 
@@ -103,7 +122,11 @@ export const branchesRoutes: RouteModule = ({ reader, branches, control: control
           },
         );
         const at = run.base.lastIndexOf("@");
-        sendJson(res, 200, { runId: run.id, runStatus: run.status, base: at === -1 ? run.base : run.base.slice(0, at), branches: list });
+        const withState = list.map((b) => {
+          const state = b.prUrl === undefined ? undefined : prStateOf(run.repo, b.prUrl);
+          return state === undefined ? b : { ...b, prState: state };
+        });
+        sendJson(res, 200, { runId: run.id, runStatus: run.status, base: at === -1 ? run.base : run.base.slice(0, at), branches: withState });
       },
     },
     {

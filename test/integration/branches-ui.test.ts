@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SqliteRunReader } from "../../src/adapters/storage/sqlite/run-reader.js";
 import { SqliteRunStore } from "../../src/adapters/storage/sqlite/run-store.js";
+import type { PullRequests } from "../../src/core/ports/pull-requests.js";
 import { GitBranchTools } from "../../src/adapters/vcs/git/git-branch-tools.js";
 import { lazyRunReader, startServer, type RunningServer, type SpawnRequest, type Spawner } from "../../src/server/index.js";
 
@@ -49,13 +50,14 @@ const spawner: Spawner = (request) => {
   return { pid: 4242, exited: Promise.resolve(answer.code ?? 0) };
 };
 
-async function launch(opts: { control?: boolean; branches?: boolean; timeoutMs?: number } = {}): Promise<RunningServer> {
+async function launch(opts: { control?: boolean; branches?: boolean; timeoutMs?: number; pulls?: PullRequests } = {}): Promise<RunningServer> {
   const reader = lazyRunReader(() => new SqliteRunReader(dbPath()));
   const server = await startServer({
     reader,
     port: 0,
     staticDir: join(scratch, "no-web"),
     ...(opts.branches === false ? {} : { branches: new GitBranchTools({ gitArgs: GIT_ARGS }) }),
+    ...(opts.pulls ? { pullRequests: opts.pulls } : {}),
     ...(opts.control === false ? {} : { control: { dataDir, spawn: spawner, ...(opts.timeoutMs ? { actionTimeoutMs: opts.timeoutMs } : {}) } }),
   });
   servers.push(server);
@@ -301,5 +303,36 @@ describe("POST /api/runs/:id/tasks/:task/pr-draft and /pr", () => {
       expect((await request(server, "POST", pr, body)).status).toBe(400);
     }
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("GET /api/runs/:id/branches with a pull request", () => {
+  const PR = "https://github.com/acme/demo/pull/7";
+  const pulls = (state: "open" | "merged" | "closed", base = "main"): PullRequests => ({
+    preflight: () => {},
+    create: () => ({ url: PR }),
+    status: () => ({ state, base }),
+  });
+
+  it("says whether the pull request is open or merged, and into which branch", async () => {
+    seed();
+    const store = new SqliteRunStore(dbPath());
+    store.upsertTask({ runId: RUN, taskId: "T1", title: "Create prueba.md", status: "passed", branch: "docs/one", worktree, startSha, position: 1, prUrl: PR });
+    store.close();
+    const reply = await request(await launch({ pulls: pulls("merged", "release/1.2") }), "GET", `/api/runs/${RUN}/branches`);
+    expect(reply.status).toBe(200);
+    expect(reply.json().branches[0]).toMatchObject({ prUrl: PR, prState: { state: "merged", base: "release/1.2" } });
+  });
+
+  it("still lists the branch when GitHub cannot be asked: no state, the address kept", async () => {
+    seed();
+    const store = new SqliteRunStore(dbPath());
+    store.upsertTask({ runId: RUN, taskId: "T1", title: "Create prueba.md", status: "passed", branch: "docs/one", worktree, startSha, position: 1, prUrl: PR });
+    store.close();
+    const broken: PullRequests = { preflight: () => {}, create: () => ({ url: PR }), status: () => { throw new Error("no network"); } };
+    const reply = await request(await launch({ pulls: broken }), "GET", `/api/runs/${RUN}/branches`);
+    expect(reply.status).toBe(200);
+    expect(reply.json().branches[0].prUrl).toBe(PR);
+    expect(reply.json().branches[0].prState).toBeUndefined();
   });
 });
