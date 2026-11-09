@@ -20,12 +20,12 @@ if (args[0] === "pr" && args[1] === "create") {
   process.stdout.write("Creating pull request...\nhttps://github.com/acme/demo/pull/7\n");
   process.exit(0);
 }
-if (args[0] === "pr" && args[1] === "view" && args.includes("state,baseRefName")) {
+if (args[0] === "pr" && args[1] === "view" && args.includes("state,baseRefName,headRefOid")) {
   if (process.env.FAKE_GH_VIEW_FAIL === "1") {
     process.stderr.write("GraphQL: Could not resolve to a PullRequest\n");
     process.exit(1);
   }
-  process.stdout.write(JSON.stringify({ state: process.env.FAKE_GH_PR_STATE ?? "OPEN", baseRefName: process.env.FAKE_GH_PR_BASE ?? "main" }) + "\n");
+  process.stdout.write(JSON.stringify({ state: process.env.FAKE_GH_PR_STATE ?? "OPEN", baseRefName: process.env.FAKE_GH_PR_BASE ?? "main", headRefOid: process.env.FAKE_GH_PR_HEAD ?? "abc1234" }) + "\n");
   process.exit(0);
 }
 if (args[0] === "pr" && args[1] === "view") {

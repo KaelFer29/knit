@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { isModelId } from "../../core/plan/parse-plan.js";
 import { describeBranches } from "../../core/branches/overview.js";
-import { isBranchName } from "../../core/branches/pr-rules.js";
+import { priorPrOf } from "../../core/branches/pr-info.js";
+import { isBranchName, type PriorPr } from "../../core/branches/pr-rules.js";
 import type { PullRequestStatus, PullRequests } from "../../core/ports/pull-requests.js";
 import type { UndoMode } from "../../core/ports/branch-tools.js";
 import { HttpError, sendJson } from "../http.js";
@@ -113,6 +114,17 @@ export const branchesRoutes: RouteModule = ({ reader, branches, pullRequests, co
         const snapshot = requireSnapshot(reader, params.id!);
         if (!branches) throw new HttpError(503, "Branch information is not available on this server");
         const { run, tasks } = snapshot;
+        // What the pull request each task already has says: its state and, once it ended, the commits added after it.
+        const prior = new Map<string, PriorPr>();
+        const statuses = new Map<string, PullRequestStatus>();
+        for (const t of tasks) {
+          if (t.prUrl === undefined || t.branch === undefined) continue;
+          const status = prStateOf(run.repo, t.prUrl);
+          if (status === undefined) continue;
+          statuses.set(t.taskId, status);
+          const found = priorPrOf(status, branches, run.repo, t.branch);
+          if (found) prior.set(t.taskId, found);
+        }
         const list = describeBranches(
           { status: run.status, base: run.base },
           tasks.map((t) => ({ taskId: t.taskId, title: t.title, status: t.status, ...(t.branch ? { branch: t.branch } : {}), ...(t.startSha ? { startSha: t.startSha } : {}), ...(t.dependsOn ? { dependsOn: t.dependsOn } : {}), ...(t.prUrl ? { prUrl: t.prUrl } : {}) })),
@@ -120,11 +132,15 @@ export const branchesRoutes: RouteModule = ({ reader, branches, pullRequests, co
             const record = tasks.find((r) => r.taskId === t.taskId)!;
             return branches.state({ repo: run.repo, branch: record.branch!, startSha: record.startSha!, ...(record.worktree ? { worktree: record.worktree } : {}) });
           },
+          undefined,
+          (taskId) => prior.get(taskId),
         );
         const at = run.base.lastIndexOf("@");
         const withState = list.map((b) => {
-          const state = b.prUrl === undefined ? undefined : prStateOf(run.repo, b.prUrl);
-          return state === undefined ? b : { ...b, prState: state };
+          const status = statuses.get(b.taskId);
+          if (status === undefined) return b;
+          const newCommits = prior.get(b.taskId)?.newCommits;
+          return { ...b, prState: { state: status.state, base: status.base, ...(newCommits === undefined ? {} : { newCommits }) } };
         });
         sendJson(res, 200, { runId: run.id, runStatus: run.status, base: at === -1 ? run.base : run.base.slice(0, at), branches: withState });
       },

@@ -6,7 +6,8 @@ import { CursorAgentRunner } from "../../adapters/agents/cursor/cursor-runner.js
 import { isModelId } from "../../core/plan/parse-plan.js";
 import { GitBranchTools } from "../../adapters/vcs/git/git-branch-tools.js";
 import { GhPullRequests } from "../../adapters/vcs/github/gh-pull-requests.js";
-import { isBranchName } from "../../core/branches/pr-rules.js";
+import { priorPrOf } from "../../core/branches/pr-info.js";
+import { isBranchName, type PriorPr } from "../../core/branches/pr-rules.js";
 import { buildPrDraftPrompt, buildPrTemplate, parsePrDraft } from "../../core/branches/pr-draft.js";
 import { describeBranches, type BranchOverview } from "../../core/branches/overview.js";
 import type { BranchRef, BranchState, UndoMode } from "../../core/ports/branch-tools.js";
@@ -101,12 +102,25 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
     };
     const ref = refOf(task);
     const now = (): string => (deps.now?.() ?? new Date()).toISOString();
+    const prs = deps.pullRequests ?? new GhPullRequests();
+    // A task that already has a pull request may open another when that one ended (merged or closed) and the branch got commits after it.
+    const priorOf = (): PriorPr | undefined => {
+      if (action !== "pr" || task.prUrl === undefined || task.branch === undefined) return undefined;
+      try {
+        return priorPrOf(prs.status(detail.run.repo, task.prUrl), tools, detail.run.repo, task.branch);
+      } catch {
+        // GitHub cannot be asked: the existing refusal stands.
+        return undefined;
+      }
+    };
+    const prior = priorOf();
     // The same decisions the web interface shows: one function reads every branch and decides each action.
     const overview = describeBranches(
       { status: detail.run.status, base: detail.run.base },
       detail.tasks.map((t) => ({ taskId: t.taskId, title: t.title, status: t.status, ...(t.branch ? { branch: t.branch } : {}), ...(t.startSha ? { startSha: t.startSha } : {}), ...(t.dependsOn ? { dependsOn: t.dependsOn } : {}), ...(t.prUrl ? { prUrl: t.prUrl } : {}) })),
       (t) => stateOf(detail.tasks.find((r) => r.taskId === t.taskId)!),
       action === "pr" && values.base !== undefined ? { taskId, base: values.base } : undefined,
+      (id) => (id === taskId ? prior : undefined),
     );
     const mine = overview.find((b) => b.taskId === taskId);
     if (mine === undefined) return fail(io, json, `${taskId} has not started, so it has no branch.`);
@@ -117,7 +131,6 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
     const decision = mine.pr;
     if (!decision.ok) return fail(io, json, decision.reason);
 
-    const prs = deps.pullRequests ?? new GhPullRequests();
     try {
       // Before anything is pushed: a pull request that cannot be opened must not leave a pushed branch behind.
       prs.preflight(detail.run.repo);

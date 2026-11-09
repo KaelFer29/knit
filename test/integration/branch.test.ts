@@ -378,6 +378,56 @@ describe("knit branch pr", () => {
     expect(git(bare, "branch", "--list", "feat/create-a")).toBe("");
   });
 
+  describe("a second pull request for a branch that got new commits after the first one was merged", () => {
+    const urls = ["https://example.test/pull/7", "https://example.test/pull/8"];
+    /** GitHub as it is after the merge: the first pull request ended at the commit it had when it was opened. */
+    const afterMerge = (endedAt: () => string): { deps: () => CliDeps; created: number } => {
+      const state = { deps: (): CliDeps => ({ ...deps() }), created: 0 };
+      const prs: PullRequests = {
+        preflight: () => {},
+        status: () => ({ state: "merged", base: "main", headSha: endedAt() }),
+        create: (input) => {
+          calls.push(input);
+          return { url: urls[state.created++]! };
+        },
+      };
+      state.deps = () => ({ ...deps(), pullRequests: prs });
+      return state;
+    };
+    const pr = (runId: string, d: CliDeps, c = capture()) => main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b", "--json"], c.io, d);
+    const addCommit = (worktree: string): void => {
+      writeFileSync(join(worktree, "second.txt"), "second\n");
+      git(worktree, "add", "-A");
+      git(worktree, "commit", "-qm", "feat(demo): a correction");
+    };
+
+    it("opens another one for the new commits, and keeps the address of the latest", async () => {
+      const { runId, worktree } = await runPlan();
+      const first = afterMerge(() => git(worktree, "rev-parse", "HEAD"));
+      expect(await pr(runId, first.deps())).toBe(0);
+      const merged = git(worktree, "rev-parse", "HEAD");
+      addCommit(worktree);
+      const later = afterMerge(() => merged);
+      later.created = 1;
+      const c = capture();
+      expect(await pr(runId, later.deps(), c)).toBe(0);
+      expect(JSON.parse(c.out().trim())).toMatchObject({ ok: true, url: urls[1] });
+      const store = new SqliteRunStore(join(dataDir, "knit.db"));
+      expect(store.getRun(runId)!.tasks[0]!.prUrl).toBe(urls[1]);
+      expect(store.getEvents(runId).filter((e) => e.type === "branch.pr_opened").map((e) => (e.payload as { url: string }).url)).toEqual(urls);
+      store.close();
+    });
+
+    it("refuses when the merged pull request carried everything", async () => {
+      const { runId, worktree } = await runPlan();
+      const first = afterMerge(() => git(worktree, "rev-parse", "HEAD"));
+      expect(await pr(runId, first.deps())).toBe(0);
+      const c = capture();
+      expect(await pr(runId, first.deps(), c)).toBe(1);
+      expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("already has a pull request") });
+    });
+  });
+
   it("takes a title or a body that starts with a dash when it is given as --title=... and --body=...", async () => {
     const { runId } = await runPlan();
     expect(await main(["branch", runId, "T1", "pr", "--title=-fix the typo", "--body=- adds the file", "--json"], capture().io, withPrs())).toBe(0);

@@ -348,3 +348,24 @@ describe("GitBranchTools.checkout", () => {
   });
 });
 
+describe("GitBranchTools.commitsSince", () => {
+  it("counts the commits of the branch that a given commit does not have", () => {
+    const { ref, path } = worktree();
+    commit(path, "a.txt", "a\n", "feat: add a");
+    const merged = git(path, "rev-parse", "HEAD");
+    expect(tools.commitsSince(repo, merged, "feat/one")).toBe(0);
+    commit(path, "b.txt", "b\n", "feat: add b");
+    commit(path, "c.txt", "c\n", "feat: add c");
+    expect(tools.commitsSince(repo, merged, "feat/one")).toBe(2);
+    expect(tools.commitsSince(repo, start, "feat/one")).toBe(3);
+    expect(ref.branch).toBe("feat/one");
+  });
+
+  it("is unknown when the commit is not in this repository, or the branch is gone", () => {
+    const { path } = worktree();
+    commit(path, "a.txt", "a\n", "feat: add a");
+    expect(tools.commitsSince(repo, "0000000000000000000000000000000000000000", "feat/one")).toBeUndefined();
+    expect(tools.commitsSince(repo, start, "feat/nope")).toBeUndefined();
+  });
+});
+

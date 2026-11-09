@@ -25,7 +25,7 @@ export interface BranchView {
   startSha: string;
   prUrl?: string;
   /** Read from GitHub when the list is built: absent when GitHub cannot be asked right now. */
-  prState?: { state: "open" | "merged" | "closed"; base: string };
+  prState?: { state: "open" | "merged" | "closed"; base: string; /** Commits the branch got after that pull request ended; they are not in the base. */ newCommits?: number };
   state: BranchState;
   undo: Record<UndoMode, Decision>;
   /** Whether the user's repository can be switched to this branch to test it. */

@@ -2,6 +2,8 @@ export interface PullRequestStatus {
   state: "open" | "merged" | "closed";
   /** The branch the pull request targets. */
   base: string;
+  /** The commit the pull request's branch was at when it was merged or closed (while it is open, where it is now). */
+  headSha?: string;
 }
 
 /** Port: opening pull requests on the code host. */

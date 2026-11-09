@@ -46,6 +46,8 @@ export interface BranchInspector {
   state(ref: BranchRef): BranchState;
   /** What the branch changed since the start; empty for a branch that does not exist. */
   diff(ref: BranchRef, maxBytes: number): BranchDiff;
+  /** How many commits the branch has that `sha` does not; undefined when `sha` or the branch is not in the repository. */
+  commitsSince(repo: string, sha: string, branch: string): number | undefined;
   /** The branches `origin` has right now, sorted (asks the remote, so it is never stale). Throws without an origin or when it cannot be reached. */
   remoteBranches(repo: string): string[];
 }

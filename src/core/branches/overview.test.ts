@@ -68,5 +68,13 @@ describe("describeBranches", () => {
     expect(describeBranches({ ...run, status: "running" }, [t1], () => state())[0]!.checkout).toMatchObject({ ok: false });
     expect(describeBranches(run, [t1], () => state({ checkedOut: true, hasWorktree: false }))[0]!.checkout).toMatchObject({ ok: false, reason: expect.stringContaining("already on") });
   });
+
+  it("lets a task whose pull request was merged open another when its branch has new commits", () => {
+    const withPr = { ...t1, prUrl: "https://example.test/pull/7" };
+    const [b] = describeBranches(run, [withPr], () => state(), undefined, (id) => (id === "T1" ? { state: "merged", newCommits: 1 } : undefined));
+    expect(b!.pr).toMatchObject({ ok: true });
+    const [again] = describeBranches(run, [withPr], () => state());
+    expect(again!.pr).toMatchObject({ ok: false });
+  });
 });
 

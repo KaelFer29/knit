@@ -339,6 +339,45 @@ describe("GET /api/runs/:id/branches with a pull request", () => {
     expect(reply.json().branches[0]).toMatchObject({ prUrl: PR, prState: { state: "merged", base: "release/1.2" } });
   });
 
+  describe("a branch that got new commits after its pull request", () => {
+    const seedWithPr = (): string => {
+      seed();
+      const store = new SqliteRunStore(dbPath());
+      store.upsertTask({ runId: RUN, taskId: "T1", title: "Create prueba.md", status: "passed", branch: "docs/one", worktree, startSha, position: 1, prUrl: PR });
+      store.close();
+      return git(repo, "rev-parse", "docs/one");
+    };
+    const endedAt = (headSha: string, state: "open" | "merged" | "closed" = "merged"): PullRequests => ({ preflight: () => {}, create: () => ({ url: PR }), status: () => ({ state, base: "main", headSha }) });
+    const addCommit = (): void => {
+      writeFileSync(join(worktree, "second.md"), "second\n");
+      git(worktree, "add", "-A");
+      git(worktree, "commit", "-qm", "docs: correct prueba.md");
+    };
+
+    it("says how many commits the merged pull request did not carry, and lets another be opened", async () => {
+      const merged = seedWithPr();
+      addCommit();
+      const b = (await request(await launch({ pulls: endedAt(merged) }), "GET", `/api/runs/${RUN}/branches`)).json().branches[0];
+      expect(b.prState).toMatchObject({ state: "merged", base: "main", newCommits: 1 });
+      expect(b.pr).toMatchObject({ ok: true, head: "docs/one" });
+    });
+
+    it("keeps refusing a second pull request when the merged one carried everything", async () => {
+      const merged = seedWithPr();
+      const b = (await request(await launch({ pulls: endedAt(merged) }), "GET", `/api/runs/${RUN}/branches`)).json().branches[0];
+      expect(b.prState).toMatchObject({ state: "merged", newCommits: 0 });
+      expect(b.pr).toMatchObject({ ok: false, reason: expect.stringContaining("already has a pull request") });
+    });
+
+    it("does not count while the pull request is still open", async () => {
+      const head = seedWithPr();
+      addCommit();
+      const b = (await request(await launch({ pulls: endedAt(head, "open") }), "GET", `/api/runs/${RUN}/branches`)).json().branches[0];
+      expect(b.prState.newCommits).toBeUndefined();
+      expect(b.pr.ok).toBe(false);
+    });
+  });
+
   it("still lists the branch when GitHub cannot be asked: no state, the address kept", async () => {
     seed();
     const store = new SqliteRunStore(dbPath());

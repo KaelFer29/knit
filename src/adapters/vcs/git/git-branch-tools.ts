@@ -127,6 +127,12 @@ export class GitBranchTools implements BranchInspector, BranchEditor {
     return { stat, patch: bytes.subarray(0, maxBytes).toString("utf8").replace(/\uFFFD+$/, ""), truncated: true };
   }
 
+  commitsSince(repo: string, sha: string, branch: string): number | undefined {
+    if (!this.exists(repo, branch) || !this.ok(repo, ["cat-file", "-e", `${sha}^{commit}`])) return undefined;
+    const count = Number(this.git(repo, ["rev-list", "--count", `${sha}..refs/heads/${branch}`]));
+    return Number.isFinite(count) ? count : undefined;
+  }
+
   remoteBranches(repo: string): string[] {
     if (!this.ok(repo, ["remote", "get-url", "origin"])) throw new Error("The repository has no 'origin' remote");
     try {

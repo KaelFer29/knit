@@ -186,6 +186,11 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
             Closed without merging
           </span>
         ) : null}
+        {b.prState !== undefined && b.prState.state !== "open" && (b.prState.newCommits ?? 0) > 0 ? (
+          <span className="branch__pr" data-state="new" title="Commits made after the pull request ended: they are not in the base branch">
+            {b.prState.newCommits} new {b.prState.newCommits === 1 ? "commit" : "commits"}
+          </span>
+        ) : null}
         <StatusBadge state={b.status === "passed" ? "delivered" : b.status === "failed" ? "failed" : "running"} />
         <Chevron />
       </button>
@@ -217,7 +222,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
       ) : null}
 
       <div className="branch__actions">
-        {b.prUrl ? null : (
+        {b.prUrl && !b.pr.ok ? null : (
           <button type="button" className="branch__primary" disabled={!b.pr.ok || busy || panel?.kind === "pr"} onClick={startPr}>
             Open pull request
           </button>

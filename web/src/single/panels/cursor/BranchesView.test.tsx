@@ -131,6 +131,29 @@ describe("BranchesView", () => {
       expect(within(card).getByRole("link", { name: "Merged ↗" }).getAttribute("href")).toBe(PR);
     });
 
+    it("says how many commits came after a merged pull request, and offers to open another", async () => {
+      listing = { branches: [branch({ prUrl: PR, prState: { state: "merged", base: "main", newCommits: 2 }, state: { ...branch().state, pushed: true } })] };
+      show();
+      const card = await screen.findByRole("region", { name: "Branch docs/one" });
+      expect(within(card).getByText("Merged into main")).toBeTruthy();
+      expect(within(card).getByText("2 new commits").getAttribute("data-state")).toBe("new");
+      const button = within(card).getByRole("button", { name: "Open pull request" }) as HTMLButtonElement;
+      expect(button.disabled).toBe(false);
+      expect(within(card).getByRole("link", { name: "Merged ↗" }).getAttribute("href")).toBe(PR);
+    });
+
+    it("speaks of one new commit in the singular, and says nothing when there are none", async () => {
+      listing = { branches: [branch({ prUrl: PR, prState: { state: "merged", base: "main", newCommits: 1 }, state: { ...branch().state, pushed: true } })] };
+      const first = show();
+      expect(await screen.findByText("1 new commit")).toBeTruthy();
+      first.unmount();
+      listing = { branches: [branch({ prUrl: PR, prState: { state: "merged", base: "main", newCommits: 0 }, pr: refuse(`T1 already has a pull request: ${PR}`), state: { ...branch().state, pushed: true } })] };
+      show();
+      await screen.findByText("Merged into main");
+      expect(screen.queryByText(/new commit/)).toBeNull();
+      expect(screen.queryByRole("button", { name: "Open pull request" })).toBeNull();
+    });
+
     it("says when a pull request was closed without merging, and when it is still open", async () => {
       listing = { branches: [branch({ prUrl: PR, prState: { state: "closed", base: "main" }, state: { ...branch().state, pushed: true } })] };
       const first = show();
