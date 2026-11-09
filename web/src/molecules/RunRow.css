@@ -8,7 +8,10 @@
   border-radius: var(--radius-lg);
   background: var(--surface-1);
   color: var(--text);
-  text-decoration: none;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   transition:
     background var(--duration-fast) var(--ease-out),
     border-color var(--duration-fast) var(--ease-out);
@@ -17,6 +20,12 @@
 .run-row:hover {
   border-color: var(--border-strong);
   background: var(--surface-2);
+}
+
+.run-row[aria-current="true"] {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--text-muted);
 }
 
 .run-row__main {
