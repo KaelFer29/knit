@@ -25,7 +25,7 @@ Objective: polish the single view of `knit ui`: blocks with their own identity (
 | P2 | S3 | Inline expansion: model switch, active agents, context use | inline | done (RED seen: 8 tests); model change goes through the block (opens it) | `feat/polish-blocks`, 7d0b422 |
 | P3 | S4 | Animated modal over the view replacing the side panel (all blocks and configuration) | inline | done (RED seen: 3 tests) | `feat/polish-blocks`, c1ba2bb |
 | P4 | S4, S5 | Claude modal: session and model switch, routing switch to the orchestrator | inline | done (RED seen: 4 tests); session and model switching already existed in the panel and stay | `feat/polish-blocks`, be0a8ac |
-| P5 | S11, S10 | Cursor modal: watched, not written to; summary, state, history, waiting state; light theme only | inline | done (RED seen: 9 tests) | `feat/polish-blocks`, see L11 |
+| P5 | S11, S10 | Cursor modal: watched, not written to; summary, state, history, waiting state; light theme only | inline | done (RED seen: 9 tests) | `feat/polish-blocks`, c136ade |
 | P7 | S12 | Plan format: a per-task model chosen by the planner, passed to the Cursor runner, shown in the interface, taught in the `knit-plan` skill | inline | pending (touches the plan format, the parser, the runner and the skill) | |
 | P6 | S9 | Overall pass: legends and hints, spacing, consistency | inline | pending | |
 
