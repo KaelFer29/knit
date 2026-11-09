@@ -252,6 +252,24 @@ describe("knit branch pr", () => {
     bare = join(scratch, "origin.git");
     git(scratch, "init", "-q", "--bare", bare);
     git(repo, "remote", "add", "origin", bare);
+    // The run's base is on origin, as it is in a real repository: GitHub needs it there.
+    git(repo, "push", "-q", "origin", "main");
+  });
+
+  it("refuses before pushing anything when the base branch is not on origin, and says how to go on", async () => {
+    const { runId } = await runPlan();
+    for (const base of [[], ["--base", "feat/gone"]]) {
+      if (base.length === 0) git(bare, "update-ref", "-d", "refs/heads/main");
+      const c = capture();
+      expect(await main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b", ...base, "--json"], c.io, withPrs())).toBe(1);
+      const out = JSON.parse(c.out().trim()) as { ok: boolean; reason: string };
+      expect(out.ok).toBe(false);
+      expect(out.reason).toMatch(/not on origin/);
+      expect(out.reason).toContain(base.length === 0 ? "main" : "feat/gone");
+      expect(out.reason).toMatch(/another branch/);
+    }
+    expect(calls).toEqual([]);
+    expect(git(bare, "branch", "--list", "feat/create-a")).toBe("");
   });
 
   it("pushes the branch, opens the pull request into the run's base with the given text, and remembers its address", async () => {
@@ -269,6 +287,7 @@ describe("knit branch pr", () => {
 
   it("opens the pull request into the branch asked for with --base, and pushes without touching anything else", async () => {
     const { runId } = await runPlan();
+    git(repo, "push", "-q", "origin", "main:refs/heads/release/1.2");
     const c = capture();
     expect(await main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b", "--base", "release/1.2", "--json"], c.io, withPrs())).toBe(0);
     expect(JSON.parse(c.out().trim())).toMatchObject({ ok: true, base: "release/1.2", head: "feat/create-a" });
@@ -282,7 +301,7 @@ describe("knit branch pr", () => {
     expect(await main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b", "--base", "feat/create-a", "--json"], c.io, withPrs())).toBe(1);
     expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("its own branch") });
     expect(calls).toEqual([]);
-    expect(git(bare, "branch", "--list")).toBe("");
+    expect(git(bare, "branch", "--list", "feat/create-a")).toBe("");
   });
 
   it("takes a title or a body that starts with a dash when it is given as --title=... and --body=...", async () => {
@@ -306,7 +325,7 @@ describe("knit branch pr", () => {
     const c = capture();
     expect(await main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b", "--json"], c.io, withPrs())).toBe(1);
     expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("not logged in") });
-    expect(git(bare, "branch", "--list")).toBe("");
+    expect(git(bare, "branch", "--list", "feat/create-a")).toBe("");
     expect(calls).toHaveLength(0);
   });
 

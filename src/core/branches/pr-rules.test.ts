@@ -30,6 +30,12 @@ describe("decidePr", () => {
     if (d.ok) expect(d.effects.join(" ")).toMatch(/pushes docs\/one to origin.*pull request.*main/is);
   });
 
+  it("says the branch is already on origin when it is, so nobody expects a first push", () => {
+    const d = decidePr(ctx({ state: state({ pushed: true }) }));
+    expect(d).toMatchObject({ ok: true });
+    if (d.ok) expect(d.effects[0]).toMatch(/already on origin.*never forced/i);
+  });
+
   it("refuses while the run is running", () => {
     expect(decidePr(ctx({ runStatus: "running" }))).toMatchObject({ ok: false, reason: "The run is still running. Abort it first." });
   });

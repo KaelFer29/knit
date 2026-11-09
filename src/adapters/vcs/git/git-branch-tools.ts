@@ -95,6 +95,18 @@ export class GitBranchTools implements BranchInspector, BranchEditor {
     return { stat, patch: bytes.subarray(0, maxBytes).toString("utf8").replace(/\uFFFD+$/, ""), truncated: true };
   }
 
+  onOrigin(repo: string, branch: string): boolean {
+    try {
+      execFileSync("git", [...this.gitArgs, "ls-remote", "--exit-code", "--heads", "origin", `refs/heads/${branch}`], { cwd: repo, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+      return true;
+    } catch (err) {
+      const e = err as { status?: number; stderr?: Buffer | string };
+      // `--exit-code` answers 2 when the remote is fine and has no such branch; anything else is a failure to ask.
+      if (e.status === 2) return false;
+      throw new Error(`Could not ask origin which branches it has: ${String(e.stderr ?? "").trim() || "git ls-remote failed"}`);
+    }
+  }
+
   push(ref: BranchRef): void {
     if (!this.ok(ref.repo, ["remote", "get-url", "origin"])) throw new Error("The repository has no 'origin' remote to push to");
     if (!this.exists(ref.repo, ref.branch)) throw new Error(`The branch ${ref.branch} no longer exists`);

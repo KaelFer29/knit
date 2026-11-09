@@ -53,6 +53,6 @@ export function decidePr(ctx: PrContext): PrDecision {
     base: target,
     head: task.branch,
     options,
-    effects: [`Pushes ${task.branch} to origin, without forcing.`, `Opens a pull request from ${task.branch} into ${target}.`],
+    effects: [state.pushed ? `${task.branch} is already on origin: it is pushed again only to bring it up to date, never forced.` : `Pushes ${task.branch} to origin, without forcing.`, `Opens a pull request from ${task.branch} into ${target}.`],
   };
 }

@@ -118,6 +118,10 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
     try {
       // Before anything is pushed: a pull request that cannot be opened must not leave a pushed branch behind.
       prs.preflight(detail.run.repo);
+      // GitHub needs the base on origin: a base that was deleted or never pushed would fail after the push, leaving it behind.
+      if (!tools.onOrigin(detail.run.repo, decision.base)) {
+        return fail(io, json, `The branch ${decision.base} is not on origin (it was deleted or never pushed), so GitHub has nothing to open the pull request into. Nothing was pushed. Choose another branch in "Into branch" (--base), or push ${decision.base} first.`);
+      }
       tools.push(ref!);
       const { url } = prs.create({ repo: detail.run.repo, head: decision.head, base: decision.base, title: values.title!, body: values.body! });
       store.upsertTask({ runId, taskId, title: task.title, status: task.status, prUrl: url });
