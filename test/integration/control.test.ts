@@ -2,7 +2,7 @@ import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { SqliteRunReader } from "../../src/adapters/storage/sqlite/run-reader.js";
 import { SqliteRunStore } from "../../src/adapters/storage/sqlite/run-store.js";
@@ -833,3 +833,81 @@ describe("run control end to end (real processes)", () => {
     expect(await until(() => !pc.isAlive(resumedPid))).toBe(true);
   });
 });
+
+describe("follow-up route", () => {
+  const url = "/api/runs/done-run/tasks/T1/followup";
+  const seedTask = (): void => {
+    seedFinished("done-run", "passed");
+    withStore((s) => s.upsertTask({ runId: "done-run", taskId: "T1", title: "A", status: "passed" }));
+  };
+  /** A spawner standing in for `knit followup`: it says it started, as the real command does first thing. */
+  const followingSpawner = (delayMs = 0): Spawner => (request) => {
+    spawnCalls.push(request);
+    const owner = idleProcess("followup-stand-in");
+    const started = (): void => withStore((s) => s.recordEvent({ runId: request.args[1]!, taskId: request.args[2]!, ts: "2026-11-08T10:06:00.000Z", type: "followup.started" }));
+    if (delayMs > 0) setTimeout(started, delayMs);
+    else started();
+    return { pid: owner.pid, exited: new Promise(() => {}) };
+  };
+
+  it("refuses what makes no sense before starting anything: no prompt, a prompt that is too long, a bad model, other fields", async () => {
+    const server = await launch(followingSpawner());
+    seedTask();
+    for (const body of [{}, { prompt: "" }, { prompt: "   " }, { prompt: 5 }, { prompt: "x".repeat(20_001) }, { prompt: "go", model: "--force" }, { prompt: "go", model: 7 }, { prompt: "go", extra: 1 }]) {
+      expect((await post(server, url, { body })).status, JSON.stringify(body).slice(0, 40)).toBe(400);
+    }
+    expect(spawnCalls).toEqual([]);
+  });
+
+  it("404 for an unknown run or task, without starting anything", async () => {
+    const server = await launch(followingSpawner());
+    seedTask();
+    expect((await post(server, "/api/runs/nope/tasks/T1/followup", { body: { prompt: "go" } })).status).toBe(404);
+    expect((await post(server, "/api/runs/done-run/tasks/T9/followup", { body: { prompt: "go" } })).status).toBe(404);
+    expect(spawnCalls).toEqual([]);
+  });
+
+  it("starts `knit followup` with the prompt after `--`, so a prompt that starts with a dash is never read as an option, and answers 202 once it started", async () => {
+    const server = await launch(followingSpawner(150));
+    seedTask();
+    const prompt = "-fix the typo\n--yes is only text";
+    const res = await post(server, url, { body: { prompt, model: "grok-4.7-high" } });
+    expect(res.status).toBe(202);
+    expect(res.json()).toMatchObject({ runId: "done-run", taskId: "T1" });
+    expect(res.json().logPath).toContain("/logs/_ui/followup-");
+    expect(spawnCalls.map((c) => c.args)).toEqual([["followup", "done-run", "T1", "--model", "grok-4.7-high", "--data-dir", dataDir, "--", prompt]]);
+  });
+
+  it("passes the reason when the command refuses, read from its log, instead of a bare 502", async () => {
+    const server = await launch((request) => {
+      mkdirSync(dirname(request.logFile), { recursive: true });
+      writeFileSync(request.logFile, "Task T1 has no recorded attempt with an agent session id, so there is no chat to resume.\n");
+      return { pid: 999_999, exited: Promise.resolve(1) };
+    });
+    seedTask();
+    const res = await post(server, url, { body: { prompt: "go" } });
+    expect(res.status).toBe(409);
+    expect(res.json().error).toContain("no chat to resume");
+  });
+
+  it("504 with the log path when the command never says it started", async () => {
+    const server = await launch(recordingSpawner(), 300);
+    seedTask();
+    const res = await post(server, url, { body: { prompt: "go" } });
+    expect(res.status).toBe(504);
+    expect(res.json().logPath).toContain("/logs/_ui/followup-");
+  });
+
+  it("a second request for the same task while the first waits is a 409 and starts nothing", async () => {
+    const server = await launch(followingSpawner(400));
+    seedTask();
+    const [first, second] = await Promise.all([
+      post(server, url, { body: { prompt: "one" } }),
+      new Promise<Reply>((resolve) => setTimeout(() => void post(server, url, { body: { prompt: "two" } }).then(resolve), 100)),
+    ]);
+    expect(first.status).toBe(202);
+    expect(second.status).toBe(409);
+    expect(spawnCalls).toHaveLength(1);
+  });
+});
+

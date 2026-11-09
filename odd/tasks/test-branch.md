@@ -16,7 +16,7 @@ Objective: make it easy to test what Cursor did (a "Test this branch" action tha
 | B1 | S1 | Pure rule `decideCheckout`, `BranchState.checkedOut`, `GitBranchTools.checkout`, `checkout` in the branch overview | inline | done (RED seen: 7 rule, 7 adapter, 2 overview tests) | 5f62df8 |
 | B2 | S1 | `knit branch … checkout` (dry run until `--yes`), the route, and the "Test this branch" action in the branch row | inline | done (RED seen: 5 CLI, 1 route, 4 page tests) | see git log |
 | B3 | S3 | `Workspace.restore` and `knit followup` recreating a missing worktree | inline | done (RED seen: 5 adapter, 3 follow-up tests) | see git log |
-| B4 | S2 | `POST /api/runs/:id/tasks/:task/followup` | inline | pending | |
+| B4 | S2 | `POST /api/runs/:id/tasks/:task/followup` | inline | done (RED seen: 6 route tests) | see git log |
 | B5 | S2 | Claude modal: list of delivered tasks to iterate on, with their context, sent to the orchestrator as a follow-up | inline | pending | |
 
 Route evidence: sequential work, no Writer trigger applies.

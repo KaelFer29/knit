@@ -370,6 +370,7 @@ Every one is a `POST` with `Content-Type: application/json` (`415` otherwise) an
 | `POST /api/runs/:id/tasks/:task/retry` | none | `knit resume <id>`, which re-runs the failed task and then the ones that were skipped after it | `202 { runId, pid, logPath }` |
 | `GET /api/runs/:id/branches` (each branch with a pull request also carries `prState`: open, merged or closed and the branch it targets, read with `gh pr view`; cached, merged and closed for good, open for 20 s; without GitHub the field is absent and the list still loads) | | read through `BranchInspector`: for each task with a branch, its state and the decision for each action | `{ runId, runStatus, base, branches: [{ taskId, title, status, branch, startSha, prUrl?, state, undo: { revert, reset, delete }, pr }] }` |
 | `GET /api/runs/:id/remote-branches` | | `BranchInspector.remoteBranches` (`git ls-remote --heads origin`) | `200 { branches }` sorted, `502 { error }` without an origin or when it cannot be reached |
+| `POST /api/runs/:id/tasks/:task/followup` | `{ prompt, model? }` (`prompt` 1 to 20000 characters; anything else is `400`) | `knit followup <id> <task> [--model <m>] --data-dir <dir> -- <prompt>`: the prompt goes after `--`, so one that starts with a dash is never read as an option | `202 { runId, taskId, pid, logPath }` once the command recorded `followup.started`; `404` for an unknown run or task; `409 { error }` with the reason the command gave when it refused (run still running, no chat, worktree not recreatable) or when a follow-up on that task is already starting; `504` when it never started |
 | `POST /api/runs/:id/tasks/:task/checkout` | `{ confirm: true }` (anything else is `400`) | `knit branch <id> <task> checkout --yes --json` | `200 { ok, branch, freedWorktree, effects }`, `409 { error }` |
 | `POST /api/runs/:id/tasks/:task/undo` | `{ mode: "revert"\|"reset"\|"delete", confirm: true }` | `knit branch <id> <task> undo --mode <m> --yes --json` | `200` the command's JSON, `409 { error }` with the reason when it refuses |
 | `POST /api/runs/:id/tasks/:task/pr-draft` | `{ model? }` or `{ template: true }` (not both) | `knit branch <id> <task> pr-draft [--template] --json` (`--template`: built from the task, no model; otherwise default model `composer-2.5-fast`) | `200 { ok, title, body, model }` |
@@ -490,7 +491,7 @@ Built in task T3 (`src/server/security.ts`, applied to every request before rout
 - **Configuration editor.** The last check before the rename narrows the race window with another writer but cannot close it (same-user local race). `.claude/settings.local.json` is not in the allow-list.
 - **Polling for sessions.** The workspace polls (about every 0.8 s while a turn runs, 4 s otherwise) instead of using SSE.
 - **Not on the canvas.** Claude's live timeline; the run's and the workspace's timeline components are separate.
-- **Follow-ups from the interface.** `knit followup` has no HTTP route; it runs from the CLI only.
+- **Follow-ups from the interface.** `POST /api/runs/:id/tasks/:task/followup` starts `knit followup`; the page lists the delivered tasks of the run in Claude's modal (see Iterating on a task).
 - **Interactive resume unverified.** `claude --resume` of a `-p` session has not been tried by hand (see [Agents and sessions](#agents-and-sessions)).
 
 ## Brand assets
