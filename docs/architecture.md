@@ -22,7 +22,7 @@ src/
     storage/sqlite/  RunStore and SessionStore (read-write), RunReader and SessionReader (read-only); one shared schema and migration (`schema.ts`)
     storage/files/   TranscriptStore (raw JSONL)
     system/          process spawning with timeouts and group kill; ProcessControl (inspect and signal processes)
-  server/          driving adapter: HTTP API, live stream (SSE), run control, sessions, configuration, files, static files and the security guard of `knit ui`; receives its read ports (`RunReader`, `SessionReader`, `TaskDiff`, `FileActivity`, `FileTree`, `PlanDrafts`) and a spawner for Knit child processes, knows nothing about SQLite or adapters
+  server/          driving adapter: HTTP API, live stream (SSE), run control, sessions, configuration, files, static files and the security guard of `knit ui`; receives its read ports (`RunReader`, `SessionReader`, `TaskDiff`, `FileActivity`, `FileTree`, `PlanDrafts`, `BranchInspector`) and a spawner for Knit child processes, knows nothing about SQLite or adapters
   cli/             command line: wires adapters into the core
     commands/        one module per command
     support/         argument parsing, paths, formatting
@@ -48,6 +48,7 @@ test/integration/  tests that cross layers (CLI against real git and SQLite)
 | `PullRequests` | open pull requests | `vcs/github` |
 | `RunStore` | persist runs (with a snapshot of the plan and the pid executing them), tasks, attempts, events | `storage/sqlite` |
 | `SessionStore` | persist chat sessions (agent-agnostic), their turns (prompt, answer, tokens, profile, meta, pid) and each turn's timeline; list sessions newest first, events after an id | `storage/sqlite` |
+| `BranchInspector`, `BranchEditor` | the branch a task created: its state (commits since the start, pushed, worktree, uncommitted changes) and its diff, read anywhere; and the edits `knit branch` makes (revert with a new commit, reset to the start, remove, push without forcing), CLI only | `vcs/git` |
 | `TaskDiff` | read side of a task's code change: files, counts and hunks between its start commit and its commit, in its worktree | `vcs/git` |
 | `FileActivity` | read side of the files a task worktree has changed now (git status), for the web interface; the files a timeline touched are derived in `core/timeline` | `vcs/git` |
 | `SessionReader` | read side of the chat sessions for the web interface: sessions with turn counts and token totals, turns, timeline entries after an id; read-only, a database without session tables has none | `storage/sqlite` |

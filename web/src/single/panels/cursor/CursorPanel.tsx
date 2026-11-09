@@ -7,10 +7,11 @@ import type { RenderDetail } from "../../../flow/detail";
 import { formatDuration, formatTokens } from "../../../flow/format";
 import { Disclosure } from "../../../molecules/Disclosure";
 import type { PanelProps } from "../registry";
+import { BranchesView } from "./BranchesView";
 import { ChangedFiles } from "./ChangedFiles";
 import "./CursorPanel.css";
 
-type Tab = "agent" | "files";
+type Tab = "agent" | "files" | "branches";
 
 function TaskHead({ task }: { task: TaskView }) {
   return (
@@ -86,8 +87,8 @@ function Summary({ board }: { board: BoardModel }) {
   );
 }
 
-/** Cursor's panel: where it is and a summary of the run, the active task and its live timeline, the history of the other tasks and, in a tab, only the files Cursor changed, grouped by task. It is watched, not written to. */
-export function CursorPanel({ board, renderDetail, detailSource }: PanelProps) {
+/** Cursor's panel: where it is and a summary of the run, the active task and its live timeline, the history of the other tasks, in a tab only the files Cursor changed grouped by task, and in another the branches it created, which can be undone or turned into pull requests. It is watched, not written to. */
+export function CursorPanel({ board, runId, live, renderDetail, detailSource }: PanelProps) {
   const [tab, setTab] = useState<Tab>("agent");
   const id = useId();
   const primary = board === undefined ? undefined : (board.tasks.find((t) => t.taskId === board.active?.taskId) ?? board.tasks[board.tasks.length - 1]);
@@ -95,6 +96,7 @@ export function CursorPanel({ board, renderDetail, detailSource }: PanelProps) {
   const tabs: { id: Tab; label: string }[] = [
     { id: "agent", label: "Agent" },
     { id: "files", label: "Files" },
+    { id: "branches", label: "Branches" },
   ];
   if (board === undefined) {
     return (
@@ -119,7 +121,9 @@ export function CursorPanel({ board, renderDetail, detailSource }: PanelProps) {
             className="cursor-panel__tab"
             onClick={() => setTab(t.id)}
             onKeyDown={(e) => {
-              if (e.key === "ArrowRight" || e.key === "ArrowLeft") setTab(tab === "agent" ? "files" : "agent");
+              if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+              const at = tabs.findIndex((x) => x.id === tab);
+              setTab(tabs[(at + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]!.id);
             }}
           >
             {t.label}
@@ -127,7 +131,13 @@ export function CursorPanel({ board, renderDetail, detailSource }: PanelProps) {
         ))}
       </div>
       <div className="cursor-panel__body" role="tabpanel" id={`${id}-body`} aria-labelledby={`${id}-${tab}`}>
-        {tab === "files" ? (
+        {tab === "branches" ? (
+          runId !== undefined && live ? (
+            <BranchesView runId={runId} />
+          ) : (
+            <p className="detail-note">Branches are only available for a real run. This is sample data.</p>
+          )
+        ) : tab === "files" ? (
           <ChangedFiles tasks={board.tasks} source={detailSource} />
         ) : primary === undefined ? (
           <p className="detail-note">No task has started yet.</p>
