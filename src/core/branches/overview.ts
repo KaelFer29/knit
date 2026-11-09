@@ -30,7 +30,13 @@ export interface BranchOverview {
  * Every task that has a branch, with its state and the decision for each action. Pure: the caller supplies how a
  * branch is read, so the command line and the web interface decide exactly the same.
  */
-export function describeBranches(run: { status: string; base: string }, tasks: BranchTask[], stateOf: (task: BranchTask) => BranchState): BranchOverview[] {
+export function describeBranches(
+  run: { status: string; base: string },
+  tasks: BranchTask[],
+  stateOf: (task: BranchTask) => BranchState,
+  /** A branch the person chose for one task's pull request, in place of the recommended one. */
+  requested?: { taskId: string; base: string },
+): BranchOverview[] {
   const states = new Map<string, BranchState>();
   const read = (task: BranchTask): BranchState => {
     let s = states.get(task.taskId);
@@ -68,6 +74,7 @@ export function describeBranches(run: { status: string; base: string }, tasks: B
           tasks: refs,
           state,
           parentState: parent && parent.branch !== undefined && parent.startSha !== undefined ? read(parent) : undefined,
+          ...(requested?.taskId === task.taskId ? { requestedBase: requested.base } : {}),
         }),
       },
     ];

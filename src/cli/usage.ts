@@ -17,7 +17,7 @@ export const USAGE = `Usage:
                                               Take back what a task did on its branch (says what it would do until --yes)
   ${PROGRAM_NAME} branch <run-id> <task-id> pr-draft [options]
                                               Have a cheap model write the title and body of a pull request for the task
-  ${PROGRAM_NAME} branch <run-id> <task-id> pr --title <t> --body <b> [options]
+  ${PROGRAM_NAME} branch <run-id> <task-id> pr --title <t> --body <b> [--base <branch>] [options]
                                               Push the task branch and open its pull request
   ${PROGRAM_NAME} ui [options]                Serve the web interface on 127.0.0.1 and print its address (Ctrl+C to stop)
 
@@ -77,7 +77,8 @@ Options for branch undo:
   pr-draft: --model <id> picks the model (default composer-2.5-fast, see 'agent models'). It writes text only, in an empty
   scratch directory, from the task, its commits and a cut of its diff.
   pr: pushes the branch to origin (never forced) and opens the pull request into the run's base branch, or into the parent
-  task's branch when the task depends on another (that branch must be on origin first). Only for a task that passed, with
+  task's branch when the task depends on another (that branch must be on origin first). --base <branch> opens it into
+  another branch instead (a plain branch name; GitHub refuses one that is not on origin). Only for a task that passed, with
   commits and no pull request yet; the address is kept with the task. Checks the GitHub CLI before pushing anything.
   A title or body that starts with a dash has to be written --title="-fix typo" and --body="- adds it", or it reads as an option.
   undo: refused (exit 1) while the run is still running, for a branch that is gone, with uncommitted changes (revert), after

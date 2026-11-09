@@ -10,9 +10,18 @@ export interface PrContext {
   state: BranchState;
   /** State of the parent's branch when the task depends on another. */
   parentState: BranchState | undefined;
+  /** A branch the person chose to target instead of the recommended one. */
+  requestedBase?: string;
 }
 
-export type PrDecision = { ok: true; base: string; head: string; effects: string[] } | { ok: false; reason: string };
+export type PrDecision = { ok: true; base: string; head: string; /** Branches worth suggesting as a target, the recommended one first. */ options: string[]; effects: string[] } | { ok: false; reason: string };
+
+const MAX_BRANCH = 200;
+
+/** A branch name that is safe to hand to git and gh: no spaces, no leading dash, no `..`, `//`, `@{`, trailing `/`, `.` or `.lock`. */
+export function isBranchName(name: string): boolean {
+  return name.length <= MAX_BRANCH && /^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(name) && !name.includes("..") && !name.includes("//") && !/(\/|\.|\.lock)$/.test(name);
+}
 
 /** Whether a task's branch may become a pull request and where it would go. Pure; the CLI and the web interface share it. */
 export function decidePr(ctx: PrContext): PrDecision {
@@ -27,13 +36,23 @@ export function decidePr(ctx: PrContext): PrDecision {
 
   const base = prBaseOf(ctx.runBase, task, ctx.tasks);
   if (!base.ok) return base;
-  if (base.parent !== undefined && !(ctx.parentState?.pushed ?? false)) {
+  const requested = ctx.requestedBase;
+  if (requested !== undefined) {
+    if (!isBranchName(requested)) return { ok: false, reason: `"${requested.slice(0, 60)}" is not a valid branch name to open the pull request into.` };
+    if (requested === task.branch) return { ok: false, reason: "A pull request cannot go into its own branch." };
+  }
+  const target = requested ?? base.base;
+  if (target === base.parent?.branch && !(ctx.parentState?.pushed ?? false)) {
     return { ok: false, reason: `${base.parent.taskId} is not on origin yet. Open its pull request first: GitHub needs the base branch (${base.parent.branch}) there.` };
   }
+  // What the person can pick from: where the rules would send it, where the run started, and the other tasks' branches.
+  const runBranch = prBaseOf(ctx.runBase, { taskId: task.taskId, branch: task.branch }, ctx.tasks);
+  const options = [base.base, ...(runBranch.ok ? [runBranch.base] : []), ...ctx.tasks.flatMap((t) => (t.branch === undefined ? [] : [t.branch]))].filter((b, i, all) => b !== task.branch && all.indexOf(b) === i);
   return {
     ok: true,
-    base: base.base,
+    base: target,
     head: task.branch,
-    effects: [`Pushes ${task.branch} to origin, without forcing.`, `Opens a pull request from ${task.branch} into ${base.base}.`],
+    options,
+    effects: [`Pushes ${task.branch} to origin, without forcing.`, `Opens a pull request from ${task.branch} into ${target}.`],
   };
 }

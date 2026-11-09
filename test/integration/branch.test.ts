@@ -267,6 +267,24 @@ describe("knit branch pr", () => {
     expect(events(runId)).toContain("branch.pr_opened");
   });
 
+  it("opens the pull request into the branch asked for with --base, and pushes without touching anything else", async () => {
+    const { runId } = await runPlan();
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b", "--base", "release/1.2", "--json"], c.io, withPrs())).toBe(0);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: true, base: "release/1.2", head: "feat/create-a" });
+    expect(calls).toEqual([{ repo, head: "feat/create-a", base: "release/1.2", title: "t", body: "b" }]);
+  });
+
+  it("refuses a --base that is not a branch name, or is the task's own branch, before pushing anything", async () => {
+    const { runId } = await runPlan();
+    expect(await main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b", "--base", "a b"], capture().io, withPrs())).toBe(2);
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b", "--base", "feat/create-a", "--json"], c.io, withPrs())).toBe(1);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("its own branch") });
+    expect(calls).toEqual([]);
+    expect(git(bare, "branch", "--list")).toBe("");
+  });
+
   it("takes a title or a body that starts with a dash when it is given as --title=... and --body=...", async () => {
     const { runId } = await runPlan();
     expect(await main(["branch", runId, "T1", "pr", "--title=-fix the typo", "--body=- adds the file", "--json"], capture().io, withPrs())).toBe(0);

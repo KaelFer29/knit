@@ -6,6 +6,7 @@ import { CursorAgentRunner } from "../../adapters/agents/cursor/cursor-runner.js
 import { isModelId } from "../../core/plan/parse-plan.js";
 import { GitBranchTools } from "../../adapters/vcs/git/git-branch-tools.js";
 import { GhPullRequests } from "../../adapters/vcs/github/gh-pull-requests.js";
+import { isBranchName } from "../../core/branches/pr-rules.js";
 import { buildPrDraftPrompt, parsePrDraft } from "../../core/branches/pr-draft.js";
 import { describeBranches, type BranchOverview } from "../../core/branches/overview.js";
 import type { BranchRef, BranchState, UndoMode } from "../../core/ports/branch-tools.js";
@@ -52,6 +53,7 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
     model: { type: "string" },
     title: { type: "string" },
     body: { type: "string" },
+    base: { type: "string" },
   });
   const [runId, taskId, action] = positionals;
   if (positionals.length !== 3 || runId === undefined || taskId === undefined) throw new UsageError(`branch needs a run id, a task id and an action (${ACTIONS.join(", ")})`);
@@ -66,6 +68,9 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
     if (values.title === undefined || values.body === undefined) throw new UsageError("pr needs --title and --body");
     if (values.title.trim() === "" || /[\r\n]/.test(values.title) || values.title.length > MAX_TITLE) throw new UsageError(`--title must be one line of at most ${MAX_TITLE} characters`);
     if (values.body.length > MAX_BODY) throw new UsageError(`--body must be at most ${MAX_BODY} characters`);
+    if (values.base !== undefined && !isBranchName(values.base)) throw new UsageError("--base must be a branch name: letters, digits, . _ - and /, not starting with a dash");
+  } else if (values.base !== undefined) {
+    throw new UsageError("--base only applies to pr");
   }
 
   const store = openStoreIfExists(env, values["data-dir"]);
@@ -99,6 +104,7 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
       { status: detail.run.status, base: detail.run.base },
       detail.tasks.map((t) => ({ taskId: t.taskId, title: t.title, status: t.status, ...(t.branch ? { branch: t.branch } : {}), ...(t.startSha ? { startSha: t.startSha } : {}), ...(t.dependsOn ? { dependsOn: t.dependsOn } : {}), ...(t.prUrl ? { prUrl: t.prUrl } : {}) })),
       (t) => stateOf(detail.tasks.find((r) => r.taskId === t.taskId)!),
+      action === "pr" && values.base !== undefined ? { taskId, base: values.base } : undefined,
     );
     const mine = overview.find((b) => b.taskId === taskId);
     if (mine === undefined) return fail(io, json, `${taskId} has not started, so it has no branch.`);

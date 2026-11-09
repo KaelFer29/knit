@@ -233,6 +233,17 @@ describe("POST /api/runs/:id/tasks/:task/pr-draft and /pr", () => {
     expect(calls[0]!.args).toEqual(["branch", RUN, "T1", "pr", "--title=Add prueba.md", "--body=## Summary\n- adds it; `rm -rf /` stays text", "--json", "--data-dir", dataDir]);
   });
 
+  it("passes the branch to open the pull request into as one argument, and refuses what is not a branch name", async () => {
+    seed();
+    answer = { json: { ok: true, url: "https://example.test/pull/7", base: "release/1.2", head: "docs/one" } };
+    const server = await launch();
+    expect((await request(server, "POST", pr, { title: "t", body: "b", base: "release/1.2" })).status).toBe(200);
+    expect(calls[0]!.args).toEqual(["branch", RUN, "T1", "pr", "--title=t", "--body=b", "--base=release/1.2", "--json", "--data-dir", dataDir]);
+    const before = calls.length;
+    for (const base of ["--force", "a b", 7, ""]) expect((await request(server, "POST", pr, { title: "t", body: "b", base })).status, String(base)).toBe(400);
+    expect(calls).toHaveLength(before);
+  });
+
   it("passes a title or a body that starts with a dash as one argument, so the command does not read it as an option", async () => {
     seed();
     answer = { json: { ok: true, url: "https://example.test/pull/7", base: "main", head: "docs/one" } };

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { isModelId } from "../../core/plan/parse-plan.js";
 import { describeBranches } from "../../core/branches/overview.js";
+import { isBranchName } from "../../core/branches/pr-rules.js";
 import type { UndoMode } from "../../core/ports/branch-tools.js";
 import { HttpError, sendJson } from "../http.js";
 import type { ControlDeps, RouteModule } from "../types.js";
@@ -136,13 +137,14 @@ export const branchesRoutes: RouteModule = ({ reader, branches, control: control
       handler: async ({ req, res, params }) => {
         const control = requireControl(controlDeps);
         const body = await readJsonBody(req);
-        rejectUnknown(body, ["title", "body"]);
+        rejectUnknown(body, ["title", "body", "base"]);
         const { title, body: text } = body;
         if (typeof title !== "string" || title.trim() === "" || /[\r\n]/.test(title) || title.length > MAX_TITLE) throw new HttpError(400, `title must be one line of at most ${MAX_TITLE} characters`);
         if (typeof text !== "string" || text.length > MAX_BODY) throw new HttpError(400, `body must be a string of at most ${MAX_BODY} characters`);
+        if (body.base !== undefined && (typeof body.base !== "string" || !isBranchName(body.base))) throw new HttpError(400, "base must be a branch name: letters, digits, . _ - and /, not starting with a dash");
         requireTask(params.id!, params.task!);
         // `--name=value`, one argument: a title or body that starts with a dash (a bullet, say) is never read as an option.
-        await act(control, res, params.id!, params.task!, "pr", [`--title=${title}`, `--body=${text}`]);
+        await act(control, res, params.id!, params.task!, "pr", [`--title=${title}`, `--body=${text}`, ...(body.base === undefined ? [] : [`--base=${body.base}`])]);
       },
     },
   ];
