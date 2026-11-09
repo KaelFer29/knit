@@ -1,0 +1,129 @@
+/* The orchestrator's stages as a track of dots joined by segments: brown for the work done and in hand, red for a failure. */
+.stage-track {
+  --stage-color: var(--agent-knit);
+  --stage-line: color-mix(in srgb, var(--agent-knit) 22%, var(--border));
+}
+
+.pipe__stages {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pipe__stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+/* The segment that joins a stage to the next one. */
+.pipe__stage:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: calc(0.55rem - 1px);
+  left: calc(50% + 0.7rem);
+  width: calc(100% - 1.4rem);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--stage-line);
+}
+
+.pipe__stage[data-status="done"]:not(:last-child)::after {
+  background: var(--stage-color);
+}
+
+.pipe__dot {
+  display: grid;
+  place-items: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 2px solid var(--stage-line);
+  border-radius: 50%;
+  background: var(--surface-1);
+  color: var(--surface-1);
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+
+.pipe__stage[data-status="done"] .pipe__dot {
+  border-color: var(--stage-color);
+  background: var(--stage-color);
+}
+
+.pipe__stage[data-status="failed"] .pipe__dot {
+  border-color: var(--status-failed);
+  background: var(--status-failed);
+}
+
+.pipe__stage[data-status="active"] .pipe__dot {
+  border-color: var(--stage-color);
+  background: color-mix(in srgb, var(--stage-color) 30%, var(--surface-1));
+  animation: stage-pulse 1.6s ease-in-out infinite;
+}
+
+.pipe__label {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pipe__stage[data-status="active"] .pipe__label {
+  color: var(--stage-color);
+}
+
+.pipe__now {
+  overflow: hidden;
+  margin: 0;
+  color: var(--stage-color);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* Large: the run's own panel, with each stage's detail under its name. */
+.stage-track[data-size="large"] .pipe__stages {
+  margin-top: 0;
+}
+
+.stage-track[data-size="large"] .pipe__dot {
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.75rem;
+}
+
+.stage-track[data-size="large"] .pipe__stage:not(:last-child)::after {
+  top: calc(0.75rem - 1px);
+  left: calc(50% + 1rem);
+  width: calc(100% - 2rem);
+}
+
+.stage-track[data-size="large"] .pipe__label {
+  font-size: var(--text-sm);
+}
+
+.pipe__detail {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pipe__stage[data-status="active"] .pipe__detail {
+  color: var(--stage-color);
+}

@@ -35,13 +35,16 @@
   --status-failed: #c22a2a;
   --status-failed-soft: #fae4e4;
 
-  /* Agent identity: Claude's terracotta, Cursor's monochrome, Knit's own teal */
+  /* Agent identity: Claude's terracotta, Cursor's monochrome, the orchestrator's light brown */
   --agent-claude: #d97757;
   --agent-claude-soft: #fbebe4;
   --agent-cursor: #14120b;
   --agent-cursor-soft: #ecece8;
-  --agent-knit: #0e8a8c;
-  --agent-knit-soft: #dcf1f1;
+  --agent-knit: #8b6a45;
+  --agent-knit-soft: #f3ece2;
+  /* The orchestrator's modal: warm white with light brown lines. */
+  --knit-canvas: #fdfaf6;
+  --knit-line: #eadfce;
   /* Block skins. Claude: claude.ai's ivory, ink and serif, with a Claude Code terminal inset. */
   --claude-ivory: #faf9f5;
   /* Claude's modal: a near-white canvas with only a trace of warmth. */

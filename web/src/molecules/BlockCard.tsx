@@ -5,6 +5,7 @@ import { StatusBadge } from "../atoms/StatusBadge";
 import { NODE_STATUS_LABEL, NODE_STATUS_TONE } from "../flow/status";
 import type { AgentIdentity } from "../identity/agents";
 import type { BlockDetails, BlockView, StageView } from "../single/pipeline";
+import { StageTrack } from "./StageTrack";
 import "./BlockCard.css";
 
 interface Props {
@@ -16,8 +17,6 @@ interface Props {
   open: boolean;
   onOpen: () => void;
 }
-
-const STAGE_ICON: Record<StageView["status"], string> = { idle: "", active: "", done: "✓", failed: "✕" };
 
 const EDIT_LINE = /^(edit|write|create)\b:?\s*/i;
 
@@ -109,7 +108,7 @@ export function BlockCard({ identity, view, details, stages, open, onOpen }: Pro
             <p className="pipe__plan" title={view.headline}>
               {view.headline}
             </p>
-            {stages !== undefined ? <Stages stages={stages} /> : null}
+            {stages !== undefined ? <StageTrack stages={stages} label="Orchestrator stages" detail="now" /> : null}
             <Lines identity={identity} view={view} render={(line) => <span className="block__text">{line}</span>} />
             {footer(<>Open {identity.label}</>, "pipe__open")}
           </>
@@ -219,36 +218,6 @@ function Lines({ identity, view, render }: { identity: AgentIdentity; view: Bloc
         ))
       )}
     </ol>
-  );
-}
-
-/** The orchestrator's stages as a horizontal track, like a delivery pipeline. */
-function Stages({ stages }: { stages: StageView[] }) {
-  // The stage to spell out: a failure first, then the work in hand (checks, then build), then whatever is next.
-  const pick = (id: StageView["id"]) => stages.find((s) => s.id === id && s.status === "active");
-  const current = stages.find((s) => s.status === "failed") ?? pick("checks") ?? pick("build") ?? stages.find((s) => s.status === "active") ?? stages.find((s) => s.status !== "done");
-  return (
-    <>
-      <ol className="pipe__stages" aria-label="Orchestrator stages">
-        {stages.map((s) => (
-          <li key={s.id} className="pipe__stage" data-status={s.status}>
-            <span className="pipe__dot" aria-hidden="true">
-              {STAGE_ICON[s.status]}
-            </span>
-            <span className="pipe__label">{s.label}</span>
-            <span className="sr-only">
-              , {s.status}
-              {s.detail !== undefined ? `, ${s.detail}` : ""}
-            </span>
-          </li>
-        ))}
-      </ol>
-      {current?.detail !== undefined ? (
-        <p className="pipe__now" aria-hidden="true">
-          {current.label} · {current.detail}
-        </p>
-      ) : null}
-    </>
   );
 }
 

@@ -94,6 +94,21 @@
   font-weight: 500;
 }
 
+/* The orchestrator's modal: warm white with light brown lines; the panels inside read the same tokens. */
+.modal__dialog[data-agent="knit"] {
+  --surface-1: var(--knit-canvas);
+  --surface-2: #f6f0e7;
+  --surface-3: #efe6d8;
+  --border: var(--knit-line);
+  --border-strong: #dccdb6;
+  border-color: var(--knit-line);
+}
+
+.modal__dialog[data-agent="knit"] .modal__head {
+  border-bottom-color: var(--knit-line);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 65%), var(--knit-canvas);
+}
+
 /* Cursor's modal mixes its two looks: a black title bar with its mark in white over a light body that carries the mark faintly. */
 .modal__dialog[data-skin="editor"] {
   border-color: var(--cursor-line);

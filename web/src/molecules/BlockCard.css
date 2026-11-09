@@ -314,16 +314,20 @@
   color: var(--claude-ink-muted);
 }
 
-/* ---- Orchestrator: a delivery pipeline in Knit's teal. ---- */
+/* ---- Orchestrator: a delivery pipeline in light brown on warm white. ---- */
 .block[data-skin="pipeline"] .block__frame {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-color: var(--knit-line);
   background:
-    radial-gradient(90% 60% at 50% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
-    var(--surface-1);
+    radial-gradient(90% 55% at 50% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
+    var(--knit-canvas);
+}
+
+.block[data-skin="pipeline"]:hover .block__frame {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--knit-line));
 }
 
 .block[data-skin="pipeline"][data-status="working"] .block__frame {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), 0 10px 30px color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent), 0 10px 30px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .pipe__mark {
@@ -337,93 +341,6 @@
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pipe__stages {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  margin: var(--space-1) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.pipe__stage {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
-  min-width: 0;
-}
-
-/* The segment that joins a stage to the next one. */
-.pipe__stage:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: calc(0.55rem - 1px);
-  left: calc(50% + 0.7rem);
-  width: calc(100% - 1.4rem);
-  height: 2px;
-  border-radius: 1px;
-  background: var(--border);
-}
-
-.pipe__stage[data-status="done"]:not(:last-child)::after {
-  background: var(--status-delivered);
-}
-
-.pipe__dot {
-  display: grid;
-  place-items: center;
-  width: 1.1rem;
-  height: 1.1rem;
-  border: 2px solid var(--border);
-  border-radius: 50%;
-  background: var(--surface-1);
-  color: var(--surface-1);
-  font-size: 0.6rem;
-  font-weight: 800;
-}
-
-.pipe__stage[data-status="done"] .pipe__dot {
-  border-color: var(--status-delivered);
-  background: var(--status-delivered);
-}
-
-.pipe__stage[data-status="failed"] .pipe__dot {
-  border-color: var(--status-failed);
-  background: var(--status-failed);
-}
-
-.pipe__stage[data-status="active"] .pipe__dot {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 30%, var(--surface-1));
-  animation: stage-pulse 1.6s ease-in-out infinite;
-}
-
-.pipe__label {
-  overflow: hidden;
-  max-width: 100%;
-  color: var(--text-muted);
-  font-size: 0.68rem;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pipe__stage[data-status="active"] .pipe__label {
-  color: var(--accent);
-}
-
-.pipe__now {
-  overflow: hidden;
-  margin: 0;
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -442,24 +359,31 @@
   color: var(--accent);
 }
 
-/* ---- Cursor: its dark agent panel, in both themes. ---- */
+/* ---- Cursor: a white card under its black title bar, like its light and dark looks together. ---- */
 .block[data-skin="editor"] .block__frame {
-  border-color: var(--cursor-line);
-  border-radius: 0.75rem;
+  gap: 0;
+  padding: 0;
+  border-color: var(--border-strong);
+  border-radius: 0.85rem;
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.block[data-skin="editor"]:hover .block__frame {
+  border-color: var(--cursor-bg);
+}
+
+.block[data-skin="editor"] .block__bar {
+  padding: 0.6rem var(--space-4);
   background: var(--cursor-bg);
   color: var(--cursor-ink);
 }
 
-.block[data-skin="editor"]:hover .block__frame {
-  border-color: color-mix(in srgb, var(--cursor-ink) 25%, var(--cursor-line));
-}
-
-/* Cursor's panel is dark in both themes, so its mark is always drawn light. */
-.block[data-skin="editor"] .logo {
+/* The fallback pointer sits on a dark chip; the official app icon brings its own tile. */
+.block[data-skin="editor"] .logo:not([data-tile]) {
   background: var(--cursor-chip);
   color: var(--cursor-ink);
 }
-
 
 .cursor__mode {
   padding: 0.05rem var(--space-2);
@@ -469,9 +393,14 @@
   font-size: var(--text-xs);
 }
 
+.block[data-skin="editor"] .status-badge {
+  background: var(--cursor-chip);
+}
+
 .cursor__task {
   overflow: hidden;
   margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-1);
   font-size: var(--text-md);
   font-weight: 600;
   text-overflow: ellipsis;
@@ -480,7 +409,8 @@
 
 .block[data-skin="editor"] .block__lines {
   gap: 0.25rem;
-  color: var(--cursor-muted);
+  padding: 0 var(--space-3);
+  color: var(--text-muted);
 }
 
 .block[data-skin="editor"] .block__line {
@@ -490,16 +420,16 @@
 }
 
 .block[data-skin="editor"] .block__line:has(.cursor__edited) {
-  background: var(--cursor-chip);
-  color: var(--cursor-ink);
+  background: var(--surface-2);
+  color: var(--text);
 }
 
-.cursor__file {
-  color: var(--cursor-muted);
+.cursor__file,
+.cursor__dir {
+  color: var(--text-muted);
 }
 
 .cursor__dir {
-  color: var(--cursor-muted);
   font-weight: 400;
 }
 
@@ -508,33 +438,33 @@
   padding: 0 0.35rem;
   border-radius: var(--radius-sm);
   background: var(--diff-add-soft);
-  color: var(--diff-add);
+  color: #1f7a33;
   font-size: 0.68rem;
   font-weight: 600;
+}
+
+.block[data-skin="editor"] .block__foot {
+  padding: var(--space-3);
 }
 
 .cursor__input {
   display: flex;
   justify-content: space-between;
   padding: 0.35rem var(--space-3);
-  border: 1px solid var(--cursor-line);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  background: var(--cursor-bar);
-  color: var(--cursor-muted);
+  background: var(--surface-1);
+  color: var(--text-muted);
   font-size: var(--text-xs);
 }
 
 .block[data-skin="editor"]:hover .cursor__input {
-  border-color: color-mix(in srgb, var(--cursor-ink) 35%, var(--cursor-line));
-  color: var(--cursor-ink);
+  border-color: var(--cursor-bg);
+  color: var(--text);
 }
 
 .block[data-skin="editor"] .block__toggle {
-  color: var(--cursor-muted);
-}
-
-.block[data-skin="editor"] .status-badge {
-  background: var(--cursor-chip);
+  color: var(--text-muted);
 }
 
 /* ---- Details sheet: drops below the card, in the block's own surface. ---- */
@@ -561,12 +491,6 @@
   border-color: var(--claude-line);
   background: var(--claude-ivory);
   color: var(--claude-ink);
-}
-
-.block[data-skin="editor"] .block__sheet {
-  border-color: var(--cursor-line);
-  background: var(--cursor-bg);
-  color: var(--cursor-ink);
 }
 
 .sheet__facts {
@@ -621,10 +545,6 @@
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
-}
-
-.block[data-skin="editor"] .sheet__bar > span {
-  background: var(--diff-add);
 }
 
 .sheet__agents ul {

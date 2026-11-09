@@ -13,6 +13,7 @@ import { runsHash, useRoute } from "../route";
 import { useRuns } from "../runs/useRuns";
 import { deriveBlocks, deriveDetails, deriveHops, deriveStages } from "../single/pipeline";
 import { PANELS, type PanelId } from "../single/panels/registry";
+import { useWorkspace } from "../sessions/useWorkspace";
 import { useLatestSession } from "../single/useLatestSession";
 import { createRenderDetail } from "./detailRenderer";
 import "./SingleView.css";
@@ -40,6 +41,7 @@ export function SingleView({ search = window.location.search, actions }: Props) 
 
   const live = useBoard(runId);
   const board = runId === undefined ? (fixtureMode ? ALL_FIXTURES[params.fixture] : undefined) : live.board;
+  const workspace = useWorkspace(!fixtureMode);
   const session = useLatestSession(!fixtureMode || runId !== undefined);
   const renderDetail = useMemo(() => {
     if (board === undefined) return undefined;
@@ -66,7 +68,7 @@ export function SingleView({ search = window.location.search, actions }: Props) 
   );
 
   return (
-    <AppShell label="Knit pipeline" actions={<>{configButton}{actions}</>}>
+    <AppShell label="Knit pipeline" workspace={workspace} actions={<>{configButton}{actions}</>}>
       <div className="single">
         <section className="single__stage" aria-label="Claude, orchestrator and Cursor pipeline">
           {runId !== undefined ? <LiveStatus connection={live.connection} error={live.error} /> : null}

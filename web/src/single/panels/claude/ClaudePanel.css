@@ -27,41 +27,6 @@
   min-height: 10rem;
 }
 
-.claude-panel__side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
-/* In the wide modal the chat takes the left and usage, plan drafts and the terminal command sit beside it. */
-@media (min-width: 900px) {
-  .claude-panel__scroll:has(> .claude-panel__side) {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
-    grid-auto-rows: min-content;
-    align-items: start;
-    gap: var(--space-4);
-  }
-
-  .claude-panel__scroll > .claude-panel__error {
-    grid-column: 1 / -1;
-  }
-
-  .claude-panel__side {
-    position: sticky;
-    top: 0;
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .claude-panel__scroll > .chat-timeline,
-  .claude-panel__scroll > .empty-chat {
-    grid-column: 1;
-    grid-row: 1;
-  }
-}
-
 .claude-panel__note {
   margin: auto;
   color: var(--text-muted);
@@ -171,7 +136,42 @@
   scrollbar-color: color-mix(in srgb, var(--text) 25%, transparent) transparent;
 }
 
-/* Air between the side column and the scrollbar next to it. */
-.claude-panel__side {
-  padding: var(--space-1) var(--space-4) var(--space-3) var(--space-1);
+/* The usage view: Claude's scene and the plan bars, centered with air around them. */
+.claude-usage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: min(30rem, 100%);
+  margin: var(--space-3) auto;
+  padding: 0 var(--space-3);
+}
+
+/* Two tabs under the session bar: the conversation and the usage view. */
+.claude-tabs {
+  display: flex;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--claude-line);
+}
+
+.claude-tabs__tab {
+  margin-bottom: -1px;
+  padding: var(--space-1) 0 var(--space-2);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.claude-tabs__tab[aria-selected="true"] {
+  border-bottom-color: var(--agent-claude);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.claude-tabs__tab:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }

@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from "react";
 import { Popover } from "./Popover";
+import { modelChoices, modelInfo } from "../sessions/models";
 import type { AgentView, Profile, ProfileField } from "../sessions/types";
 import "./ProfileBar.css";
 
@@ -13,7 +14,8 @@ interface Props {
   modelRef?: RefObject<HTMLButtonElement | null>;
 }
 
-const EFFORTS = ["low", "medium", "high"];
+/** The levels `--effort` accepts, from lightest to heaviest. The slider starts at "Default": the agent's own choice. */
+const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 const PERMISSIONS: { value: string; label: string; hint: string }[] = [
   { value: "", label: "Default", hint: "Ask before edits" },
   { value: "acceptEdits", label: "Accept edits", hint: "Edit files without asking" },
@@ -63,6 +65,7 @@ export function ProfileBar({ agent, models, profile, onChange, modelRef }: Props
     else next[field] = value;
     onChange(next);
   };
+  const effortIndex = profile.effort === undefined ? 0 : Math.max(0, EFFORTS.indexOf(profile.effort) + 1);
   const permission = PERMISSIONS.find((p) => p.value === (profile.permissionMode ?? ""));
 
   return (
@@ -74,7 +77,7 @@ export function ProfileBar({ agent, models, profile, onChange, modelRef }: Props
           triggerClassName="chip"
           trigger={
             <>
-              <span className="chip__main">{showModel ? (profile.model ?? "Default model") : profile.effort ? "Effort" : "Default effort"}</span>
+              <span className="chip__main">{showModel ? (profile.model === undefined ? "Default model" : modelInfo(profile.model).name) : profile.effort ? "Effort" : "Default effort"}</span>
               {profile.effort ? <span className="chip__sub">{profile.effort}</span> : null}
             </>
           }
@@ -85,21 +88,43 @@ export function ProfileBar({ agent, models, profile, onChange, modelRef }: Props
                 <input className="pick-input" type="text" aria-label="Model" value={profile.model ?? ""} placeholder="Default model" autoComplete="off" spellCheck={false} onChange={(e) => set("model", e.target.value.trim())} />
               ) : (
                 <>
-                  <Option checked={profile.model === undefined} label="Default" hint="The agent's own default" onPick={() => set("model", "")} />
-                  {models.map((m) => (
-                    <Option key={m} checked={profile.model === m} label={m} onPick={() => set("model", m)} />
+                  <Option checked={profile.model === undefined} label="Default (recommended)" hint="The agent's own default" onPick={() => set("model", "")} />
+                  {modelChoices(models).map((m) => (
+                    <Option key={m.id} checked={profile.model !== undefined && modelInfo(profile.model).name === m.name} label={m.name} {...(m.hint === undefined ? {} : { hint: m.hint })} onPick={() => set("model", m.id)} />
                   ))}
                 </>
               )}
             </Group>
           ) : null}
           {showEffort ? (
-            <Group label="Effort" heading="Effort">
-              <Option checked={profile.effort === undefined} label="Default" onPick={() => set("effort", "")} />
-              {EFFORTS.map((e) => (
-                <Option key={e} checked={profile.effort === e} label={e} onPick={() => set("effort", e)} />
-              ))}
-            </Group>
+            <div className="effort">
+              <p className="pick-group__heading">{`Effort (${profile.effort ?? "Default"})`}</p>
+              <div className="effort__track">
+                <span className="effort__dots" aria-hidden="true">
+                  {Array.from({ length: EFFORTS.length + 1 }, (_, i) => (
+                    <span key={i} data-reached={i <= effortIndex} />
+                  ))}
+                </span>
+                <input
+                  className="effort__slider"
+                  type="range"
+                  min={0}
+                  max={EFFORTS.length}
+                  step={1}
+                  value={effortIndex}
+                  aria-label="Effort"
+                  aria-valuetext={profile.effort ?? "Default"}
+                    onChange={(e) => {
+                    const i = Number(e.target.value);
+                    set("effort", i === 0 ? "" : EFFORTS[i - 1]!);
+                  }}
+                />
+              </div>
+              <div className="effort__scale" aria-hidden="true">
+                <span>Default</span>
+                <span>Max</span>
+              </div>
+            </div>
           ) : null}
         </Popover>
       ) : null}

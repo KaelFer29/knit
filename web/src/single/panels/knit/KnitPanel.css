@@ -93,3 +93,49 @@
   color: var(--text);
   font-weight: 600;
 }
+
+/* The run on top, then the queue beside run control and the runs list. */
+.knit-panel__stages,
+.knit-panel__empty {
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+
+.knit-panel__empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.knit-panel__empty-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.knit-panel__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.knit-panel__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .knit-panel__cols:not([data-empty]) {
+    grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 1fr);
+  }
+
+  .knit-panel__cols[data-empty] {
+    max-width: 40rem;
+  }
+}

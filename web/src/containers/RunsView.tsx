@@ -13,10 +13,12 @@ interface Props {
   selectedId?: string | undefined;
   /** Makes a run the one the view shows; `undefined` goes back to the most recent run. */
   onSelect: (runId: string | undefined) => void;
+  /** Opens the form that starts a run: when there is nothing else to look at, it is the first thing to see. */
+  startOpen?: boolean;
 }
 
 /** Container: the runs picker (newest first) with the form that starts a new run. A started run becomes the shown one. */
-export function RunsView({ pollMs, selectedId, onSelect }: Props) {
+export function RunsView({ pollMs, selectedId, onSelect, startOpen = false }: Props) {
   const { runs, error, reload } = useRuns(pollMs);
   const [busy, setBusy] = useState(false);
   const [startError, setStartError] = useState<string>();
@@ -34,7 +36,7 @@ export function RunsView({ pollMs, selectedId, onSelect }: Props) {
   };
   return (
     <>
-      <details className="knit-panel__start">
+      <details className="knit-panel__start" open={startOpen || undefined}>
         <summary>Start a run</summary>
         <StartRunForm busy={busy} error={startError} onStart={(o) => void start(o)} />
       </details>

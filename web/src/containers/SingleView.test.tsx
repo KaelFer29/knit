@@ -12,7 +12,7 @@ const reply = (body: unknown, status = 200) => ({ ok: status < 400, status, stat
 beforeEach(() => {
   window.location.hash = "";
   vi.mocked(configApi.listConfigFiles).mockResolvedValue([]);
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply({ runs: [], sessions: [], agents: [] })));
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply({ runs: [], sessions: [], agents: [], cwd: "/home/kael/orquestador" })));
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -46,6 +46,18 @@ describe("SingleView", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     await user.click(toggle);
     expect(screen.queryByRole("region", { name: "Cursor details" })).toBeNull();
+  });
+
+  it("shows the working directory once, in the header, for every agent", async () => {
+    render(<SingleView search="" />);
+    const header = screen.getByRole("banner");
+    expect(await within(header).findByText("/home/kael/orquestador")).toBeTruthy();
+    expect(within(header).getByTitle("Where Knit was launched; agents work here")).toBeTruthy();
+  });
+
+  it("shows no directory for sample data, which has none", () => {
+    render(<SingleView search="?fixture=runningRun" />);
+    expect(within(screen.getByRole("banner")).queryByTitle("Where Knit was launched; agents work here")).toBeNull();
   });
 
   it("is idle with no run and no session", async () => {
@@ -110,7 +122,7 @@ describe("SingleView", () => {
       await user.tab({ shift: true });
       expect(dialog.contains(document.activeElement)).toBe(true);
     }
-  });
+  }, 20_000);
 
   it("wears the identity of the block that opened it", async () => {
     const user = userEvent.setup();

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentView, Profile } from "../sessions/types";
@@ -27,25 +27,44 @@ describe("ProfileBar", () => {
     expect(screen.getByRole("button", { name: "Permission mode" }).textContent).toContain("Permissions: Default");
   });
 
-  it("picks a model from the list and reports it", async () => {
+  it("lists the models by name with a description, the agent's default first, and reports the pick", async () => {
     const user = userEvent.setup();
-    const onChange = setup();
+    const onChange = setup(agent(), {}, ["sonnet", "opus", "claude-sonnet-5-5"]);
     await user.click(screen.getByRole("button", { name: "Model and effort" }));
     const models = within(screen.getByRole("radiogroup", { name: "Model" }));
-    expect(models.getByRole("radio", { name: "Default" }).getAttribute("aria-checked")).toBe("true");
-    await user.click(models.getByRole("radio", { name: "deep" }));
-    expect(onChange).toHaveBeenCalledWith({ model: "deep" });
+    expect(models.getAllByRole("radio").map((r) => r.getAttribute("aria-label"))).toEqual(["Default (recommended)", "Sonnet 5.5", "Opus 5.5"]);
+    expect(models.getByRole("radio", { name: "Default (recommended)" }).getAttribute("aria-checked")).toBe("true");
+    expect(models.getByText("Most efficient for simpler tasks")).toBeTruthy();
+    await user.click(models.getByRole("radio", { name: "Opus 5.5" }));
+    expect(onChange).toHaveBeenCalledWith({ model: "opus" });
   });
 
-  it("picks an effort, and clears a choice with Default", async () => {
+  it("shows the model chip with the model's name", () => {
+    setup(agent(), { model: "sonnet" }, ["sonnet"]);
+    expect(screen.getByRole("button", { name: "Model and effort" }).textContent).toContain("Sonnet 5.5");
+  });
+
+  it("sets the effort with a slider that moves along five levels, Default at the start, and reports it", async () => {
     const user = userEvent.setup();
-    const onChange = setup(agent(), { model: "deep", effort: "low" });
+    const onChange = setup(agent(), { model: "deep" });
     await user.click(screen.getByRole("button", { name: "Model and effort" }));
-    const effort = screen.getByRole("radiogroup", { name: "Effort" });
-    expect(within(effort).getByRole("radio", { name: "low" }).getAttribute("aria-checked")).toBe("true");
-    await user.click(within(effort).getByRole("radio", { name: "high" }));
+    const slider = screen.getByRole("slider", { name: "Effort" }) as HTMLInputElement;
+    expect(slider.getAttribute("aria-valuetext")).toBe("Default");
+    expect(slider.max).toBe("5");
+    fireEvent.change(slider, { target: { value: "3" } });
     expect(onChange).toHaveBeenLastCalledWith({ model: "deep", effort: "high" });
-    await user.click(within(effort).getByRole("radio", { name: "Default" }));
+    fireEvent.change(slider, { target: { value: "5" } });
+    expect(onChange).toHaveBeenLastCalledWith({ model: "deep", effort: "max" });
+  });
+
+  it("reads the effort in use on the slider, and clears it at the start", async () => {
+    const user = userEvent.setup();
+    const onChange = setup(agent(), { model: "deep", effort: "medium" });
+    await user.click(screen.getByRole("button", { name: "Model and effort" }));
+    const slider = screen.getByRole("slider", { name: "Effort" }) as HTMLInputElement;
+    expect(slider.value).toBe("2");
+    expect(screen.getByText("Effort (medium)")).toBeTruthy();
+    fireEvent.change(slider, { target: { value: "0" } });
     expect(onChange).toHaveBeenLastCalledWith({ model: "deep" });
   });
 

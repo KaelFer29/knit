@@ -1,31 +1,37 @@
 .run-summary {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--surface-1);
+  background:
+    radial-gradient(60% 120% at 0% 0%, color-mix(in srgb, var(--agent-knit) 8%, transparent), transparent 70%),
+    var(--surface-1);
+  box-shadow: var(--shadow-sm);
 }
 
 .run-summary__top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
 }
 
-.run-summary__plan {
+.run-summary__who {
   min-width: 0;
+}
+
+.run-summary__plan {
   margin: 0;
-  font-size: var(--text-md);
+  font-size: 1.2rem;
   font-weight: 650;
   letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
 
 .run-summary__id {
-  margin: 0;
+  margin: 2px 0 0;
   color: var(--text-faint);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -33,20 +39,18 @@
 }
 
 .run-summary__bar {
-  height: 4px;
+  height: 6px;
   overflow: hidden;
-  border-radius: 2px;
+  border-radius: 3px;
   background: var(--surface-3);
 }
 
 .run-summary__fill {
   display: block;
   height: 100%;
-  background: var(--status-running);
-}
-
-.run-summary[data-status="passed"] .run-summary__fill {
-  background: var(--status-delivered);
+  border-radius: inherit;
+  background: var(--agent-knit);
+  transition: width var(--duration-slow) var(--ease-out);
 }
 
 .run-summary[data-status="failed"] .run-summary__fill {
@@ -54,11 +58,29 @@
 }
 
 .run-summary__stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: var(--space-3);
   margin: 0;
+}
+
+.run-summary__stat dt {
   color: var(--text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.run-summary__stat dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-summary__fill {
+    transition: none;
+  }
 }

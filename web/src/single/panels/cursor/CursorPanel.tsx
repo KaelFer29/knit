@@ -39,14 +39,16 @@ function Waiting() {
   return (
     <section className="cursor-panel__idle" aria-label="Cursor is idle">
       <BrandArt identity={AGENTS.cursor} className="cursor-panel__idle-art" />
-      <h3 className="cursor-panel__idle-title">Waiting for a task</h3>
-      <p className="cursor-panel__idle-text">Cursor is the hands of the workflow: it works when the orchestrator hands it one. You do not write to it; you watch it.</p>
-      <ul className="cursor-panel__idle-list" aria-label="What will appear here">
-        <li>Its reasoning and every tool it uses, live</li>
-        <li>The changes it makes, task by task</li>
-        <li>The files it touched and the repository</li>
-        <li>Tokens, attempts and time</li>
-      </ul>
+      <div className="cursor-panel__idle-body">
+        <h3 className="cursor-panel__idle-title">Waiting for a task</h3>
+        <p className="cursor-panel__idle-text">Cursor is the hands of the workflow: it works when the orchestrator hands it one. You do not write to it; you watch it.</p>
+        <ul className="cursor-panel__idle-list" aria-label="What will appear here">
+          <li>Its reasoning and every tool it uses, live</li>
+          <li>The changes it makes, task by task</li>
+          <li>The files it touched and the repository</li>
+          <li>Tokens, attempts and time</li>
+        </ul>
+      </div>
     </section>
   );
 }
