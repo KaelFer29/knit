@@ -1,0 +1,123 @@
+.tl-entry {
+  min-width: 0;
+  font-size: var(--text-md);
+}
+
+.tl-entry__text {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.tl-entry__meta {
+  margin-bottom: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.tl-entry--prompt {
+  align-self: flex-end;
+  max-width: min(42rem, 90%);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-3);
+}
+
+.tl-entry--message {
+  max-width: 48rem;
+}
+
+.tl-entry--thinking {
+  max-width: 48rem;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.tl-entry--thinking summary,
+.tl-entry--tool summary {
+  cursor: pointer;
+}
+
+.tl-entry--muted {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.tl-entry--tool {
+  max-width: 48rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  font-size: var(--text-sm);
+}
+
+.tl-entry--tool summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.tl-entry__tool {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.tl-entry__state {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.tl-entry--tool[data-state="running"] .tl-entry__state {
+  color: var(--status-running);
+}
+
+.tl-entry--tool[data-state="failed"] .tl-entry__state {
+  color: var(--status-failed);
+}
+
+.tl-entry__pre {
+  max-height: 14rem;
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tl-entry--result {
+  max-width: 48rem;
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--border-strong);
+}
+
+.tl-entry--result[data-state="failed"] .tl-entry__meta {
+  color: var(--status-failed);
+}
+
+.tl-entry--working {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--status-running);
+  font-size: var(--text-sm);
+}
+
+.tl-entry__dots {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentcolor;
+  animation: tl-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes tl-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}

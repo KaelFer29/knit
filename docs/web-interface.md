@@ -268,6 +268,27 @@ Built in task T6 on top of the flow canvas: the `renderDetail` slot of every dis
 | Cursor | none of its own: its work is opened task by task |
 
 Gaps: Knit stores only the failed check's command, not its output, so the "check output" is shown for the setup command only; the retry feedback is rebuilt from the verdicts, not read from a stored prompt. The agent output, the plan and the patch always render as text (never as markup).
+## Workspace (built)
+
+Built in task T12: the sessions of any agent in one place (S10, S13, S16, D5, D8 to D10). The page is at `#/workspace` (a header link next to Runs); `#/workspace/<id>` opens a session and `#/workspace/new` the new-session form. Everything it shows comes from the [session routes](#sessions); nothing in `web/` checks an agent's name. An agent the interface has no brand for gets a neutral monogram identity (`identityOf`), so a new adapter appears without a change to the components.
+
+| Piece | Where | Notes |
+| --- | --- | --- |
+| `WorkspaceView` (container) | `containers/WorkspaceView.tsx` | Fetches agents, the session list (every 3 s) and the open session, owns the composer's choices (per-agent profile, directory), starts turns and hands everything to presentational components |
+| `useSessionLive` | `sessions/useSessionLive.ts` | Keeps one session current: its record and turns plus the timeline entries after the last id it holds (no gap, no repeat). About every 0.8 s while a turn runs, every 4 s otherwise. It polls instead of using SSE: sessions have their own id sequence and one session is a few rows; the run stream stays SSE |
+| `SessionList`, `SessionRow` | `organisms/`, `molecules/` | Every session, most recent first: agent logo, title, relative time or "Running", turns and tokens. Buttons with `aria-current` on the open one |
+| `SessionHeader`, `NewSessionHeader` | `organisms/` | Title, agent and directory plus the "Continue in terminal" command with a copy button (only when the server sent `continueCommand`); or one radio per agent the server lists and the directory field |
+| `UsagePanel`, `UsageMeter` | `organisms/`, `molecules/` | Session tokens (summed over its turns) and one bar per plan window in `meta.planUsage`, with the percentage written out and the reset time. An agent whose `planUsage` capability is false gets "This agent does not report plan usage." instead of bars. Toggled by the Usage button or `/usage` |
+| `Timeline`, `TimelineEntry` | `organisms/`, `molecules/` | The shared timeline: prompt, messages, reasoning, tool calls (arguments and result, paired by call id), the closing result with duration and tokens, and a working marker. Reasoning is shown when present and as "Reasoning not shared by the agent" otherwise (S8). Output is only ever text. `sessions/timeline.ts` builds the items from turns and events (pure, unit tested) |
+| `Composer`, `CommandPalette`, `ProfileBar` | `organisms/`, `molecules/` | Prompt field (Enter sends, Shift+Enter adds a line) with the palette that opens on a lone `/word`, and the per-turn profile |
+
+**Command palette (D9).** `paletteCommands` builds it from capabilities: Knit's own commands first (`/clear` always, `/model` if the agent can choose a model, `/usage` if it reports plan usage), then the agent's own list from `meta.commands` when it declares `commandList` (a Knit command hides an agent command of the same name). Arrow keys move, Enter or Tab picks, Escape closes. A Knit command runs at once (`/clear` opens the new-session form, `/model` focuses the model field, `/usage` opens the panel); an agent command is completed into the field and sent to the agent as the prompt.
+
+**Profile (D5, level 1).** Next to the composer: only the fields the agent's `profileFields` lists, and the model as a picker (from `GET /api/agents/:agent/models`) only when it declares `chooseModel`, free text if the list is empty. The values travel as the turn's profile and become CLI flags. They are remembered per agent while the page is open and never written anywhere else.
+
+**Sending.** A session that is running, or a request in flight, disables Send and says why. The server answers `202` only when the child has recorded its turn, so the page then reads again at once. A refusal (`409`, `400`, `502`) is shown as an alert and keeps the text. An agent that cannot resume gets no composer on a session that already has a conversation.
+
+**Shared timeline components.** The timeline components of T6 and T7 were not on this branch's base, so the workspace has its own `Timeline` and `TimelineEntry` over the same normalized entry kinds. When those tasks land, replacing `TimelineEntry` with the shared one is a change in one molecule.
 
 ## HTTP API
 
@@ -353,6 +374,23 @@ Rules files may be created (`expectedHash: "absent"`); names are checked per seg
 - Known limit: a directory swapped for a symlink between the check and the rename is not defended against (same-user local race). The files are shown as they are, so secrets inside `cli-config.json` are visible to whoever holds the launch token.
 
 **In the app** (`#/config`, tab "Configuration"): files are grouped by agent and scope; the editor is a plain text area; "Review changes" (enabled only when the text changed and, for JSON files, still parses) shows a line diff (`web/src/config/diff.ts`), and only that step offers "Save". A `409` offers "Reload the file".
+### Sessions
+
+Phase B (`src/server/routes/sessions.ts`). Reads go through the `SessionReader` port (a read-only SQLite connection that never writes or migrates; a database from before schema 5 reads as having no sessions). A turn starts by spawning `knit chat` through the same spawner as run control, so the server never writes the database. The session dependencies (`SessionsDeps`: the reader and one `AgentInfo` per agent) travel inside `ControlDeps.sessions`: without control (no build) the read routes answer empty lists and the POSTs `503`.
+
+`AgentInfo` is built in `cli/commands/ui.ts`, the one place that knows the adapters: id, label, the adapter's declared `capabilities`, the `profileFields` it takes (`model`, `effort`, `permissionMode`), `listModels` and the terminal command that resumes its own session. The page renders from that, never from an agent's name.
+
+| Route | Returns / does |
+| --- | --- |
+| `GET /api/agents` | `{ agents: [{ id, label, capabilities, profileFields }] }` |
+| `GET /api/agents/:agent/models` | `{ models }` from `listModels`; empty for an agent that cannot choose its model or cannot be asked; `404` for an unknown agent |
+| `GET /api/sessions` | `{ sessions: [{ session, turnCount, inputTokens, outputTokens }] }`, most recently active first |
+| `GET /api/sessions/:id` | `{ session, turns, meta, lastEventId, continueCommand? }`. `meta` is the newest `commands` and `planUsage` any turn reported (plus `model`); `continueCommand` is `cd '<cwd>' && <agent> --resume <agent session id>`, present once the agent reported its session id and only if it can resume |
+| `GET /api/sessions/:id/events?after=<id>` | `{ sessionId, events, lastEventId }`: timeline entries with `id > after` (at most 2000), so a poller resumes with no gap or duplicate |
+| `POST /api/sessions` | `{ agent, cwd, prompt, profile? }` runs `knit chat --agent <a> --cwd <cwd> [profile flags] --data-dir <dir> -- <prompt>` and answers `202 { sessionId, logPath }` once a new session shows up |
+| `POST /api/sessions/:id/turns` | `{ prompt, profile? }` runs `knit chat --session <id> ...` and answers `202 { sessionId, logPath }` once the turn is recorded; `409` while a turn is running or when the agent cannot resume |
+
+`cwd` must be an absolute existing directory; `prompt` at most 32,000 characters; a profile field must be one the agent takes and match `[A-Za-z0-9][A-Za-z0-9._:/[\]-]*` (never starts with a dash). The prompt goes after `--`, so a prompt that starts with a dash is still a prompt. `502` and `504` as for run control when the child dies or is too slow to record its turn.
 
 ### Adding routes
 

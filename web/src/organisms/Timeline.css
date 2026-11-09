@@ -1,0 +1,19 @@
+.timeline {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 12rem;
+  padding: var(--space-4);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-0);
+}
+
+.timeline__empty {
+  margin: auto;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}

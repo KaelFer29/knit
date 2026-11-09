@@ -1,0 +1,28 @@
+.profile-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.profile-bar__field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.profile-bar__label {
+  color: var(--text-muted);
+}
+
+.profile-bar__field select,
+.profile-bar__field input {
+  width: 9.5rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
