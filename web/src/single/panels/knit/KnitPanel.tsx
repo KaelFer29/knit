@@ -9,9 +9,9 @@ import { RunSummary } from "./RunSummary";
 import "./KnitPanel.css";
 
 /**
- * The orchestrator's panel. The run on top (plan, numbers, and its five stages as one track), then two columns: the
- * task queue in order, each task with its checks and verdicts one click away, and beside it run control and the runs
- * list as a picker. There is no form to start a run: plans are drafted in Claude and sent from there.
+ * The orchestrator's panel, in one column. The run comes first as one unit: its summary, its five stages as one track,
+ * run control and its tasks nested under it (a task belongs to the run it is under). Below, the runs list switches
+ * to another run. There is no form to start a run: plans are drafted in Claude and sent from there.
  */
 export function KnitPanel({ board, runId, live, renderDetail, selectRun }: PanelProps) {
   const stages = useMemo(() => deriveStages(board), [board]);
@@ -24,33 +24,22 @@ export function KnitPanel({ board, runId, live, renderDetail, selectRun }: Panel
           <StageTrack stages={stages} label="Run stages" detail="each" size="large" />
         </section>
       ) : (
-        <>
+        <section className="knit-panel__run" aria-label={`Run ${board.planName}`}>
           <RunSummary board={board} />
-          <section className="knit-panel__stages" aria-label="Stages">
+          <div className="knit-panel__stages">
             <StageTrack stages={stages} label="Run stages" detail="each" size="large" />
-          </section>
-        </>
+          </div>
+          {live ? <RunControlBar board={board} /> : null}
+          <ol className="knit-panel__tasks" aria-label="Tasks of this run">
+            {board.tasks.map((task) => (
+              <li key={task.taskId}>
+                <TaskCard task={{ ...task, attempts: task.attempts.filter((a) => !a.setup).length }} renderDetail={renderDetail} />
+              </li>
+            ))}
+          </ol>
+        </section>
       )}
-      <div className="knit-panel__cols" data-empty={board === undefined || undefined}>
-        {board === undefined ? null : (
-          <section className="knit-panel__section knit-panel__main" aria-labelledby="knit-queue">
-            <h3 id="knit-queue" className="knit-panel__heading">
-              Task queue
-            </h3>
-            <ol className="knit-panel__list">
-              {board.tasks.map((task) => (
-                <li key={task.taskId}>
-                  <TaskCard task={{ ...task, attempts: task.attempts.filter((a) => !a.setup).length }} renderDetail={renderDetail} />
-                </li>
-              ))}
-            </ol>
-          </section>
-        )}
-        <div className="knit-panel__side">
-          {board !== undefined && live ? <RunControlBar board={board} /> : null}
-          <RunsView selectedId={runId} onSelect={selectRun} />
-        </div>
-      </div>
+      <RunsView selectedId={board?.runId ?? runId} onSelect={selectRun} />
     </div>
   );
 }

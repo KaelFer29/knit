@@ -1,28 +1,18 @@
 .task-card {
-  --card-border: var(--border);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-md);
-  background: var(--surface-0);
-  transition:
-    border-color var(--duration-base) var(--ease-out),
-    box-shadow var(--duration-base) var(--ease-out);
+  border-bottom: 1px solid var(--border);
 }
 
-.task-card:hover {
-  --card-border: var(--border-strong);
-}
-
-.task-card[data-state="failed"] {
-  --card-border: color-mix(in srgb, var(--state) 40%, var(--border));
+.task-card:last-child {
+  border-bottom: 0;
 }
 
 .task-card__trigger {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: center;
   gap: var(--space-3);
   width: 100%;
-  padding: var(--space-3);
+  padding: var(--space-2) 0;
   border: 0;
   border-radius: inherit;
   background: transparent;
@@ -32,15 +22,16 @@
   cursor: pointer;
 }
 
-.task-card__trigger .chevron {
-  margin-top: 2px;
+.task-card__trigger:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .task-card__position {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 999px;
   background: var(--surface-3);
   color: var(--text-muted);
@@ -49,25 +40,26 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Title and facts on one line; the title gives way first. */
 .task-card__text {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-3);
   min-width: 0;
 }
 
 .task-card__title {
-  display: -webkit-box;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
   font-size: var(--text-sm);
   font-weight: 560;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .task-card__meta {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -82,4 +74,16 @@
   gap: 4px;
   font-family: var(--font-mono);
   color: var(--text-faint);
+}
+
+@media (max-width: 640px) {
+  .task-card__text {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+
+  .task-card__title {
+    white-space: normal;
+  }
 }

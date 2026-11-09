@@ -6,26 +6,27 @@
 
 .runs-filter__chip {
   height: 26px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-1);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
   color: var(--text-muted);
   font: inherit;
   font-size: var(--text-xs);
   cursor: pointer;
 }
 
-.runs-filter__chip:hover {
-  border-color: var(--border-strong);
+.runs-filter__chip[aria-pressed="true"] {
+  border-bottom-color: var(--agent-knit);
+  color: var(--text);
+  font-weight: 600;
 }
 
-.runs-filter__chip[aria-pressed="true"] {
-  border-color: var(--text);
-  background: var(--text);
-  color: var(--surface-0);
+.runs-filter__chip:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
 }
 
 .runs-compact {
-  gap: var(--space-1);
+  gap: 0;
 }

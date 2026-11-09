@@ -76,4 +76,17 @@ describe("KnitPanel", () => {
     expect(screen.getByText(/Ask Claude for a plan/)).toBeTruthy();
     expect(await screen.findByText(/Plans come from Claude/)).toBeTruthy();
   });
+
+  it("keeps the summary, the stages and the tasks together under the run, and the runs list apart", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(200, { runs: [] })));
+    const p = props(ALL_FIXTURES.runningRun);
+    render(<KnitPanel {...p} />);
+    const run = within(screen.getByRole("region", { name: `Run ${p.board.planName}` }));
+    expect(run.getByRole("region", { name: "Run summary" })).toBeTruthy();
+    expect(run.getByRole("list", { name: "Run stages" })).toBeTruthy();
+    const tasks = run.getByRole("list", { name: "Tasks of this run" });
+    expect(within(tasks).getAllByRole("listitem")).toHaveLength(p.board.tasks.length);
+    expect(await screen.findByText("No runs yet")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: /^Runs/ })).queryByRole("list", { name: "Tasks of this run" })).toBeNull();
+  });
 });
