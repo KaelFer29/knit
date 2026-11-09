@@ -1,3 +1,4 @@
+import { openFollowups } from "../../core/board/followups.js";
 import type { RunStatus } from "../../core/ports/run-store.js";
 import { BASE_HEADERS, HttpError } from "../http.js";
 import type { RouteContext, RouteModule, ServerDeps } from "../types.js";
@@ -75,7 +76,8 @@ function openStream(deps: ServerDeps, { req, res, url, params }: RouteContext): 
           lastStatusCheck = deps.now();
           const status = reader.getRun(runId)?.status;
           finalStatus = status;
-          finished = status !== "running";
+          // A follow-up works on a run that is already finished: the stream stays open until it finishes too.
+          finished = status !== "running" && openFollowups(reader.getEventsAfter(runId, 0)).size === 0;
         }
         const events = reader.getEventsAfter(runId, eventId, BATCH);
         const agentEvents = reader.getAgentEventsAfter(runId, agentEventId, { limit: BATCH });

@@ -32,6 +32,11 @@ export interface LiveBoard {
   error: string | undefined;
   pulses: Pulse[];
   onPulseEnd: (id: string) => void;
+  /**
+   * Reads the board again and listens again from it. A finished run's stream has ended, so work that starts after that
+   * (a follow-up on one of its tasks) is only seen once the page reopens it.
+   */
+  reopen: () => void;
 }
 
 function partsOf(detail: RunDetail): SnapshotParts | undefined {
@@ -52,6 +57,7 @@ export function useBoard(runId: string | undefined, options: UseBoardOptions = {
   const [connection, setConnection] = useState<LiveBoard["connection"]>("idle");
   const [error, setError] = useState<string>();
   const [pulses, setPulses] = useState<Pulse[]>([]);
+  const [generation, setGeneration] = useState(0);
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
@@ -142,8 +148,9 @@ export function useBoard(runId: string | undefined, options: UseBoardOptions = {
       clearTimeout(refreshTimer);
       closeStream?.();
     };
-  }, [runId]);
+  }, [runId, generation]);
 
+  const reopen = useCallback(() => setGeneration((g) => g + 1), []);
   const onPulseEnd = useCallback((id: string) => setPulses((list) => list.filter((p) => p.id !== id)), []);
-  return { board, snapshot, connection, error, pulses, onPulseEnd };
+  return { board, snapshot, connection, error, pulses, onPulseEnd, reopen };
 }

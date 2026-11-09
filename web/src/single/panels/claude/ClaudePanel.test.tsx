@@ -507,6 +507,16 @@ describe("ClaudePanel: iterating on a delivered task", () => {
     expect((await within(region).findByRole("status")).textContent).toMatch(/Cursor is working/);
   });
 
+  it("makes the page listen to the run again once the follow-up was sent, so it shows up on the board", async () => {
+    details.a1 = detail("a1", "alpha", { turns: [{ id: 1, sessionId: "a1", seq: 1, prompt: "x", startedAt: NOW_ISO, status: "passed", resultText: FOLLOWUP }] });
+    const refreshRun = vi.fn();
+    const user = userEvent.setup();
+    render(withRun({ refreshRun }));
+    await choose(user);
+    await user.click(await screen.findByRole("button", { name: "Send to the orchestrator" }));
+    await waitFor(() => expect(refreshRun).toHaveBeenCalledTimes(1));
+  });
+
   it("offers no follow-up while no task is chosen, even if the answer has a followup block", async () => {
     details.a1 = detail("a1", "alpha", { turns: [{ id: 1, sessionId: "a1", seq: 1, prompt: "x", startedAt: NOW_ISO, status: "passed", resultText: FOLLOWUP }] });
     render(withRun());

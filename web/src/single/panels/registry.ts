@@ -37,6 +37,8 @@ export interface PanelProps {
   renderDetail: RenderDetail | undefined;
   /** Makes another run the one the view shows (`undefined` goes back to the most recent run). */
   selectRun: (runId: string | undefined) => void;
+  /** Makes the page listen to the run again, for work that starts after its stream ended (a follow-up). */
+  refreshRun?: () => void;
   /** Opens another panel over this one, for example the orchestrator on a run just started from Claude. */
   openPanel?: (id: PanelId) => void;
   /** The agent the panel belongs to (the id of its block); a panel for an agent only talks to that agent. */

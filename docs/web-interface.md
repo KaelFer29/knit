@@ -351,11 +351,12 @@ Errors are JSON, `{ "error": "<message>" }`, with the right status: `404` for an
 | --- | --- |
 | `event` | a lifecycle event (the `events` table row, with its `id`) |
 | `agent_event` | an agent timeline entry (the `agent_events` row, with its `id`) |
-| `done` | `{ "status": "passed" \| "failed" }`, sent once and followed by the end of the stream, when the run is no longer running and every row was delivered |
+| `done` | `{ "status": "passed" \| "failed" }`, sent once and followed by the end of the stream, when the run is no longer running, no follow-up on one of its tasks is still working (`followup.started` without its `followup.finished`) and every row was delivered |
 
 - **Ids.** Lifecycle events and agent events have separate id sequences, so one SSE id carries both cursors: `<lastEventId>.<lastAgentEventId>`. The id of each message is the pair of cursors right after that message. A poll sends its lifecycle rows first, then its agent rows. This is what makes resuming exact (the task's wording is "row `id` as the SSE `id`"; with two tables a single number cannot be unambiguous).
 - **Resuming.** A reconnecting browser sends `Last-Event-ID` and receives exactly the rows after that pair: no gap and no duplicate. The first connection of a page can pass `?after=<lastEventId>.<lastAgentEventId>` (the two values of the snapshot it just fetched); the header wins when both are present. With neither, the stream starts from the beginning of the run, in slices of 500 rows per poll. A malformed value is a `400`.
 - **Heartbeat.** A `: ping` comment every 15 s keeps idle connections open.
+- **Follow-ups.** A follow-up works on a run that is already finished, so the board treats a run as live while one is open (`openFollowups`, `core/board/followups.ts`): the task is running or verifying, the knit and Cursor nodes are working and the wires animate; `followup.started` pulses the first wire like a task starting. A page that was already open has no stream to a finished run, so `useBoard` exposes `reopen()` (it reads the board again and listens from its cursors) and Claude's modal calls it once a follow-up was sent.
 - **End.** The status of the run is checked about every 2 s while the stream is idle, and always before a poll, so the rows written before the run finished are delivered before `done`. The client must close its `EventSource` on `done`, or it reconnects and receives another `done`.
 - **Cost.** Polling stops as soon as the client disconnects. A failed read (the database being migrated by another process) is retried on the next poll.
 - **Not in the stream.** `task` and `attempt` messages (rows without an increasing id) are not sent: the page derives them from the lifecycle events, or refetches `GET /api/runs/:id`.

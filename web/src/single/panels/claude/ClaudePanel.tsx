@@ -38,7 +38,7 @@ const messageOf = (err: unknown): string => (err instanceof ApiError || err inst
  * its capabilities in `GET /api/agents`; nothing here looks at an agent's name. A turn never starts a run: only the
  * explicit "Send plan to the orchestrator" click does.
  */
-export function ClaudePanel({ agentId: panelAgent, board, runId, live: runIsLive, selectRun, openPanel }: PanelProps) {
+export function ClaudePanel({ agentId: panelAgent, board, runId, live: runIsLive, selectRun, refreshRun, openPanel }: PanelProps) {
   const [picked, setPicked] = useState<string | undefined>();
   const [listed, setListed] = useState(false);
   const [agents, setAgents] = useState<AgentView[]>([]);
@@ -306,6 +306,8 @@ export function ClaudePanel({ agentId: panelAgent, board, runId, live: runIsLive
               initial={instruction}
               onSend={async (text) => {
                 await sendFollowup(runId, target.taskId, text);
+                // The run's stream ended when it finished: listen again so the follow-up shows up and animates.
+                refreshRun?.();
               }}
               onOpenCursor={openPanel ? () => openPanel("cursor") : undefined}
             />
