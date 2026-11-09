@@ -63,6 +63,56 @@ describe("BranchesView", () => {
     expect((within(card).getByRole("button", { name: "Open pull request" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  describe("with many branches", () => {
+    const many = (n: number) => Array.from({ length: n }, (_, i) => branch({ taskId: `T${i + 1}`, title: `Task number ${i + 1}`, branch: `feat/b${i + 1}` }));
+
+    it("shows each as one collapsed row and opens its commits and actions on demand", async () => {
+      listing = { branches: many(3) };
+      const user = userEvent.setup();
+      show();
+      const row = await screen.findByRole("region", { name: "Branch feat/b2" });
+      expect(within(row).getByText("1 commit · Local only")).toBeTruthy();
+      expect(within(row).queryByText("docs: add prueba.md")).toBeNull();
+      expect(within(row).queryByRole("button", { name: "Open pull request" })).toBeNull();
+      const toggle = within(row).getByRole("button", { name: /T2/ });
+      expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      await user.click(toggle);
+      expect(toggle.getAttribute("aria-expanded")).toBe("true");
+      expect(within(row).getByText("docs: add prueba.md")).toBeTruthy();
+      expect(within(row).getByRole("button", { name: "Open pull request" })).toBeTruthy();
+      await user.click(toggle);
+      expect(within(row).queryByText("docs: add prueba.md")).toBeNull();
+    });
+
+    it("opens a lone branch by itself, since there is nothing to scan", async () => {
+      show();
+      expect(await screen.findByText("docs: add prueba.md")).toBeTruthy();
+    });
+
+    it("shows one page of branches and moves through the rest", async () => {
+      listing = { branches: many(8) };
+      const user = userEvent.setup();
+      show();
+      expect(await screen.findAllByRole("region", { name: /^Branch / })).toHaveLength(6);
+      expect(screen.getByText("1–6 of 8 branches")).toBeTruthy();
+      await user.click(screen.getByRole("button", { name: "Next page" }));
+      expect(screen.getAllByRole("region", { name: /^Branch / })).toHaveLength(2);
+    });
+
+    it("searches by task, title or branch name", async () => {
+      listing = { branches: many(8) };
+      const user = userEvent.setup();
+      show();
+      await screen.findAllByRole("region", { name: /^Branch / });
+      await user.type(screen.getByRole("searchbox", { name: "Search branches" }), "b7");
+      expect(screen.getAllByRole("region", { name: /^Branch / })).toHaveLength(1);
+      expect(screen.getByRole("region", { name: "Branch feat/b7" })).toBeTruthy();
+      await user.clear(screen.getByRole("searchbox", { name: "Search branches" }));
+      await user.type(screen.getByRole("searchbox", { name: "Search branches" }), "zzz");
+      expect(screen.getByText("No branch matches this search.")).toBeTruthy();
+    });
+  });
+
   it("says when there is nothing to show yet", async () => {
     listing = { branches: [] };
     show();

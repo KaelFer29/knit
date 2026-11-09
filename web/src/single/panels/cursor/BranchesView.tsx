@@ -1,8 +1,15 @@
 import { useMemo } from "react";
+import type { BranchView } from "../../../branches/types";
+import { useList } from "../../../lists/useList";
+import { ListToolbar } from "../../../molecules/ListToolbar";
+import { Pager } from "../../../molecules/Pager";
 import { draftPullRequest, openPullRequest, undoBranch } from "../../../branches/api";
 import { useBranches } from "../../../branches/useBranches";
 import { BranchCard, type BranchActions } from "../../../organisms/BranchCard";
 import "./BranchesView.css";
+
+const PAGE_SIZE = 6;
+const searchable = (b: BranchView): string[] => [b.taskId, b.title, b.branch];
 
 /**
  * The branches Cursor created for a run: what each holds and what can be done with it (undo it, or open its pull
@@ -18,6 +25,7 @@ export function BranchesView({ runId, pollMs }: { runId: string; pollMs?: number
     }),
     [runId],
   );
+  const list = useList({ items: listing?.branches ?? [], pageSize: PAGE_SIZE, fields: searchable });
   if (listing === undefined) {
     return error === undefined ? (
       <p className="detail-note" role="status">
@@ -40,9 +48,12 @@ export function BranchesView({ runId, pollMs }: { runId: string; pollMs?: number
           Could not refresh: {error}
         </p>
       )}
-      {listing.branches.map((b) => (
-        <BranchCard key={b.taskId} runId={runId} branch={b} actions={actions} onChanged={reload} />
+      {listing.branches.length > 1 ? <ListToolbar label="Search branches" query={list.query} onQuery={list.setQuery} summary={list.narrowed ? `${list.matching} of ${listing.branches.length} branches` : undefined} /> : null}
+      {list.view.total === 0 ? <p className="detail-note">No branch matches this search.</p> : null}
+      {list.view.items.map((b) => (
+        <BranchCard key={b.taskId} runId={runId} branch={b} actions={actions} onChanged={reload} defaultOpen={listing.branches.length === 1} />
       ))}
+      <Pager page={list.view} onPage={list.setPage} noun="branches" />
     </div>
   );
 }

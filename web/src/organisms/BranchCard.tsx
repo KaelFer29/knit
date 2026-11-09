@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import { ApiError } from "../api/client";
+import { Chevron } from "../atoms/Chevron";
 import { StatusBadge } from "../atoms/StatusBadge";
 import type { BranchView, PrDraft, PrResult, UndoMode, UndoResult } from "../branches/types";
 import { draftKey, draftOnce, forgetDraft, loadDraft, saveDraft } from "../branches/draftCache";
@@ -47,7 +48,9 @@ type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | undefined;
  * exactly what it will do; a pull request is drafted by a cheap model and edited before anything is pushed. The card
  * only renders and holds the state of its own forms; the actions come from the container.
  */
-export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: string; branch: BranchView; actions: BranchActions; onChanged: () => void }) {
+export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen = false }: { runId: string; branch: BranchView; actions: BranchActions; onChanged: () => void; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const sectionId = useId();
   const [panel, setPanel] = useState<Panel>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -127,11 +130,19 @@ export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: st
 
   return (
     <section className="branch" aria-label={`Branch ${b.branch}`} data-status={b.status}>
-      <header className="branch__head">
+      <button type="button" className="branch__toggle" aria-expanded={open} aria-controls={open ? sectionId : undefined} onClick={() => setOpen((v) => !v)}>
         <span className="branch__id">{b.taskId}</span>
         <span className="branch__title">{b.title}</span>
+        <span className="branch__summary">
+          {plural(state.ahead.length, "commit")} · {state.pushed ? "On origin" : "Local only"}
+          {b.prUrl ? " · PR" : ""}
+          {state.dirty || !state.exists ? " · !" : ""}
+        </span>
         <StatusBadge state={b.status === "passed" ? "delivered" : b.status === "failed" ? "failed" : "running"} />
-      </header>
+        <Chevron />
+      </button>
+      {open ? (
+        <div className="branch__body-wrap" id={sectionId}>
       <p className="branch__name">
         <span aria-hidden="true">⎇ </span>
         {b.branch}
@@ -301,6 +312,8 @@ export function BranchCard({ runId, branch: b, actions, onChanged }: { runId: st
             result.text
           )}
         </p>
+      ) : null}
+        </div>
       ) : null}
     </section>
   );
