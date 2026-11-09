@@ -70,4 +70,10 @@ describe("TaskCard", () => {
     expect(container.querySelector("img")).toBeNull();
     expect(screen.getByText("<img src=x onerror=alert(1)>")).toBeTruthy();
   });
+
+  it("explains the attempts and the dependency when the pointer rests on them", () => {
+    render(<TaskCard task={{ ...task, attempts: 2 }} />);
+    expect(screen.getByText("2 attempts").getAttribute("title")).toMatch(/failed check/i);
+    expect(screen.getByText("T3", { exact: false }).closest("[title]")?.getAttribute("title")).toMatch(/branch/i);
+  });
 });

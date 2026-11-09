@@ -1,11 +1,13 @@
+/* The changes of a task: a plain list under its heading. No box of its own, so its summary line reads as text. */
 .diff {
-  max-height: 28rem;
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.diff > .detail-note {
+  margin: 0 0 var(--space-1);
 }
 
 .diff__row {

@@ -31,7 +31,9 @@ export function BlockCard({ identity, view, details, stages, open, onOpen }: Pro
   const toggleRef = useRef<HTMLButtonElement>(null);
   const sheetId = useId();
   const style = { "--block-accent": identity.accent, "--block-soft": identity.accentSoft } as CSSProperties;
-  const badge = <StatusBadge state={NODE_STATUS_TONE[view.status]} label={NODE_STATUS_LABEL[view.status]} />;
+  // A block that runs on a model says which one; the status it used to show said nothing a glance did not.
+  const badge =
+    view.model === undefined ? <StatusBadge state={NODE_STATUS_TONE[view.status]} label={NODE_STATUS_LABEL[view.status]} /> : <span className="block__model">{view.model}</span>;
   const openButton = (children: ReactNode, className: string) => (
     <button type="button" className={`block__open ${className}`} data-panel-trigger={identity.id} aria-haspopup="dialog" aria-expanded={open} onClick={onOpen}>
       {children}

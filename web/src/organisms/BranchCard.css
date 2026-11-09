@@ -74,6 +74,11 @@
   color: var(--status-delivered);
 }
 
+.branch__chips > li[data-tone="merged"] {
+  background: var(--status-merged-soft);
+  color: var(--status-merged);
+}
+
 .branch__chips > li[data-tone="warn"] {
   background: var(--status-retrying-soft);
   color: var(--status-retrying);

@@ -185,3 +185,31 @@ describe("deriveDetails", () => {
     expect(cursor.facts).toEqual([{ label: "Task", value: "None" }]);
   });
 });
+
+describe("block models", () => {
+  it("names Claude's model and Cursor's, in place of a status that says nothing", () => {
+    const blocks = deriveBlocks(runningRun, claudeBusy);
+    expect(blocks.claude.model).toBe("Default");
+    const sonnet = deriveBlocks(runningRun, { ...claudeBusy, model: "claude-sonnet-5-5" });
+    expect(sonnet.claude.model).toBe("Sonnet 5.5");
+  });
+
+  it("names the model of the task Cursor is on, then of the last task, then the agent's default", () => {
+    const withModel = (ids: Record<string, string>) => ({ ...runningRun, tasks: runningRun.tasks.map((t) => (ids[t.taskId] ? { ...t, model: ids[t.taskId] } : t)) });
+    const active = withModel({ T3: "grok-4.7", T6: "composer-2.5-fast" });
+    expect(deriveBlocks(active, claudeBusy).cursor.model).toBe("grok-4.7");
+    // Nothing active: the last task of the plan is the one Cursor was given last.
+    const done = { ...active, active: undefined, tasks: active.tasks.map((t) => ({ ...t, state: "delivered" as const })) };
+    expect(deriveBlocks(done as typeof runningRun, undefined).cursor.model).toBe("composer-2.5-fast");
+    expect(deriveBlocks({ ...runningRun, tasks: runningRun.tasks.map((t) => ({ ...t, model: undefined })) }, undefined).cursor.model).toBe("Default");
+  });
+});
+
+describe("live plan usage", () => {
+  it("draws the meters from the live windows when they are given, so they do not wait for the next turn", () => {
+    const live = [{ label: "Current session", percent: 67 }];
+    expect(deriveDetails(runningRun, claudeBusy, live).claude.meters).toEqual([{ label: "Current session", ratio: 0.67 }]);
+    const stored = { ...claudeBusy, planUsage: [{ name: "five_hour", utilization: 0.42 }] };
+    expect(deriveDetails(runningRun, stored).claude.meters).toEqual([expect.objectContaining({ ratio: 0.42 })]);
+  });
+});

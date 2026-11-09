@@ -21,7 +21,7 @@ describe("KnitPanel", () => {
     const p = props();
     render(<KnitPanel {...p} />);
     expect(screen.getByRole("heading", { name: p.board.planName })).toBeTruthy();
-    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe(String(p.board.totals.tasks.delivered));
+    expect(screen.queryByRole("progressbar")).toBeNull();
     const cards = screen.getAllByRole("button").filter((b) => b.className.includes("task-card__trigger"));
     expect(cards).toHaveLength(p.board.tasks.length);
     expect(screen.getByRole("button", { name: "Resume" })).toBeTruthy();
@@ -88,5 +88,15 @@ describe("KnitPanel", () => {
     expect(within(tasks).getAllByRole("listitem")).toHaveLength(p.board.tasks.length);
     expect(await screen.findByText("No runs yet")).toBeTruthy();
     expect(within(screen.getByRole("region", { name: /^Runs/ })).queryByRole("list", { name: "Tasks of this run" })).toBeNull();
+  });
+
+  it("explains each number in the run summary when the pointer rests on it", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(200, { runs: [] })));
+    render(<KnitPanel {...props(ALL_FIXTURES.runningRun)} />);
+    const summary = within(screen.getByRole("region", { name: "Run summary" }));
+    for (const label of ["Delivered", "Attempts", "Tokens", "Elapsed"]) {
+      expect(summary.getByText(label).closest("dt")?.getAttribute("title"), label).toBeTruthy();
+    }
+    expect(summary.getByText("Attempts").closest("dt")?.getAttribute("title")).toMatch(/failed check/i);
   });
 });

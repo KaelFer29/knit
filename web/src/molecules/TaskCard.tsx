@@ -28,9 +28,13 @@ export function TaskCard({ task, renderDetail }: Props) {
           <span className="task-card__title">{task.title}</span>
           <span className="task-card__meta">
             <StatusBadge state={task.state} />
-            {task.attempts > 0 ? <span className="task-card__attempts">{task.attempts === 1 ? "1 attempt" : `${task.attempts} attempts`}</span> : null}
+            {task.attempts > 0 ? (
+              <span className="task-card__attempts" title="Times Cursor tried this task. A failed check sends it back for another attempt; the setup phase is not counted.">
+                {task.attempts === 1 ? "1 attempt" : `${task.attempts} attempts`}
+              </span>
+            ) : null}
             {task.dependsOn === undefined ? null : (
-              <span className="task-card__dependency">
+              <span className="task-card__dependency" title={`Starts from the branch of ${task.dependsOn}, so its pull request goes into that branch.`}>
                 <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
                   <path d="M4 3v5a3 3 0 0 0 3 3h5m0 0-2.5-2.5M12 11l-2.5 2.5" />
                 </svg>

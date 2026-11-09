@@ -181,9 +181,9 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
         {state.dirty ? <li data-tone="warn">Uncommitted changes</li> : null}
         {!state.exists ? <li data-tone="warn">Branch is gone</li> : null}
         {b.prUrl ? (
-          <li data-tone="ok">
+          <li data-tone={b.prState?.state === "merged" ? "merged" : b.prState?.state === "closed" ? "warn" : "ok"}>
             <a href={b.prUrl} target="_blank" rel="noopener noreferrer">
-              Pull request ↗
+              {b.prState?.state === "merged" ? "Merged ↗" : b.prState?.state === "closed" ? "Closed ↗" : "Pull request ↗"}
             </a>
           </li>
         ) : null}

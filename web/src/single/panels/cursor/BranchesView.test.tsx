@@ -79,13 +79,14 @@ describe("BranchesView", () => {
       const card = await screen.findByRole("region", { name: "Branch docs/one" });
       const pill = within(card).getByText("Merged into release/1.2");
       expect(pill.getAttribute("data-state")).toBe("merged");
-      expect(within(card).getByRole("link", { name: "Pull request ↗" }).getAttribute("href")).toBe(PR);
+      expect(within(card).getByRole("link", { name: "Merged ↗" }).getAttribute("href")).toBe(PR);
     });
 
     it("says when a pull request was closed without merging, and when it is still open", async () => {
       listing = { branches: [branch({ prUrl: PR, prState: { state: "closed", base: "main" }, state: { ...branch().state, pushed: true } })] };
       const first = show();
       expect(await screen.findByText("Closed without merging")).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Closed ↗" })).toBeTruthy();
       first.unmount();
       listing = { branches: [branch({ prUrl: PR, prState: { state: "open", base: "main" }, state: { ...branch().state, pushed: true } })] };
       show();

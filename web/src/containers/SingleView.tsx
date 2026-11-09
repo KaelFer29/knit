@@ -13,6 +13,7 @@ import { runsHash, useRoute } from "../route";
 import { useRuns } from "../runs/useRuns";
 import { deriveBlocks, deriveDetails, deriveHops, deriveStages } from "../single/pipeline";
 import { PANELS, type PanelId } from "../single/panels/registry";
+import { usePlanUsage } from "../sessions/usePlanUsage";
 import { useSessionTitles } from "../sessions/useSessionTitles";
 import { useWorkspace } from "../sessions/useWorkspace";
 import { useLatestSession } from "../single/useLatestSession";
@@ -57,7 +58,9 @@ export function SingleView({ search = window.location.search, actions }: Props) 
   const blocks = useMemo(() => deriveBlocks(board, session), [board, session]);
   const hops = useMemo(() => deriveHops(board, session), [board, session]);
   const stages = useMemo(() => deriveStages(board), [board]);
-  const details = useMemo(() => deriveDetails(board, session), [board, session]);
+  // Plan usage is read from the agent while the page is open, not taken from the last turn's stored figures.
+  const usage = usePlanUsage("claude", !fixtureMode, 30_000);
+  const details = useMemo(() => deriveDetails(board, session, usage.windows.length > 0 ? usage.windows : undefined), [board, session, usage.windows]);
 
   const [open, setOpen] = useState<PanelId>();
   const toggle = useCallback((id: PanelId) => setOpen((current) => (current === id ? undefined : id)), []);

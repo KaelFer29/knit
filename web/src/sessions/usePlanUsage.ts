@@ -27,7 +27,7 @@ export function usePlanUsage(agent: string | undefined, enabled: boolean, interv
     fetchPlanUsage(agent).then(
       (r) => {
         if (!live.current) return;
-        setWindows(r.windows);
+        setWindows(r.windows ?? []);
         setCheckedAt(r.checkedAt);
         setError(undefined);
         setLoading(false);
