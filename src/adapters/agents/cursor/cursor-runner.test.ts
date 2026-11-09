@@ -1,8 +1,9 @@
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CursorAgentRunner } from "./cursor-runner.js";
-import { capabilitiesOf, type AgentEvent, type AgentRunner } from "../../../core/ports/agent-runner.js";
+import { capabilitiesOf, type AgentEvent, type AgentRunRequest, type AgentRunner } from "../../../core/ports/agent-runner.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const runner = new CursorAgentRunner({
@@ -84,14 +85,91 @@ describe("CursorAgentRunner", () => {
     expect(r.resultText).toContain("definitely-not-a-real-binary-xyz");
   });
 
-  it("declares what the current adapter supports", () => {
+  it("declares what the adapter supports, from what the real CLI was seen to do", () => {
+    // Resume is verified. The headless stream has no command list (a slash command sent with -p reaches the model as
+    // plain text) and reports tokens only, never plan usage, so those two stay false.
     expect(capabilitiesOf(runner)).toEqual({
-      resume: false,
+      resume: true,
       chooseModel: true,
       commandList: false,
       visibleReasoning: true,
       planUsage: false,
     });
+  });
+});
+
+describe("CursorAgentRunner resume and model", () => {
+  const argvOf = async (request: Partial<AgentRunRequest>, from: CursorAgentRunner = runner): Promise<string[]> => {
+    const events: AgentEvent[] = [];
+    await from.run({ cwd: here, prompt: "do it MODE:ok", timeoutMs: 10_000, ...request }, (e) => events.push(e));
+    return (events.find((e) => e.type === "system")!.raw as { argv: string[] }).argv;
+  };
+
+  it("does not resume unless asked", async () => {
+    expect(await argvOf({})).not.toContain("--resume");
+  });
+
+  it("continues the given chat with --resume and keeps its id", async () => {
+    const argv = await argvOf({ resumeSessionId: "chat-42" });
+    expect(argv.slice(argv.indexOf("--resume"), argv.indexOf("--resume") + 2)).toEqual(["--resume", "chat-42"]);
+    expect(argv.at(-1)).toContain("MODE:ok");
+    const r = await runner.run({ cwd: here, prompt: "again MODE:ok", timeoutMs: 10_000, resumeSessionId: "chat-42" });
+    expect(r.sessionId).toBe("chat-42");
+    expect(r.isError).toBe(false);
+  });
+
+  it("still passes the headless flags when resuming", async () => {
+    expect(await argvOf({ resumeSessionId: "chat-42" })).toEqual(expect.arrayContaining(["-p", "--force", "--output-format", "stream-json"]));
+  });
+
+  it("uses the request's model over the one the runner was built with, and the built-in one otherwise", async () => {
+    const withDefault = new CursorAgentRunner({
+      command: process.execPath,
+      prefixArgs: [join(here, "__fixtures__/fake-agent.mjs")],
+      model: "composer-2.5",
+      killGraceMs: 200,
+    });
+    const valueOf = (argv: string[]) => argv[argv.indexOf("--model") + 1];
+    expect(valueOf(await argvOf({}, withDefault))).toBe("composer-2.5");
+    expect(valueOf(await argvOf({ profile: { model: "auto" } }, withDefault))).toBe("auto");
+    expect(valueOf(await argvOf({ profile: { model: "" } }, withDefault))).toBe("composer-2.5");
+    expect(await argvOf({ profile: {} })).not.toContain("--model");
+  });
+});
+
+describe("a real Cursor stream (sanitized fixture)", () => {
+  const events = readFileSync(join(here, "__fixtures__/stream-resume.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map((l) => JSON.parse(l) as { type: string; subtype?: string; session_id?: string; result?: string });
+
+  it("carries the chat id in the init and result events, and a resumed turn keeps the same id", () => {
+    const inits = events.filter((e) => e.type === "system" && e.subtype === "init");
+    const results = events.filter((e) => e.type === "result");
+    expect(inits).toHaveLength(2);
+    expect(results.map((r) => r.result)).toEqual(["ok", "PINEAPPLE"]);
+    expect(new Set([...inits, ...results].map((e) => e.session_id))).toEqual(new Set(["chat-0001"]));
+  });
+
+  it("has no command list and no plan usage anywhere in the stream", () => {
+    const text = JSON.stringify(events);
+    expect(text).not.toContain("slash_commands");
+    expect(text).not.toMatch(/rate_limit|planUsage|utilization/);
+  });
+});
+
+describe("listModels", () => {
+  const withFlags = (...flags: string[]) =>
+    new CursorAgentRunner({ command: process.execPath, prefixArgs: [join(here, "__fixtures__/fake-agent.mjs"), ...flags], killGraceMs: 200 });
+
+  it("returns the model ids `agent models` prints, without the title, labels, zero-width spaces or the tip", async () => {
+    expect(await runner.listModels()).toEqual(["auto", "composer-2.5-fast", "grok-4.7-low-fast", "claude-sonnet-5-thinking-high"]);
+  });
+
+  it("returns an empty list when the command fails or prints something unexpected", async () => {
+    expect(await withFlags("--fake-fail").listModels()).toEqual([]);
+    expect(await withFlags("--fake-junk").listModels()).toEqual([]);
+    expect(await new CursorAgentRunner({ command: "definitely-not-a-real-binary-xyz" }).listModels()).toEqual([]);
   });
 });
 

@@ -70,6 +70,11 @@ export interface AgentRunner {
   /** Omitted by simple runners and fakes: they are treated as supporting nothing optional. */
   readonly capabilities?: AgentCapabilities;
   run(request: AgentRunRequest, onEvent?: (event: AgentEvent) => void): Promise<AgentRunResult>;
+  /**
+   * Model ids the agent accepts in `profile.model`, to fill a model picker. Optional: runners that cannot tell omit it,
+   * and the picker falls back to free text. Resolves to an empty list when the agent cannot be asked; never rejects.
+   */
+  listModels?(): Promise<string[]>;
 }
 
 export const NO_CAPABILITIES: AgentCapabilities = {

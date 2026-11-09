@@ -41,6 +41,13 @@ interface ResultEvent {
   usage?: unknown;
 }
 
+/**
+ * Values `--model` accepts. The aliases are the ones `claude --help` documents (it names `fable`, `opus` and
+ * `sonnet`; `haiku` is accepted too); the full ids are ones real streams reported in their init and usage events.
+ * Static on purpose: asking the CLI would be a real call.
+ */
+const MODELS = ["sonnet", "opus", "haiku", "fable", "claude-sonnet-5-5", "claude-haiku-5-5"];
+
 const WINDOWS = ["five_hour", "seven_day"] as const;
 
 type Rec = Record<string, unknown>;
@@ -107,6 +114,10 @@ export class ClaudeAgentRunner implements AgentRunner {
     if (options.resumeSessionId) this.resumeSessionId = options.resumeSessionId;
     this.strictMcp = options.strictMcp === true;
     if (options.killGraceMs !== undefined) this.killGraceMs = options.killGraceMs;
+  }
+
+  async listModels(): Promise<string[]> {
+    return [...MODELS];
   }
 
   async run(request: AgentRunRequest, onEvent?: (event: AgentEvent) => void): Promise<AgentRunResult> {

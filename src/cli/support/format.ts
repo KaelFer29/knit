@@ -1,5 +1,6 @@
 import type { RunDetail, StoredAgentEvent, StoredRun } from "../../adapters/storage/sqlite/run-store.js";
 import type { EventRecord } from "../../core/ports/run-store.js";
+import type { SessionEventRecord } from "../../core/ports/session-store.js";
 
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
@@ -79,6 +80,8 @@ export function formatProgress(e: EventRecord): string | undefined {
       return `${who}check: ${String(p.command)}`;
     case "attempt.finished":
       return `${who}attempt ${e.attempt}: ${p.passed ? "passed" : "failed"}`;
+    case "followup.started":
+      return `${who}follow-up: resuming the agent's chat as attempt ${e.attempt}`;
     case "task.passed":
       return `${who}passed (commit ${String(p.commitSha).slice(0, 8)})`;
     case "task.failed":
@@ -132,4 +135,10 @@ export function formatAgentEvent(e: StoredAgentEvent): string {
       body = `${e.kind.padEnd(9)} ${String(p.type ?? "")}`;
   }
   return `${time} ${who} ${body}`.trimEnd();
+}
+
+/** The line `knit logs` would print for a session's timeline entry, without its `[run]` label (a session has no tasks). */
+export function formatSessionEvent(e: SessionEventRecord): string {
+  const stored: StoredAgentEvent = { id: 0, runId: e.sessionId, ts: e.ts, kind: e.kind, agent: e.agent, ...(e.payload !== undefined ? { payload: e.payload } : {}) };
+  return formatAgentEvent(stored).replace(" [run] ", " ");
 }
