@@ -21,7 +21,7 @@ export function BranchesView({ runId, pollMs }: { runId: string; pollMs?: number
     () => ({
       undo: (taskId, mode) => undoBranch(runId, taskId, mode),
       draft: (taskId) => draftPullRequest(runId, taskId),
-      open: (taskId, title, body) => openPullRequest(runId, taskId, title, body),
+      open: (taskId, title, body, into) => openPullRequest(runId, taskId, title, body, into),
     }),
     [runId],
   );

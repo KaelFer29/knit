@@ -10,7 +10,7 @@ import "./BranchCard.css";
 export interface BranchActions {
   undo: (taskId: string, mode: UndoMode) => Promise<UndoResult>;
   draft: (taskId: string) => Promise<PrDraft>;
-  open: (taskId: string, title: string, body: string) => Promise<PrResult>;
+  open: (taskId: string, title: string, body: string, into?: string) => Promise<PrResult>;
 }
 
 const UNDO: Record<UndoMode, { menu: string; hint: string; title: (branch: string) => string; confirm: string; done: (branch: string, taskId: string) => string }> = {
@@ -52,6 +52,8 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
   const [open, setOpen] = useState(defaultOpen);
   const sectionId = useId();
   const [panel, setPanel] = useState<Panel>();
+  /** The branch typed in the form; undefined until the person edits it, so the recommended one stays the default. */
+  const [into, setInto] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [result, setResult] = useState<{ text: string; url?: string }>();
@@ -97,6 +99,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
   const startPr = (): void => {
     setResult(undefined);
     setError(undefined);
+    setInto(undefined);
     setPanel({ kind: "pr" });
     const saved = loadDraft(key);
     if (saved) setDraft({ state: "ready", title: saved.title, body: saved.body, model: saved.model, saved: true });
@@ -113,7 +116,8 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
     setBusy(true);
     setError(undefined);
     try {
-      const done = await actions.open(b.taskId, draft.title.trim(), draft.body);
+      const target = baseValue.trim();
+      const done = await actions.open(b.taskId, draft.title.trim(), draft.body, target === recommended ? undefined : target);
       setPanel(undefined);
       forgetDraft(key);
       setResult({ text: `Opened ${done.url}`, url: done.url });
@@ -127,6 +131,9 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
 
   const { state } = b;
   const prReason = b.pr.ok ? undefined : b.pr.reason;
+  const recommended = b.pr.ok ? b.pr.base : "";
+  const baseValue = into ?? recommended;
+  const intoId = useId();
 
   return (
     <section className="branch" aria-label={`Branch ${b.branch}`} data-status={b.status}>
@@ -246,7 +253,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
           aria-busy={draft.state === "writing"}
           onSubmit={(e) => {
             e.preventDefault();
-            if (draft.title.trim() !== "" && !busy && draft.state !== "writing") void sendPr();
+            if (draft.title.trim() !== "" && baseValue.trim() !== "" && !busy && draft.state !== "writing") void sendPr();
           }}
         >
           {draft.state === "writing" ? (
@@ -271,11 +278,22 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
           </label>
           <textarea id={bodyId} className="branch__field branch__body" rows={8} value={draft.body} disabled={draft.state === "writing"} placeholder={draft.state === "writing" ? "…" : undefined} onChange={(e) => edit({ body: e.target.value })} />
           {b.pr.ok ? (
-            <ul className="branch__effects">
-              {b.pr.effects.map((e) => (
-                <li key={e}>{e}</li>
-              ))}
-            </ul>
+            <>
+              <label className="branch__label" htmlFor={intoId}>
+                Into branch
+              </label>
+              <input id={intoId} className="branch__field" list={`${intoId}-options`} value={baseValue} maxLength={200} spellCheck={false} disabled={busy} onChange={(e) => setInto(e.target.value)} />
+              <datalist id={`${intoId}-options`}>
+                {b.pr.options.map((o) => (
+                  <option key={o} value={o} />
+                ))}
+              </datalist>
+              <p className="branch__panel-note">Recommended: {recommended}</p>
+              <ul className="branch__effects">
+                <li>{b.pr.effects[0]}</li>
+                <li>{`Opens a pull request from ${b.pr.head} into ${baseValue.trim() === "" ? "…" : baseValue.trim()}.`}</li>
+              </ul>
+            </>
           ) : null}
           {error ? (
             <p className="branch__error" role="alert">
@@ -283,7 +301,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
             </p>
           ) : null}
           <div className="branch__row">
-            <button type="submit" className="branch__primary" disabled={busy || draft.state === "writing" || draft.title.trim() === ""}>
+            <button type="submit" className="branch__primary" disabled={busy || draft.state === "writing" || draft.title.trim() === "" || baseValue.trim() === ""}>
               {busy ? "Working…" : "Push and open pull request"}
             </button>
             <button type="button" className="branch__ghost" disabled={busy} onClick={close}>

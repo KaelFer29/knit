@@ -11,5 +11,6 @@ export const undoBranch = (runId: string, taskId: string, mode: UndoMode): Promi
 /** Has the cheap model write the title and body of the task's pull request. Nothing is pushed or opened. */
 export const draftPullRequest = (runId: string, taskId: string): Promise<PrDraft> => apiPost<PrDraft>(`${base(runId, taskId)}/pr-draft`, {});
 
-/** Pushes the branch and opens the pull request with exactly this text. */
-export const openPullRequest = (runId: string, taskId: string, title: string, body: string): Promise<PrResult> => apiPost<PrResult>(`${base(runId, taskId)}/pr`, { title, body });
+/** Pushes the branch and opens the pull request with exactly this text. `into` is sent only when the person chose a branch other than the recommended one. */
+export const openPullRequest = (runId: string, taskId: string, title: string, body: string, into?: string): Promise<PrResult> =>
+  apiPost<PrResult>(`${base(runId, taskId)}/pr`, { title, body, ...(into === undefined ? {} : { base: into }) });

@@ -15,7 +15,7 @@ const branch = (over: Record<string, unknown> = {}) => ({
   startSha: "aaaaaaa",
   state: { exists: true, head: "bbbbbbb", historyIntact: true, pushed: false, hasWorktree: true, dirty: false, ahead: [{ sha: "b1", subject: "docs: add prueba.md" }] },
   undo: { revert: ok, reset: { ok: true, effects: ["Moves docs/one back to the commit the task started from. 1 commit leaves the branch."] }, delete: { ok: true, effects: ["Deletes the branch docs/one and its worktree.", "1 commit of the task is lost from this repository."] } },
-  pr: { ok: true, base: "main", head: "docs/one", effects: ["Pushes docs/one to origin, without forcing.", "Opens a pull request from docs/one into main."] },
+  pr: { ok: true, base: "main", head: "docs/one", options: ["main", "docs/two"], effects: ["Pushes docs/one to origin, without forcing.", "Opens a pull request from docs/one into main."] },
   ...over,
 });
 
@@ -146,6 +146,46 @@ describe("BranchesView", () => {
     const button = (await screen.findByRole("button", { name: "Open pull request" })) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(screen.getByText(/did not pass its checks/)).toBeTruthy();
+  });
+
+  describe("where the pull request goes", () => {
+    it("proposes the recommended branch, suggests the others and says so in what it will do", async () => {
+      const user = userEvent.setup();
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      const into = within(form).getByRole("combobox", { name: "Into branch" }) as HTMLInputElement;
+      expect(into.value).toBe("main");
+      expect(within(form).getByText("Recommended: main")).toBeTruthy();
+      expect(Array.from(form.querySelectorAll("datalist option")).map((o) => o.getAttribute("value"))).toEqual(["main", "docs/two"]);
+      await user.clear(into);
+      await user.type(into, "docs/two");
+      expect(within(form).getByText("Opens a pull request from docs/one into docs/two.")).toBeTruthy();
+    });
+
+    it("sends the branch only when it was changed, and keeps the old request when it was not", async () => {
+      const user = userEvent.setup();
+      replies["POST pr"] = { status: 200, body: { ok: true, url: "https://example.test/pull/7", base: "docs/two", head: "docs/one" } };
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Add prueba.md", body: "- adds it", model: "composer-2.5-fast" } };
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      await within(form).findByDisplayValue("- adds it");
+      const into = within(form).getByRole("combobox", { name: "Into branch" });
+      await user.clear(into);
+      await user.type(into, "docs/two");
+      await user.click(within(form).getByRole("button", { name: "Push and open pull request" }));
+      await waitFor(() => expect(posts().find((c) => c.url.endsWith("/pr"))?.body).toEqual({ title: "Add prueba.md", body: "- adds it", base: "docs/two" }));
+    });
+
+    it("cannot be sent with the branch field empty", async () => {
+      const user = userEvent.setup();
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      await user.clear(within(form).getByRole("combobox", { name: "Into branch" }));
+      expect((within(form).getByRole("button", { name: "Push and open pull request" }) as HTMLButtonElement).disabled).toBe(true);
+    });
   });
 
   describe("undo", () => {

@@ -3,7 +3,7 @@
 export type UndoMode = "revert" | "reset" | "delete";
 
 export type Decision = { ok: true; effects: string[] } | { ok: false; reason: string };
-export type PrDecision = { ok: true; base: string; head: string; effects: string[] } | { ok: false; reason: string };
+export type PrDecision = { ok: true; base: string; head: string; /** Branches worth suggesting as a target, the recommended one first. */ options: string[]; effects: string[] } | { ok: false; reason: string };
 
 export interface BranchState {
   exists: boolean;
