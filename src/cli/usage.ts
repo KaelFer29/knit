@@ -9,6 +9,7 @@ export const USAGE = `Usage:
   ${PROGRAM_NAME} show <run-id>               Show tasks, attempts, tokens, branches and PRs of a run
   ${PROGRAM_NAME} logs <run-id> [options]     Show what the agent did: thinking, messages, tool calls and results
   ${PROGRAM_NAME} clean <run-id> [options]    Remove the worktrees of a run (branches are kept)
+  ${PROGRAM_NAME} ui [options]                Serve the web interface on 127.0.0.1 and print its address (Ctrl+C to stop)
 
 Options for run and resume:
   --dry-run                  (run only) Print the prompts that would be sent; change nothing
@@ -24,6 +25,10 @@ Options for run and resume:
 Options for logs:
   --task <id>                Only one task (e.g. T1)
   --follow                   Keep printing new events while the run is in progress
+  --data-dir <dir>
+
+Options for ui:
+  --port <n>                 Port to listen on (default 4317; 0 picks a free one). It always binds to 127.0.0.1
   --data-dir <dir>
 
 Options for clean:

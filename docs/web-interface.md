@@ -1,6 +1,6 @@
 # Web interface
 
-> **Design, not built yet.** This is the agreed design for `knit ui`. Progress and open decisions are tracked in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md). Sections move to "built" as tasks land.
+> **Partly built.** This is the agreed design for `knit ui`. Built so far: the read side (T2) and the server with `knit ui` (T3: read routes, live stream, static files, security). Not built yet: the web app itself, run control and everything from phase B on. Progress and open decisions are tracked in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md). Sections say "built" when they are.
 
 A local web app that joins Claude and Cursor into one workflow and is the single place to review everything.
 
@@ -87,13 +87,13 @@ src/
     board/                  pure: records → board view model (nodes, wires, queue, task blocks)
   adapters/
     storage/sqlite/         RunReader implementation (readonly connection)
-  server/                   driving adapter: HTTP routes, SSE stream, static files
+  server/                   driving adapter: HTTP routes, SSE stream, static files, security guard (built)
   cli/commands/ui.ts        wires the SQLite reader into the server; the only place adapters are chosen
 web/                        browser app (Vite + React + TypeScript), built to dist/web
 ```
 
 - `core/board` turns raw records into what the page draws. It is pure, so the visual states (queued, running, retrying, verifying, delivered) are unit-tested without a browser.
-- `server` knows HTTP and SSE, not SQLite. It receives a `RunReader`.
+- `server` knows HTTP and SSE, not SQLite. It receives a `RunReader`; `cli/commands/ui.ts` builds it (read-only, opened once the database exists).
 - `web` never talks to SQLite or the file system; it only consumes the HTTP API. Inside it: container components fetch and subscribe, presentational components only render props (atomic design: atoms, molecules, organisms).
 
 ## Read side and board view model
@@ -150,17 +150,53 @@ Nodes and wires follow from that. Knit is `working` while the run runs, `done` w
 
 The live line is the newest agent event of the open attempt while the agent works (a tool call reads `read: src/a.ts`, other kinds show their text clipped to 160 characters) and the check command, attributed to `knit`, while the attempt is verifying. It is absent when the run is not running, when no attempt is open or when the attempt has no events yet.
 
+## `knit ui`
+
+Built in task T3.
+
+```
+knit ui [--port <n>] [--data-dir <dir>]
+```
+
+| Option | Does |
+| --- | --- |
+| `--port <n>` | port to listen on, default `4317`; `0` picks a free one. A busy port stops with `Port <n> is already in use` and exit code 1; a malformed one is a usage error (exit code 2) |
+| `--data-dir <dir>` | where `knit.db` lives (default `~/.knit`, or `$KNIT_HOME`), like the other commands |
+
+It prints one line, `http://127.0.0.1:<port>/?token=<token>`, and keeps running until `SIGINT` or `SIGTERM`, then closes its connections and exits with 0. It never opens a browser: open the address yourself. The host is not configurable. If `knit.db` does not exist yet, the server still starts (the runs list is empty) and opens the database, read-only, as soon as `knit run` creates it.
+
 ## HTTP API
+
+Built in task T3 (`src/server/`). Every route is a `GET` for now; the `POST` routes of the next tasks sit behind the same [security guard](#security).
 
 | Route | Returns |
 | --- | --- |
-| `GET /api/runs` | runs, newest first, with status and task counts |
-| `GET /api/runs/:id` | snapshot: run, plan, tasks, attempts, last event ids |
-| `GET /api/runs/:id/stream` | SSE: `event`, `agent_event`, `task`, `attempt` messages after `Last-Event-ID` |
-| `GET /api/runs/:id/tasks/:task/attempts/:n/timeline` | full agent timeline of one attempt (lazy, for expanded blocks) |
-| `GET /*` | the built app from `dist/web` |
+| `GET /api/runs` | `{ runs }`: `RunListItem[]`, newest first, with status, task counts and token totals |
+| `GET /api/runs/:id` | the `RunSnapshot` (`run`, `tasks`, `attempts`, `events`, `lastEventId`, `lastAgentEventId`) plus `board`, the `BoardModel` built by `core/board`. The plan text is `run.planText` |
+| `GET /api/runs/:id/tasks/:task/attempts/:n/timeline` | `{ runId, taskId, attempt, events }`: the agent timeline of one attempt (lazy, for expanded blocks). An attempt without entries is an empty list |
+| `GET /api/runs/:id/stream` | Server-Sent Events, see below |
+| `GET /*` | the built app from `dist/web` (or the directory the server was started with) |
 
-Commands (phase A; phase B adds sessions, turns and plan launch; phase D adds configuration):
+Errors are JSON, `{ "error": "<message>" }`, with the right status: `404` for an unknown run, task or API route, `400` for a malformed request (a non-numeric attempt, a bad `Last-Event-ID`, a malformed percent escape), `401` and `403` from the guard, `405` (with `Allow`) for a known path with another method, `500` when a handler fails. API responses carry `Cache-Control: no-store`.
+
+### Live stream
+
+`GET /api/runs/:id/stream` polls the `RunReader` every 500 ms and pushes only the rows it has not sent yet:
+
+| SSE `event` | Data |
+| --- | --- |
+| `event` | a lifecycle event (the `events` table row, with its `id`) |
+| `agent_event` | an agent timeline entry (the `agent_events` row, with its `id`) |
+| `done` | `{ "status": "passed" \| "failed" }`, sent once and followed by the end of the stream, when the run is no longer running and every row was delivered |
+
+- **Ids.** Lifecycle events and agent events have separate id sequences, so one SSE id carries both cursors: `<lastEventId>.<lastAgentEventId>`. The id of each message is the pair of cursors right after that message. A poll sends its lifecycle rows first, then its agent rows. This is what makes resuming exact (the task's wording is "row `id` as the SSE `id`"; with two tables a single number cannot be unambiguous).
+- **Resuming.** A reconnecting browser sends `Last-Event-ID` and receives exactly the rows after that pair: no gap and no duplicate. The first connection of a page can pass `?after=<lastEventId>.<lastAgentEventId>` (the two values of the snapshot it just fetched); the header wins when both are present. With neither, the stream starts from the beginning of the run, in slices of 500 rows per poll. A malformed value is a `400`.
+- **Heartbeat.** A `: ping` comment every 15 s keeps idle connections open.
+- **End.** The status of the run is checked about every 2 s while the stream is idle, and always before a poll, so the rows written before the run finished are delivered before `done`. The client must close its `EventSource` on `done`, or it reconnects and receives another `done`.
+- **Cost.** Polling stops as soon as the client disconnects. A failed read (the database being migrated by another process) is retried on the next poll.
+- **Not in the stream.** `task` and `attempt` messages (rows without an increasing id) are not sent: the page derives them from the lifecycle events, or refetches `GET /api/runs/:id`.
+
+Commands (phase A; phase B adds sessions, turns and plan launch; phase D adds configuration). Not built yet:
 
 | Route | Does |
 | --- | --- |
@@ -169,7 +205,9 @@ Commands (phase A; phase B adds sessions, turns and plan launch; phase D adds co
 | `POST /api/runs/:id/resume` | `knit resume <id>` |
 | `POST /api/runs/:id/tasks/:task/retry` | resume from that failed task |
 
-Unknown ids return 404 with a JSON error.
+### Adding routes
+
+A route module lives in `src/server/routes/<name>.ts` and exports a function from the server's dependencies to a list of `{ method, pattern, handler }` (patterns use `:name` segments, decoded for the handler; a handler throws `HttpError(status, message)` to answer an error). It is registered with one line in `src/server/routes/index.ts`. The guard runs before routing, so a new route, whatever its method, cannot skip it.
 
 ## Visual model
 
@@ -199,11 +237,19 @@ One canvas per run, read left to right as a circuit:
 
 ## Security
 
-The server can launch agents that have no sandbox, so any page able to call it could make them run commands on this machine.
+Built in task T3 (`src/server/security.ts`, applied to every request before routing). The server can launch agents that have no sandbox, so any page able to call it could make them run commands on this machine.
 
-- Bind to `127.0.0.1`; the port is configurable with `--port`.
-- Every request carries a token generated at launch and given to the browser in the URL `knit ui` prints.
-- Mutating requests (`POST`) check `Origin` and `Host`, which blocks other websites and DNS rebinding.
+- **Loopback only.** It listens on `127.0.0.1` and nothing else; the port is configurable with `--port`, the host is not.
+- **Launch token.** Each launch generates a token (32 random bytes, hex). Every request must present it, and the comparison is constant time (both sides are hashed, then compared with `timingSafeEqual`). It is accepted from:
+  1. the `Authorization: Bearer <token>` header;
+  2. the `knit_token` cookie.
+
+  The first page load carries `?token=<token>`, the URL `knit ui` prints. On a `GET`, a valid `?token=` is answered with `302` to the same URL without the token, plus `Set-Cookie: knit_token=<token>; HttpOnly; SameSite=Strict; Path=/`. A wrong `?token=` is a `401`. The cookie is what `fetch` and `EventSource` use afterwards (`EventSource` cannot set headers). A token in the query of any other request is ignored, so the token only ever travels in a URL once.
+- **Host check (DNS rebinding).** The `Host` header must be `127.0.0.1:<port>` or `localhost:<port>`, otherwise `403`, before anything else is read.
+- **Origin check.** `POST`, `PUT`, `PATCH` and `DELETE` also need an `Origin` header equal to `http://<the Host of the request>`: a request from another website, or without an `Origin`, is a `403`. Order of checks: host (`403`), token (`401`), origin (`403`).
+- **Responses.** `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, a restrictive `Content-Security-Policy` (`default-src 'self'`, scripts from the same origin only, `frame-ancestors 'none'`, `object-src 'none'`; inline styles are allowed because React sets `style` attributes) and `Cache-Control: no-store` on API responses. No CORS headers are ever sent, so browsers keep other origins from reading responses.
+- **Static files.** The path is decoded and resolved inside the served directory; anything that leaves it (`..%2f`, an encoded NUL or backslash, a symlink pointing out) is a `400` or `403`, never a file.
+- **The token is never logged.** The only place it is written is the line that prints the launch URL.
 - The database connection is read-only; the server changes state only by starting Knit or agent processes.
 - Agent output is untrusted. Render it as text; any Markdown rendering is sanitized. Never inject agent strings as HTML.
 

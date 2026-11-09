@@ -24,6 +24,7 @@ node dist/cli/index.js runs                      # list runs
 node dist/cli/index.js show <run-id>             # tasks, attempts, tokens, branches, PRs
 node dist/cli/index.js logs <run-id> --follow    # watch what the agent is doing, live
 node dist/cli/index.js clean <run-id>            # remove the run's worktrees
+node dist/cli/index.js ui [--port 4317]          # serve the web interface on 127.0.0.1 (read-only view of the runs)
 ```
 
 Optionally run `pnpm link --global` to get a `knit` command instead of `node dist/cli/index.js`.
@@ -32,7 +33,7 @@ Run it from inside the project you want to change: if the plan has no `Repo:`, t
 
 Exit codes: `0` run passed, `1` a task failed, `2` usage or plan error.
 
-It is a one-shot command, not a server: it starts, runs the plan, writes the history to SQLite and exits. Nothing listens in the background.
+`run` and `resume` are one-shot commands, not servers: they start, run the plan, write the history to SQLite and exit. Nothing listens in the background. The only long-lived command is `ui`, which you start yourself: it serves the web interface on `127.0.0.1` (see [docs/web-interface.md](docs/web-interface.md#knit-ui)).
 
 ## What a run does
 
@@ -51,6 +52,7 @@ A failed task stops the run and the remaining tasks are skipped; fix the cause a
 ```
 src/core/        pure logic (plan, prompt, verification, timeline, run loop) and the ports
 src/adapters/    implementations of the ports: agents, vcs, checks, storage, system
+src/server/      local HTTP server of the web interface (routes, live stream, security guard)
 src/cli/         command line: one module per command
 test/integration/ tests that cross layers; unit tests sit next to their module
 docs/            architecture, plan format, run lifecycle, data model
