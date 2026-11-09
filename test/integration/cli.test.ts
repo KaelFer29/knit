@@ -139,6 +139,16 @@ describe("cli run", () => {
     expect(git(repo, "worktree", "list").split("\n")).toHaveLength(1);
   });
 
+  it("dry-run shows the model a task names, and prints nothing extra for a task that names none", async () => {
+    const c = capture();
+    expect(await main(["run", planPath, "--dry-run"], c.io, baseDeps())).toBe(0);
+    expect(c.out.join("")).toContain("===== T1: Create a (branch feat/create-a) =====");
+    writeFileSync(planPath, PLAN(repo).replace("Branch: feat/create-a\n", "Branch: feat/create-a\nModel: composer-2.5\n"));
+    const d = capture();
+    expect(await main(["run", planPath, "--dry-run"], d.io, baseDeps())).toBe(0);
+    expect(d.out.join("")).toContain("===== T1: Create a (branch feat/create-a, model composer-2.5) =====");
+  });
+
   it("runs a plan end to end on the plan's branch with the agent's own commits", async () => {
     const c = capture();
     expect(await main(["run", planPath], c.io, baseDeps())).toBe(0);

@@ -151,3 +151,31 @@ describe("parsePlan", () => {
     expect(issuesOf(md).length).toBeGreaterThan(3);
   });
 });
+
+describe("parsePlan: the model of a task", () => {
+  const withModel = (line: string) => VALID.replace("Branch: feat/add-greeting\n", `Branch: feat/add-greeting\n${line}\n`);
+
+  it("reads an optional Model per task, strips backticks and leaves it out when absent", () => {
+    const plan = parsePlan(withModel("Model: `composer-2.5`"));
+    expect(plan.tasks[0]!.model).toBe("composer-2.5");
+    expect("model" in plan.tasks[1]!).toBe(false);
+    expect("model" in parsePlan(VALID).tasks[0]!).toBe(false);
+  });
+
+  it("accepts the ids Cursor lists", () => {
+    for (const id of ["auto", "composer-2.5", "grok-4.7-high", "gpt-5.3-codex-high-fast", "claude-sonnet-5-thinking-high", "cursor-grok-4.5-high"]) {
+      expect(parsePlan(withModel(`Model: ${id}`)).tasks[0]!.model, id).toBe(id);
+    }
+  });
+
+  it("rejects a model that is empty, has spaces or could be read as a flag, and says which task", () => {
+    for (const bad of ["Model:", "Model: Grok 4.7", "Model: --force", "Model: a;b", "Model: -x"]) {
+      expect(() => parsePlan(withModel(bad)), bad).toThrow(/T1: invalid model/);
+    }
+  });
+
+  it("is not read from the plan header, where it means nothing", () => {
+    expect(() => parsePlan(VALID.replace("Base: main", "Base: main\nModel: auto"))).not.toThrow();
+    expect(parsePlan(VALID.replace("Base: main", "Base: main\nModel: auto")).tasks.every((t) => !("model" in t))).toBe(true);
+  });
+});

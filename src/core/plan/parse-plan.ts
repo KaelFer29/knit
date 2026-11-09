@@ -11,6 +11,8 @@ export interface Task {
   /** Task whose branch this one starts from; absent means it starts from the plan base. */
   dependsOn?: string;
   goal: string;
+  /** Model the builder agent uses for this task (its `--model`); absent means the agent's own default. Chosen by the planner. */
+  model?: string;
   specs: Spec[];
   allowedFiles: string[];
   checks: string[];
@@ -44,6 +46,7 @@ interface DraftTask {
   branch?: string;
   depends?: string;
   goal?: string;
+  model?: string;
   specs: Spec[];
   allowedFiles: string[];
   checks: string[];
@@ -52,6 +55,8 @@ interface DraftTask {
 const TASK_HEADING = /^##\s+(T\d+):\s*(.*)$/;
 const PLAN_HEADING = /^#\s+Plan:\s*(.*)$/;
 const SPEC_ITEM = /^-\s+(S\d+):\s*(.*)$/;
+/** The ids the Cursor CLI lists (`auto`, `composer-2.5`, `grok-4.7-high`): letters, digits and `. _ : / -`, never starting like a flag. */
+const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$/;
 const BRANCH_NAME = /^(feat|fix|refactor|docs|chore|test)\/[a-z0-9][a-z0-9._-]*$/;
 
 function stripBackticks(value: string): string {
@@ -121,6 +126,9 @@ export function parsePlan(markdown: string): Plan {
     } else if (/^Branch:/.test(line)) {
       current.branch = stripBackticks(line.slice("Branch:".length));
       section = null;
+    } else if (/^Model:/.test(line)) {
+      current.model = stripBackticks(line.slice("Model:".length));
+      section = null;
     } else if (/^Depends:/.test(line)) {
       current.depends = stripBackticks(line.slice("Depends:".length));
       section = null;
@@ -151,6 +159,9 @@ export function parsePlan(markdown: string): Plan {
   for (const d of drafts) {
     if (seen.has(d.id)) issues.push(`Duplicate task ID: ${d.id}`);
     if (!d.goal) issues.push(`${d.id}: missing 'Goal:'`);
+    if (d.model !== undefined && !MODEL_ID.test(d.model)) {
+      issues.push(`${d.id}: invalid model '${d.model}' (use an id from 'agent models', such as auto or composer-2.5: no spaces, and it cannot start with a dash)`);
+    }
     if (d.specs.length === 0) issues.push(`${d.id}: missing Specs`);
     if (d.allowedFiles.length === 0) issues.push(`${d.id}: missing Allowed files`);
     for (const p of d.allowedFiles) {
@@ -187,6 +198,7 @@ export function parsePlan(markdown: string): Plan {
       branch: d.branch!,
       ...(dep ? { dependsOn: dep } : {}),
       goal: d.goal!,
+      ...(d.model ? { model: d.model } : {}),
       specs: d.specs,
       allowedFiles: d.allowedFiles,
       checks: d.checks,

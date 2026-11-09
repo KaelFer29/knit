@@ -171,3 +171,14 @@
   color: var(--status-failed);
   font-size: var(--text-sm);
 }
+
+/* The model the planner picked for the task: a small black chip, like Cursor's own. */
+.plan-draft__model {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  background: var(--cursor-bg);
+  color: var(--cursor-ink);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}

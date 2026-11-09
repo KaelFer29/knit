@@ -9,6 +9,13 @@ describe("routedPrompt", () => {
     expect(text).toContain("docs/plans/");
   });
 
+  it("asks it to choose Cursor's model for each task by how hard the task is, from the list `agent models` prints", () => {
+    const text = routedPrompt("x");
+    expect(text).toContain("`Model:`");
+    expect(text).toContain("agent models");
+    expect(text).toMatch(/complexity/i);
+  });
+
   it("tells the agent not to implement anything or start a run", () => {
     expect(routedPrompt("x")).toMatch(/do not implement/i);
     expect(routedPrompt("x")).toMatch(/do not start a run/i);

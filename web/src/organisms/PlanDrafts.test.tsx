@@ -22,13 +22,20 @@ describe("PlanDrafts", () => {
     expect(container.firstChild).toBeNull();
   });
 
+  it("shows the model the planner chose for a task, and nothing for a task that has none", () => {
+    const plan: PlanDraftView = { ...valid, tasks: [{ id: "T1", title: "Form", branch: "feat/form", model: "grok-4.7-high" }, { id: "T2", title: "Docs", branch: "docs/x" }] };
+    render(<PlanDrafts dir="docs/plans" plans={[plan]} onLaunch={() => {}} />);
+    const chip = screen.getByTitle("Model Cursor will use for T1");
+    expect(chip.textContent).toBe("grok-4.7-high");
+    expect(screen.queryByTitle("Model Cursor will use for T2")).toBeNull();
+  });
+
   it("shows a valid plan with tasks and its runs, and launches only on click", async () => {
     const user = userEvent.setup();
     const onLaunch = vi.fn();
     render(<PlanDrafts dir="docs/plans" plans={[valid]} onLaunch={onLaunch} />);
     expect(screen.getByText("Valid")).toBeTruthy();
     expect(screen.getByText("feat/form")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /run-1234 · passed/ }).getAttribute("href")).toBe("?run=run-12345678-zz#/runs");
     expect(onLaunch).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Send plan to the orchestrator" }));
     expect(onLaunch).toHaveBeenCalledWith(valid);

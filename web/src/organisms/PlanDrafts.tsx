@@ -10,10 +10,8 @@ interface Props {
   onLaunch: (plan: PlanDraftView) => void;
 }
 
-const runHref = (id: string): string => `?run=${encodeURIComponent(id)}#/runs`;
-
 /**
- * The draft plans a session left in the repository: validation result, tasks, the runs started from each, and the
+ * The draft plans a session left in the repository: validation result, tasks (with the model chosen for each) and the
  * button that launches one. Launching is only ever this explicit click (S15); an invalid plan has no button.
  */
 export function PlanDrafts({ dir, plans, launching, error, onLaunch }: Props) {
@@ -56,6 +54,11 @@ export function PlanDrafts({ dir, plans, launching, error, onLaunch }: Props) {
                 {plan.tasks.map((task) => (
                   <li key={task.id}>
                     <span className="plan-draft__task-id">{task.id}</span> {task.title} <span className="plan-draft__branch">{task.branch}</span>
+                    {task.model === undefined ? null : (
+                      <span className="plan-draft__model" title={`Model Cursor will use for ${task.id}`}>
+                        {task.model}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ol>
@@ -66,16 +69,6 @@ export function PlanDrafts({ dir, plans, launching, error, onLaunch }: Props) {
                 ))}
               </ul>
             )}
-            {plan.runs.length > 0 ? (
-              <p className="plan-draft__runs">
-                Runs:{" "}
-                {plan.runs.map((run) => (
-                  <a key={run.id} className="plan-draft__run" href={runHref(run.id)}>
-                    {run.id.slice(0, 8)} · {run.status}
-                  </a>
-                ))}
-              </p>
-            ) : null}
           </li>
         ))}
       </ul>

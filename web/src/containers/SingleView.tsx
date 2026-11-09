@@ -43,11 +43,12 @@ export function SingleView({ search = window.location.search, actions }: Props) 
   const board = runId === undefined ? (fixtureMode ? ALL_FIXTURES[params.fixture] : undefined) : live.board;
   const workspace = useWorkspace(!fixtureMode);
   const session = useLatestSession(!fixtureMode || runId !== undefined);
-  const renderDetail = useMemo(() => {
+  const detailSource = useMemo(() => {
     if (board === undefined) return undefined;
-    if (runId === undefined) return createRenderDetail(board, fixtureDetailSource(board));
-    return live.snapshot ? createRenderDetail(board, createApiDetailSource(live.snapshot)) : undefined;
+    if (runId === undefined) return fixtureDetailSource(board);
+    return live.snapshot ? createApiDetailSource(live.snapshot) : undefined;
   }, [board, runId, live.snapshot]);
+  const renderDetail = useMemo(() => (board === undefined || detailSource === undefined ? undefined : createRenderDetail(board, detailSource)), [board, detailSource]);
 
   const blocks = useMemo(() => deriveBlocks(board, session), [board, session]);
   const hops = useMemo(() => deriveHops(board, session), [board, session]);
@@ -76,7 +77,7 @@ export function SingleView({ search = window.location.search, actions }: Props) 
         </section>
         {Panel === undefined || open === undefined ? null : (
           <PanelModal key={open} panelId={open} title={Panel.title} identity={(AGENT_ORDER as readonly string[]).includes(open) ? AGENTS[open as AgentId] : undefined} onClose={() => setOpen(undefined)}>
-            <Panel.Component board={board} runId={runId} live={runId !== undefined} renderDetail={renderDetail} selectRun={selectRun} agentId={open} />
+            <Panel.Component board={board} runId={runId} live={runId !== undefined} renderDetail={renderDetail} {...(detailSource ? { detailSource } : {})} selectRun={selectRun} openPanel={setOpen} agentId={open} />
           </PanelModal>
         )}
       </div>

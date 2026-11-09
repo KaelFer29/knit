@@ -13,6 +13,8 @@ export interface PlanDraftTask {
   title: string;
   branch: string;
   dependsOn?: string;
+  /** The model the planner chose for the builder on this task, when it chose one. */
+  model?: string;
 }
 
 export interface PlanDraft {

@@ -14,6 +14,7 @@ const props = (board: BoardModel | undefined, source = board ? fixtureDetailSour
   runId: undefined,
   live: false,
   renderDetail: board && source ? createRenderDetail(board, source) : undefined,
+  ...(source ? { detailSource: source } : {}),
   selectRun: vi.fn(),
 });
 
@@ -53,13 +54,25 @@ describe("CursorPanel", () => {
     expect(screen.getByRole("region", { name: "Latest task" })).toBeTruthy();
   });
 
-  it("switches to the file explorer tab", async () => {
+  it("shows in Files only what Cursor changed, grouped by task, and no repository explorer", async () => {
     const user = userEvent.setup();
     render(<CursorPanel {...props(runningRun)} />);
     expect(screen.getByRole("tab", { name: "Agent" }).getAttribute("aria-selected")).toBe("true");
     await user.click(screen.getByRole("tab", { name: "Files" }));
-    expect(await screen.findByRole("treeitem", { name: /README.md/ })).toBeTruthy();
+    const groups = await screen.findAllByRole("region", { name: /^Changes of T\d/ });
+    const started = runningRun.tasks.filter((t) => t.state !== "queued").map((t) => t.taskId);
+    expect(groups.map((g) => g.getAttribute("aria-label"))).toEqual(started.map((id) => `Changes of ${id}`));
+    expect(await within(groups[0]!).findByText("src/webhooks/signature.ts")).toBeTruthy();
+    expect(screen.queryByRole("tree")).toBeNull();
     expect(screen.queryByRole("region", { name: "Active task" })).toBeNull();
+  });
+
+  it("says so when no task has changed anything yet", async () => {
+    const user = userEvent.setup();
+    const queued = { ...runningRun, tasks: runningRun.tasks.map((t) => ({ ...t, state: "queued" as const })), active: undefined };
+    render(<CursorPanel {...props(queued as BoardModel)} />);
+    await user.click(screen.getByRole("tab", { name: "Files" }));
+    expect(await screen.findByText(/has not changed any file yet/i)).toBeTruthy();
   });
 
   it("shows a waiting state with what Cursor will show, not an empty box, when there is no run", () => {

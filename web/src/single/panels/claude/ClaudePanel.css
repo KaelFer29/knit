@@ -138,11 +138,107 @@
   min-height: 0;
 }
 
+/* The plan drafts and the runs line float over the bottom of the chat, in full; the toggle folds them to read the chat. */
+.claude-panel__chat {
+  position: relative;
+}
+
+.claude-panel__overlay {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 78%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--claude-line);
+  border-radius: var(--radius-lg);
+  background: var(--claude-paper);
+  box-shadow: var(--shadow-lg);
+}
+
 .claude-panel__drafts {
-  flex: none;
-  max-height: 45%;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
+}
+
+.claude-panel__drafts-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.claude-panel__drafts-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.claude-panel__count {
+  margin-left: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  background: var(--agent-claude);
+  color: #fff;
+  font-size: var(--text-xs);
+}
+
+.claude-panel__chevron {
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.claude-panel__drafts-toggle[aria-expanded="false"] .claude-panel__chevron {
+  transform: rotate(180deg);
+}
+
+.claude-panel__runs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.claude-panel__runs-label {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.claude-panel__run {
+  padding: 0.15rem var(--space-3);
+  border: 1px solid var(--claude-line);
+  border-radius: 999px;
+  background: var(--claude-ivory);
+  color: var(--text);
+  font: inherit;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.claude-panel__run:hover {
+  border-color: var(--agent-claude);
+}
+
+.claude-panel__run:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .claude-panel__chevron {
+    transition: none;
+  }
 }
 
 .claude-panel__aside {
