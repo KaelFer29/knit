@@ -24,6 +24,7 @@ export async function execute(
   deps: CliDeps,
   env: NodeJS.ProcessEnv,
   resumeRunId: string | undefined,
+  planText?: string,
 ): Promise<number> {
   const maxAttempts = positiveNumber(values["max-attempts"], "--max-attempts", 2);
   const agentTimeoutMs = positiveNumber(values["agent-timeout-min"], "--agent-timeout-min", 10) * 60_000;
@@ -77,6 +78,8 @@ export async function execute(
       {
         runId,
         planPath,
+        pid: process.pid,
+        ...(planText !== undefined ? { planText } : {}),
         maxAttempts,
         agentTimeoutMs,
         checkTimeoutMs,

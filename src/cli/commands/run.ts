@@ -8,7 +8,7 @@ import { execute } from "./execute.js";
 export async function runCommand(args: string[], io: CliIo, deps: CliDeps, env: NodeJS.ProcessEnv, cwd: string): Promise<number> {
   const { values, positionals } = parse(args, RUN_OPTIONS);
   if (positionals.length !== 1) throw new UsageError("run needs exactly one plan file");
-  const { plan, path } = loadPlan(positionals[0]!, env, cwd);
+  const { plan, path, text } = loadPlan(positionals[0]!, env, cwd);
 
   if (values["dry-run"]) {
     io.out(`Dry run: plan '${plan.name}', repo ${plan.repo}\n`);
@@ -20,5 +20,5 @@ export async function runCommand(args: string[], io: CliIo, deps: CliDeps, env: 
     }
     return 0;
   }
-  return execute(plan, path, values, io, deps, env, undefined);
+  return execute(plan, path, values, io, deps, env, undefined, text);
 }

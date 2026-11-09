@@ -84,11 +84,12 @@ function harness(options: Options = {}) {
   const agentRecords: AgentEventRecord[] = [];
   const transcripts: { ctx: { runId: string; taskId: string; attempt: number }; raw: unknown[]; closed: boolean }[] = [];
   const tasks = new Map<string, TaskRecord>((options.existing ?? []).map((t) => [t.taskId, t]));
-  const runs: { created?: RunRecord; status?: RunStatus; reopened?: boolean } = {};
+  const runs: { created?: RunRecord; status?: RunStatus; reopened?: boolean; reopenPid?: number } = {};
   let agentCalls = 0;
   let preflights = 0;
 
   const agent: AgentRunner = {
+    name: "fake-agent",
     run: async (req, onEvent) => {
       order.push("agent");
       prompts.push(req.prompt);
@@ -145,7 +146,10 @@ function harness(options: Options = {}) {
   const store: RunStore = {
     createRun: (r) => void (runs.created = r),
     finishRun: (_id, status) => void (runs.status = status),
-    reopenRun: () => void (runs.reopened = true),
+    reopenRun: (_id, pid) => {
+      runs.reopened = true;
+      if (pid !== undefined) runs.reopenPid = pid;
+    },
     upsertTask: (t) => void tasks.set(t.taskId, { ...tasks.get(t.taskId), ...t }),
     getTasks: () => [...tasks.values()],
     nextAttempt: () => options.nextAttemptStart ?? 1,
@@ -211,6 +215,20 @@ describe("runPlan: core loop", () => {
     expect(h.runs.created).toMatchObject({ id: "run-1", planName: "demo", repo: "/repo", base: "main@basesha" });
     expect(h.events[0]).toMatchObject({ type: "run.started" });
     expect(h.events.at(-1)).toMatchObject({ type: "run.finished", payload: { status: "passed" } });
+  });
+
+  it("records the plan snapshot: plan text, pid and each task's goal, dependency, position and specs", async () => {
+    const h = harness({ agent: writes(["src/a.ts"], ["src/b.ts"]) });
+    await h.run({ planText: PLAN_MD, pid: 1234 });
+    expect(h.runs.created).toMatchObject({ planText: PLAN_MD, pid: 1234 });
+    expect(h.tasks.get("T1")).toMatchObject({ goal: "Do first.", position: 1, specs: [{ id: "S1", text: "first spec" }] });
+    expect(h.tasks.get("T1")?.dependsOn).toBeUndefined();
+    expect(h.tasks.get("T2")).toMatchObject({
+      goal: "Do second.",
+      dependsOn: "T1",
+      position: 2,
+      specs: [{ id: "S1", text: "second spec" }],
+    });
   });
 
   it("never commits itself: the agent owns the commits", async () => {
@@ -382,6 +400,13 @@ describe("runPlan: agent transcript", () => {
     expect(h.agentRecords.at(-1)!.payload).toEqual({ text: "tail" }); // flushed at the end of the attempt
     expect(h.agentRecords.every((r) => r.runId === "run-1" && r.taskId === "T1" && r.attempt === 1)).toBe(true);
     expect(h.agentRecords[0]!.ts).toBe("2026-11-08T10:00:00.000Z");
+  });
+
+  it("labels every timeline entry with the name of the agent runner", async () => {
+    const h = harness({ planMd: onlyT1(PLAN_MD), agent: writes(["src/a.ts"]), agentEvents: STREAM });
+    await h.run();
+    expect(h.agentRecords.length).toBeGreaterThan(0);
+    expect(h.agentRecords.every((r) => r.agent === "fake-agent")).toBe(true);
   });
 
   it("writes every raw event to the attempt's transcript and closes it", async () => {
@@ -563,6 +588,14 @@ describe("runPlan: resume", () => {
     expect(h.prompts).toHaveLength(1);
     expect(h.prompts[0]).toContain("A previous run of this task did not finish");
     expect(h.attempts[0]).toMatchObject({ taskId: "T2", attempt: 3 });
+  });
+
+  it("records the new pid on resume and snapshots the tasks that are added", async () => {
+    const h = harness({ existing: [existing[0]!], agent: writes(["src/b.ts"]) });
+    await h.run({ resume: true, pid: 99 });
+    expect(h.runs.created).toBeUndefined();
+    expect(h.runs.reopenPid).toBe(99);
+    expect(h.tasks.get("T2")).toMatchObject({ goal: "Do second.", dependsOn: "T1", position: 2 });
   });
 
   it("prepares a fresh worktree from the parent's branch when the old one is gone", async () => {

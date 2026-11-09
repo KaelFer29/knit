@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { SqliteRunStore } from "../../src/adapters/storage/sqlite/run-store.js";
 import { main, type CliDeps } from "../../src/cli/main.js";
 import type { AgentRunner } from "../../src/core/ports/agent-runner.js";
 import type { CreatePullRequestInput, PullRequests } from "../../src/core/ports/pull-requests.js";
@@ -157,6 +158,24 @@ describe("cli run", () => {
     expect(text).toContain("attempt 1");
     expect(text).toContain("10 in / 3 out");
     expect(text).toContain("branch feat/create-a");
+  });
+
+  it("records the plan snapshot of the run in the database", async () => {
+    expect(await main(["run", planPath], capture().io, baseDeps())).toBe(0);
+    const store = new SqliteRunStore(join(dataDir, "knit.db"));
+    try {
+      const { run, tasks } = store.getRun(await runIdOf())!;
+      expect(run.planText).toBe(readFileSync(planPath, "utf8"));
+      expect(run.pid).toBeUndefined(); // finished runs hold no pid
+      expect(tasks[0]).toMatchObject({
+        goal: "Create src/a.txt.",
+        position: 1,
+        specs: [{ id: "S1", text: "Create the file src/a.txt" }],
+      });
+      expect(store.getAgentEvents(run.id).every((e) => e.agent === "cursor")).toBe(true);
+    } finally {
+      store.close();
+    }
   });
 
   it("uses the repository of the current directory when the plan has no Repo", async () => {
