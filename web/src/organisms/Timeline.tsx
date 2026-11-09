@@ -18,7 +18,7 @@ export function Timeline({ items, emptyText }: { items: TimelineItem[]; emptyTex
   return (
     <div
       ref={ref}
-      className="timeline"
+      className="chat-timeline"
       tabIndex={0}
       role="log"
       aria-label="Conversation"
@@ -28,7 +28,7 @@ export function Timeline({ items, emptyText }: { items: TimelineItem[]; emptyTex
         pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
       }}
     >
-      {items.length === 0 ? <p className="timeline__empty">{emptyText}</p> : items.map((item) => <TimelineEntry key={item.key} item={item} />)}
+      {items.length === 0 ? <p className="chat-timeline__empty">{emptyText}</p> : items.map((item) => <TimelineEntry key={item.key} item={item} />)}
     </div>
   );
 }

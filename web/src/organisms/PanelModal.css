@@ -85,6 +85,10 @@
   border-color: var(--claude-line);
 }
 
+.modal__dialog[data-skin="terminal"] .modal__head {
+  background: var(--claude-canvas);
+}
+
 .modal__dialog[data-skin="terminal"] .modal__title {
   font-family: var(--font-serif);
   font-weight: 500;

@@ -22,7 +22,7 @@
   overflow-y: auto;
 }
 
-.claude-panel__scroll .timeline {
+.claude-panel__scroll .chat-timeline {
   flex: 1 0 auto;
   min-height: 10rem;
 }
@@ -55,7 +55,7 @@
     grid-row: 1;
   }
 
-  .claude-panel__scroll > .timeline,
+  .claude-panel__scroll > .chat-timeline,
   .claude-panel__scroll > .empty-chat {
     grid-column: 1;
     grid-row: 1;
@@ -83,14 +83,17 @@
 }
 
 /* The conversation sits straight on the modal, like a chat app: no box around it. */
-.claude-panel .timeline {
+.claude-panel .chat-timeline {
   gap: var(--space-2);
-  padding: 0 var(--space-1);
+  padding: var(--space-1) var(--space-2) var(--space-2) var(--space-1);
   border: 0;
   background: none;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text) 25%, transparent) transparent;
 }
 
-/* Bubbles: yours on the right in Claude's soft tint, Claude's on the left in white; small text, the time inside. */
+/* Bubbles, as in a messaging app: the same white bubble for both, yours on the right and Claude's on the left; small text, the time inside. */
 .claude-panel .tl-entry--prompt,
 .claude-panel .tl-entry--message,
 .claude-panel .tl-entry--result {
@@ -104,9 +107,10 @@
 
 .claude-panel .tl-entry--prompt {
   align-self: flex-end;
-  border: 1px solid color-mix(in srgb, var(--agent-claude) 22%, transparent);
+  border: 1px solid var(--claude-line);
   border-bottom-right-radius: 4px;
-  background: color-mix(in srgb, var(--agent-claude) 12%, var(--claude-paper));
+  background: var(--claude-paper);
+  box-shadow: 0 1px 1px rgb(20 20 15 / 5%);
 }
 
 .claude-panel .tl-entry--message,
@@ -153,4 +157,21 @@
 
 .claude-panel__side {
   gap: var(--space-3);
+}
+
+/* The composer is white with a neutral outline; the send button is the one coral accent. */
+.claude-panel .composer__box {
+  background: var(--claude-paper);
+  border-color: var(--claude-line);
+}
+
+.claude-panel__scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text) 25%, transparent) transparent;
+}
+
+/* Air between the side column and the scrollbar next to it. */
+.claude-panel__side {
+  padding: var(--space-1) var(--space-4) var(--space-3) var(--space-1);
 }

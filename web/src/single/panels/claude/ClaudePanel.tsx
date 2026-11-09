@@ -7,7 +7,6 @@ import { Timeline } from "../../../organisms/Timeline";
 import { PlanUsageCard } from "../../../organisms/PlanUsageCard";
 import { ClaudeAtWork } from "../../../molecules/ClaudeAtWork";
 import { usePlanUsage } from "../../../sessions/usePlanUsage";
-import { CopyCommand } from "../../../molecules/CopyCommand";
 import { fetchAgentList, fetchModels, fetchSessions, sendTurn, startSession } from "../../../sessions/api";
 import { identityOf } from "../../../identity/agents";
 import { launchPlan, type PlanDraftView } from "../../../sessions/plans";
@@ -178,14 +177,11 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
     ? live.detail.turns.reduce((sum, t) => ({ input: sum.input + (t.inputTokens ?? 0), output: sum.output + (t.outputTokens ?? 0) }), { input: 0, output: 0 })
     : { input: 0, output: 0 };
 
-  const continueCommand = live.detail?.continueCommand;
-
   const side = (
     <aside className="claude-panel__side" aria-label="Usage and plans">
       <ClaudeAtWork working={running} tokens={tokens} />
       {agent?.capabilities.planUsage ? <PlanUsageCard windows={usage.windows} checkedAt={usage.checkedAt} now={now} loading={usage.loading} error={usage.error} onRefresh={usage.refresh} /> : null}
       {drafts.listing ? <PlanDrafts dir={drafts.listing.dir} plans={drafts.listing.plans} launching={launching} error={launchError} onLaunch={(plan) => void launch(plan)} /> : null}
-      {continueCommand ? <CopyCommand command={continueCommand} label="Continue in a terminal" compact /> : null}
     </aside>
   );
 

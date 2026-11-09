@@ -16,7 +16,8 @@
 }
 
 .composer__box:focus-within {
-  border-color: var(--agent-claude);
+  border-color: color-mix(in srgb, var(--text) 40%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 6%, transparent);
 }
 
 .composer__field {

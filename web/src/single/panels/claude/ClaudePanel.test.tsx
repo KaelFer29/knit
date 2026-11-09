@@ -107,11 +107,21 @@ describe("ClaudePanel: an open session", () => {
     expect(document.querySelector("b")).toBeNull();
   });
 
-  it("shows the terminal command and the plan usage of an agent that declares them", async () => {
+  it("shows the plan usage and the tokens, and no terminal command card", async () => {
     render(panel());
-    await screen.findByText("cd '/repo' && alpha --resume agent-sess-1");
+    await screen.findByText("<b>Here is the plan</b>");
     expect((await screen.findByRole("meter", { name: "Current session" })).getAttribute("aria-valuenow")).toBe("36");
     expect(screen.getByText("1.2k tokens in this conversation")).toBeTruthy();
+    expect(screen.queryByText(/continue in a terminal/i)).toBeNull();
+    expect(screen.queryByText("cd '/repo' && alpha --resume agent-sess-1")).toBeNull();
+  });
+
+  it("keeps the chat out of the class the agent's timeline list uses, so one cannot restyle the other", async () => {
+    render(panel());
+    await screen.findByText("<b>Here is the plan</b>");
+    const chat = screen.getByRole("log", { name: "Conversation" });
+    expect(chat.classList.contains("timeline")).toBe(false);
+    expect(chat.classList.contains("chat-timeline")).toBe(true);
   });
 
   it("offers the agent's own commands and the capability-gated Knit commands in the palette", async () => {
@@ -128,7 +138,6 @@ describe("ClaudePanel: an open session", () => {
     await screen.findByText("Plan the board");
     expect(screen.queryByRole("region", { name: "Plan usage" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Model and effort" })).toBeNull();
-    expect(screen.queryByText("Continue in terminal")).toBeNull();
     // It cannot resume, so continuing here is not offered either.
     expect(screen.getByText(/cannot continue this conversation here/)).toBeTruthy();
     expect(screen.queryByRole("combobox", { name: /message beta/i })).toBeNull();
