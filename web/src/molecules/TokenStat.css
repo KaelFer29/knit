@@ -1,0 +1,36 @@
+.token-stat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  row-gap: 2px;
+  margin: 0;
+}
+
+.token-stat__label {
+  grid-column: 1 / -1;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.token-stat__value {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.token-stat__value[data-empty="true"] {
+  color: var(--text-faint);
+}
+
+.token-stat__split {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}

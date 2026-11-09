@@ -1,6 +1,6 @@
 # Web interface
 
-> **Partly built.** This is the agreed design for `knit ui`. Built so far: the read side and board view model (T2), the server with `knit ui` (T3: read routes, live stream, static files, security) and the app scaffold (T4, see [Web app scaffold](#web-app-scaffold)). Not built yet: the flow canvas, run control and everything from phase B on. Progress and open decisions are tracked in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md). Sections say "built" when they are.
+> **Partly built.** This is the agreed design for `knit ui`. Built so far: the read side and board view model (T2), the server with `knit ui` (T3: read routes, live stream, static files, security) the app scaffold (T4, see [Web app scaffold](#web-app-scaffold)) and the flow canvas on fixtures (T5, see [Flow canvas](#flow-canvas-built)). Not built yet: live data in the canvas, the detail inside the expandable blocks, run control and everything from phase B on. Progress and open decisions are tracked in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md). Sections say "built" when they are.
 
 A local web app that joins Claude and Cursor into one workflow and is the single place to review everything.
 
@@ -187,7 +187,7 @@ Built in task T4: the skeleton of the browser app with its look and its identiti
 | Themes | `tokens.css`, `web/src/theme/` | Light by default, dark under `prefers-color-scheme`, and `data-theme="light"` or `"dark"` on `<html>` overrides the system. The toggle offers light, dark and system and stores the choice under the `localStorage` key `knit.theme` (every storage access is guarded; the page works when storage is blocked). The stored theme is applied in `main.tsx` before the first render |
 | Identities | `web/src/identity/agents.ts` | Claude (planner), Knit (orchestrator) and Cursor (builder): label, role, brand color tokens, logo file, monogram. Components receive an identity and never branch on the agent's name |
 | Logo | `web/src/atoms/Logo.tsx` | Loads `/brand/<file>`; shows the monogram while it loads and keeps it when the file is missing or fails. Knit's own mark (`atoms/KnitMark.tsx`, two interlocked threads) is drawn in code |
-| Shell | `web/src/App.tsx`, `organisms/AppShell.tsx` | Header with the Knit mark and name and the theme toggle; skip link; an empty `main#canvas` that the flow canvas will fill |
+| Shell | `web/src/App.tsx`, `organisms/AppShell.tsx` | Header with the Knit mark and name and the theme toggle; skip link; `main#canvas`, which hosts the flow canvas through the `FlowView` container |
 | API client | `web/src/api/client.ts` | `apiGet` with same-origin credentials and `ApiError`; no routes are called yet |
 | Fixtures | `web/src/fixtures/boards.ts` | Typed `BoardModel` samples (running, retrying, verifying, failed, delivered, a long queue, and a run from before schema 4) that the canvas is drawn from until it is wired to live data |
 
@@ -215,6 +215,32 @@ The app asks for exactly these files and never commits them:
 | Knit | none | original mark drawn in code |
 
 `web/public/brand/` is git-ignored; Vite serves it at `/brand/` and copies it into `dist/web/brand/` on build. A missing or unreadable file leaves the monogram in place.
+
+## Flow canvas (built)
+
+Built in task T5, on the fixtures: the circuit described in [Visual model](#visual-model) as a working picture. There is no live data yet; a later task replaces the fixture with the live board and the demo pulses with real events.
+
+| Piece | Where | Notes |
+| --- | --- | --- |
+| `FlowView` (container) | `web/src/containers/FlowView.tsx` | Picks the board and the pulses and hands them down. Today: a fixture from `?fixture=<name>` and the demo pulses from `?demo=1`. This is the only place the live source replaces |
+| `FlowCanvas` | `organisms/FlowCanvas.tsx` | Lays out Claude, Knit and Cursor and draws the board it is given, plus the pulses it is given. Presentational |
+| `AgentBlock` | `organisms/AgentBlock.tsx` | One identity block: logo (through `Logo`, with the monogram fallback), label, role, status badge from the node status, token total and, for the builder, the single live line. Renders from props and the identity, never from the agent's name |
+| `QueueLane`, `ActiveTask`, `DeliveryLane` | `organisms/` | Knit's input (queued tasks in execution order, a connector between neighbours that depend on each other, a fold behind "Show N more" past six), center (the running task, or the failed one, with its stage and the check being run) and output (a commit chip and a pull request chip per delivered task) |
+| `TaskCard` | `molecules/TaskCard.tsx` | Position, title, state, attempt count and the `Depends` link |
+| `Wires` | `organisms/Wires.tsx` | The SVG overlay: strands, ports and pulses |
+| Geometry | `flow/geometry.ts` | `computeWires` is a pure function from the measured block rectangles to strand paths and ports (unit tested). `FlowCanvas` measures with a `ResizeObserver` (`flow/useFlowLayout.ts`) and recomputes whenever the canvas or any block changes size, so opening a block moves the wires with it |
+
+**Wires.** One strand per task from Claude to Knit (a ribbon that lands on the queue), one per dispatched task from Knit to Cursor (the prompt) and one per finished attempt back (the result), as smooth curves on two parallel lanes. A wire that carries nothing yet keeps an idle, dotted lane so the circuit stays connected. Strands are neutral while queued or delivered and take the status color while a task is running, retrying, verifying or failed; the strand of the open task flows (marching dashes).
+
+**Pulses.** `FlowCanvas` takes `pulses: { id, wireId, kind }[]` with `kind` one of `dispatched` (plan wire), `prompt` or `result`, and `wireId` a strand (`prompt:T3`) or a bare wire. A dot travels the strand in the color of the sender and `onPulseEnd(id)` fires when it arrives; the owner drops it. Under `prefers-reduced-motion` the dot becomes a static highlight of the strand that clears after about two seconds, and every other animation is off. Demo mode (`?demo=1`, marked "Demo pulses: on" in the switcher) plays dispatch, prompt and result in turn on the fixture; it is `flow/useDemoPulses.ts` and exists only to see and screenshot the motion.
+
+**States.** Each task state has its own icon and text label, so color is never the only signal: queued (dashed ring), running (turning arc, the only state with life: a soft halo on the running card), retrying (circular arrow), verifying (checklist), delivered (check) and failed (cross). Blocks borrow the same look for their node status (idle, working, done, failed).
+
+**Expandable blocks.** Blocks, task cards and the running task are disclosure widgets: a focusable `<button>` with `aria-expanded` and `aria-controls`, toggled by Enter and Space. The open panel is the `renderDetail(target)` slot, with `target` either `{ kind: "agent", id }` or `{ kind: "task", taskId }`; it is called only while open. With nothing to render the panel shows a tidy empty state. The detail content (attempts, timelines, checks, plan) belongs to later tasks.
+
+**Layout.** From a canvas width of 1120 px (a 1280 px window) the three blocks sit side by side; below it the same flow runs top to bottom (Claude, Knit, Cursor) with the wires recomputed, and nothing scrolls horizontally down to 768 px. The orientation is chosen in one place from the measured width and written to `data-layout`. Tab order follows the reading order: Claude, Knit, its queue, the running task, the delivered links, Cursor.
+
+**Viewing the fixtures.** `pnpm dev:web` (or a built `dist/web` served statically), then open `/?fixture=runningRun`. A switcher with the fixtures appears only when `fixture` is in the URL: `runningRun` (the default without the parameter), `retryingRun`, `verifyingRun`, `failedRun`, `deliveredRun`, `longQueueRun` and `legacyRun`. Add `&demo=1` for the pulses.
 
 ## HTTP API
 

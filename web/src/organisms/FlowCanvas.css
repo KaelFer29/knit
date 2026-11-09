@@ -1,0 +1,88 @@
+/*
+ * Layout of the canvas. `data-layout` is set from the measured canvas width (see flow/useFlowLayout), so the
+ * wires and the grid always agree about which orientation they are in.
+ */
+.flow {
+  position: relative;
+  display: grid;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+/* From a wide canvas: the circuit, Claude then Knit then Cursor, with room between them for the wires. */
+.flow[data-layout="horizontal"] {
+  grid-template-columns: clamp(204px, 17vw, 240px) minmax(0, 1fr) clamp(204px, 17vw, 240px);
+  column-gap: clamp(64px, 7vw, 120px);
+}
+
+/* A narrower canvas: the same flow from top to bottom. */
+.flow[data-layout="vertical"] {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 72px;
+}
+
+.flow[data-layout="vertical"] > .agent-block:not(:nth-of-type(2)) {
+  justify-self: center;
+  width: min(100%, 380px);
+}
+
+/* Knit: the queue at its input, the running task at its center. */
+.flow__knit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
+
+/* The delivery lane is Knit's output: a quiet band along the bottom edge of the block. */
+.flow .delivery-lane {
+  margin: var(--space-2) calc(var(--space-5) * -1) calc(var(--space-5) * -1);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+
+.flow__plan {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 560;
+  overflow-wrap: anywhere;
+}
+
+.flow__delegated {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow__delegated-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-1);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.flow__delegated-item .state-icon {
+  width: 12px;
+  height: 12px;
+  color: var(--state);
+}
+
+@media (max-width: 600px) {
+  .flow__knit {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -54,7 +54,7 @@ function makeBoard(init: BoardInit): BoardModel {
 
   const strands = (include: (t: TaskView) => boolean): WireStrand[] =>
     tasks.filter(include).map((t) => ({ taskId: t.taskId, state: t.state }));
-  const hasFinishedAttempt = (t: TaskView) => t.attempts.some((a) => a.status === "passed" || a.status === "failed");
+  const hasFinishedAttempt = (t: TaskView) => t.attempts.some((a) => !a.setup && (a.status === "passed" || a.status === "failed"));
   const wires: WireView[] = [
     { id: "plan", from: "claude", to: "knit", active: runStatus === "running" && queued.length > 0, strands: strands(() => true) },
     { id: "prompt", from: "knit", to: "cursor", active: open?.state === "running" || open?.state === "retrying", strands: strands((t) => t.state !== "queued") },

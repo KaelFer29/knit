@@ -1,0 +1,53 @@
+.fixture-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.fixture-switcher__nav {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.fixture-switcher__link,
+.fixture-switcher__demo {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.fixture-switcher__link:hover,
+.fixture-switcher__demo:hover {
+  color: var(--text);
+}
+
+.fixture-switcher__link[aria-current="page"] {
+  background: var(--surface-1);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* The demo toggle is marked on purpose: pulses on a fixture are not real events. */
+.fixture-switcher__demo {
+  border: 1px dashed var(--border-strong);
+}
+
+.fixture-switcher__demo[data-on="true"] {
+  border-style: solid;
+  background: var(--status-verifying-soft);
+  color: var(--status-verifying);
+}

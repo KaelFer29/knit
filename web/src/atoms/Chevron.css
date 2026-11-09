@@ -1,0 +1,13 @@
+.chevron {
+  flex: none;
+  color: var(--text-faint);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+[aria-expanded="true"] > .chevron,
+[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+  color: var(--text-muted);
+}
