@@ -40,9 +40,6 @@ export function BranchesView({ runId, pollMs }: { runId: string; pollMs?: number
   if (listing.branches.length === 0) return <p className="detail-note">No branches yet. Cursor creates one for each task it starts.</p>;
   return (
     <div className="branches">
-      <p className="branches__note">
-        Pull requests go into <code>{listing.base}</code>, or into the branch of the task they depend on. Nothing is pushed until you press the button.
-      </p>
       {error === undefined ? null : (
         <p className="detail-note" role="status">
           Could not refresh: {error}

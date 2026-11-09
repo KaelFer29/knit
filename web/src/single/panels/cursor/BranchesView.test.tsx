@@ -56,7 +56,8 @@ describe("BranchesView", () => {
     show();
     const card = await screen.findByRole("region", { name: "Branch docs/one" });
     expect(within(card).getByText("T1")).toBeTruthy();
-    expect(within(card).getByText("Create prueba.md")).toBeTruthy();
+    expect(within(card).getByText("docs/one")).toBeTruthy();
+    expect(within(card).queryByText("Create prueba.md")).toBeNull();
     expect(within(card).getByText("1 commit")).toBeTruthy();
     expect(within(card).getByText("Local only")).toBeTruthy();
     expect(within(card).getByText("docs: add prueba.md")).toBeTruthy();
@@ -71,7 +72,8 @@ describe("BranchesView", () => {
       const user = userEvent.setup();
       show();
       const row = await screen.findByRole("region", { name: "Branch feat/b2" });
-      expect(within(row).getByText("1 commit · Local only")).toBeTruthy();
+      expect(within(row).getByText("feat/b2")).toBeTruthy();
+      expect(within(row).queryByText("1 commit")).toBeNull();
       expect(within(row).queryByText("docs: add prueba.md")).toBeNull();
       expect(within(row).queryByRole("button", { name: "Open pull request" })).toBeNull();
       const toggle = within(row).getByRole("button", { name: /T2/ });
@@ -79,6 +81,9 @@ describe("BranchesView", () => {
       await user.click(toggle);
       expect(toggle.getAttribute("aria-expanded")).toBe("true");
       expect(within(row).getByText("docs: add prueba.md")).toBeTruthy();
+      expect(within(row).getByText("1 commit")).toBeTruthy();
+      expect(within(row).getByText("Local only")).toBeTruthy();
+      expect(within(row).getByText("Has a worktree")).toBeTruthy();
       expect(within(row).getByRole("button", { name: "Open pull request" })).toBeTruthy();
       await user.click(toggle);
       expect(within(row).queryByText("docs: add prueba.md")).toBeNull();
@@ -111,6 +116,13 @@ describe("BranchesView", () => {
       await user.type(screen.getByRole("searchbox", { name: "Search branches" }), "zzz");
       expect(screen.getByText("No branch matches this search.")).toBeTruthy();
     });
+  });
+
+  it("does not repeat the branch name below the row, and has no note about where pull requests go", async () => {
+    show();
+    const card = await screen.findByRole("region", { name: "Branch docs/one" });
+    expect(within(card).getAllByText("docs/one")).toHaveLength(1);
+    expect(screen.queryByText(/Nothing is pushed until you press the button/)).toBeNull();
   });
 
   it("says when there is nothing to show yet", async () => {

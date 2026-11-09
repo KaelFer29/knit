@@ -27,14 +27,6 @@
   outline-offset: 2px;
 }
 
-.branch__summary {
-  flex: none;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
 .branch__body-wrap {
   display: flex;
   flex-direction: column;
@@ -49,20 +41,15 @@
   font-size: var(--text-xs);
 }
 
-.branch__title {
+.branch__name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.branch__name {
-  margin: 0;
-  color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .branch__chips {

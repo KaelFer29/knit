@@ -130,23 +130,17 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
 
   return (
     <section className="branch" aria-label={`Branch ${b.branch}`} data-status={b.status}>
-      <button type="button" className="branch__toggle" aria-expanded={open} aria-controls={open ? sectionId : undefined} onClick={() => setOpen((v) => !v)}>
+      <button type="button" className="branch__toggle" aria-expanded={open} aria-controls={open ? sectionId : undefined} onClick={() => setOpen((v) => !v)} title={b.title}>
         <span className="branch__id">{b.taskId}</span>
-        <span className="branch__title">{b.title}</span>
-        <span className="branch__summary">
-          {plural(state.ahead.length, "commit")} · {state.pushed ? "On origin" : "Local only"}
-          {b.prUrl ? " · PR" : ""}
-          {state.dirty || !state.exists ? " · !" : ""}
+        <span className="branch__name">
+          <span aria-hidden="true">⎇ </span>
+          {b.branch}
         </span>
         <StatusBadge state={b.status === "passed" ? "delivered" : b.status === "failed" ? "failed" : "running"} />
         <Chevron />
       </button>
       {open ? (
         <div className="branch__body-wrap" id={sectionId}>
-      <p className="branch__name">
-        <span aria-hidden="true">⎇ </span>
-        {b.branch}
-      </p>
       <ul className="branch__chips" aria-label="State of the branch">
         <li>{plural(state.ahead.length, "commit")}</li>
         <li data-tone={state.pushed ? "ok" : undefined}>{state.pushed ? "On origin" : "Local only"}</li>

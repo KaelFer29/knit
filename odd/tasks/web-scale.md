@@ -25,7 +25,7 @@ Objective: make the runs list, the branches and the changed files of `knit ui` u
 | L4 | S3 | Changed files: collapsed groups with counts, paginated | inline | done (RED seen: 2 tests); only the page shown reads its diffs | see git log |
 
 | L5 | S5, S6 | Cursor modal: drop the Files tab (and `ChangedFiles`); Agent tab compact (only the active task open, the rest collapsed, paged, searchable) | inline | done (RED seen: 3 tests) | see git log |
-| L6 | S7 | Branch row: branch name and icon in the title slot, smaller expanded view, no note | inline | pending | |
+| L6 | S7 | Branch row: branch name and icon in the title slot, details with the tags and commits only, no note | inline | done (RED seen: 3 tests) | see git log |
 | L7 | S8 | Pull request target choice with the computed base as default (core rule, CLI, route, page) | inline | pending | |
 | L8 | S9 | Claude block and modal show the renamed session title (shared titles store) | inline | done (RED seen: 1 test) | see git log |
 | L9 | S10 | Orchestrator modal: minimal, white with a faint green, compact tasks, runs and their tasks as one hierarchy | inline | pending | |
