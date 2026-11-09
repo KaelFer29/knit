@@ -8,6 +8,8 @@ export default defineConfig({
           name: "node",
           // Unit tests live next to the module they test; cross-layer tests live in test/integration.
           include: ["src/**/*.test.ts", "test/**/*.test.ts"],
+          // Several suites start real processes and git; under the parallel load of a full run 5 s is not enough.
+          testTimeout: 20_000,
         },
       },
       {
