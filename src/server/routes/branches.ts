@@ -13,7 +13,7 @@ const MODES: readonly UndoMode[] = ["revert", "reset", "delete"];
 const MAX_TITLE = 200;
 const MAX_BODY = 60_000;
 /** How long each action may take: an undo is git, a draft waits for a model, a pull request waits for GitHub. */
-const DEFAULT_TIMEOUT_MS: Record<string, number> = { undo: 60_000, "pr-draft": 150_000, pr: 120_000 };
+const DEFAULT_TIMEOUT_MS: Record<string, number> = { undo: 60_000, checkout: 60_000, "pr-draft": 150_000, pr: 120_000 };
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -153,6 +153,18 @@ export const branchesRoutes: RouteModule = ({ reader, branches, pullRequests, co
         if (body.confirm !== true) throw new HttpError(400, "confirm must be true: undoing loses work, so it has to be asked for explicitly");
         requireTask(params.id!, params.task!);
         await act(control, res, params.id!, params.task!, "undo", ["--mode", body.mode, "--yes"]);
+      },
+    },
+    {
+      method: "POST",
+      pattern: "/api/runs/:id/tasks/:task/checkout",
+      handler: async ({ req, res, params }) => {
+        const control = requireControl(controlDeps);
+        const body = await readJsonBody(req);
+        rejectUnknown(body, ["confirm"]);
+        if (body.confirm !== true) throw new HttpError(400, "confirm must be true: switching your repository to another branch is only done when asked for explicitly");
+        requireTask(params.id!, params.task!);
+        await act(control, res, params.id!, params.task!, "checkout", ["--yes"]);
       },
     },
     {

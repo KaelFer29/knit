@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 import { ApiError } from "../api/client";
 import { Chevron } from "../atoms/Chevron";
 import { StatusBadge } from "../atoms/StatusBadge";
-import type { BranchView, PrDraft, PrResult, UndoMode, UndoResult } from "../branches/types";
+import type { BranchView, CheckoutResult, PrDraft, PrResult, UndoMode, UndoResult } from "../branches/types";
 import { draftKey, draftOnce, forgetDraft, loadDraft, saveDraft } from "../branches/draftCache";
 import { Popover } from "../molecules/Popover";
 import "./BranchCard.css";
@@ -10,6 +10,8 @@ import "./BranchCard.css";
 export interface BranchActions {
   /** The branches origin has now, asked each time the pull request form opens. */
   remote: () => Promise<string[]>;
+  /** Switches the user's repository to the branch to test it. */
+  checkout: (taskId: string) => Promise<CheckoutResult>;
   undo: (taskId: string, mode: UndoMode) => Promise<UndoResult>;
   draft: (taskId: string, how: "template" | "model") => Promise<PrDraft>;
   open: (taskId: string, title: string, body: string, into?: string) => Promise<PrResult>;
@@ -45,7 +47,7 @@ const DRAFT_MODEL = "composer-2.5-fast";
 /** What the server calls a description built from the task, with no model. */
 const TEMPLATE = "template";
 
-type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | undefined;
+type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | { kind: "checkout" } | undefined;
 
 /**
  * One branch Cursor created: its commits and where it is, and what can be done with it. Undoing asks first and says
@@ -79,6 +81,21 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
       await actions.undo(b.taskId, mode);
       setPanel(undefined);
       setResult({ text: UNDO[mode].done(b.branch, b.taskId) });
+      onChanged();
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmCheckout = async (): Promise<void> => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await actions.checkout(b.taskId);
+      setPanel(undefined);
+      setResult({ text: `Your repository is now on ${b.branch}.` });
       onChanged();
     } catch (err) {
       setError(messageOf(err));
@@ -205,6 +222,19 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
             Open pull request
           </button>
         )}
+        <button
+          type="button"
+          className="branch__ghost"
+          disabled={!b.checkout.ok || busy || panel?.kind === "checkout"}
+          title={b.checkout.ok ? "Switch your repository to this branch to test it" : b.checkout.reason}
+          onClick={() => {
+            setResult(undefined);
+            setError(undefined);
+            setPanel({ kind: "checkout" });
+          }}
+        >
+          Test this branch
+        </button>
         <Popover
           label="Undo"
           direction="down"
@@ -245,6 +275,31 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
         </Popover>
       </div>
       {prReason !== undefined && !b.prUrl ? <p className="branch__why">{prReason}</p> : null}
+      {!b.checkout.ok && b.checkout.reason !== prReason ? <p className="branch__why">{b.checkout.reason}</p> : null}
+
+      {panel?.kind === "checkout" && b.checkout.ok ? (
+        <div className="branch__panel" role="alertdialog" aria-label={`Test ${b.branch} in your repository`}>
+          <p className="branch__panel-title">Test {b.branch} in your repository</p>
+          <ul className="branch__effects">
+            {b.checkout.effects.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+          {error ? (
+            <p className="branch__error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="branch__row">
+            <button type="button" className="branch__primary" disabled={busy} onClick={() => void confirmCheckout()}>
+              {busy ? "Working…" : "Switch my repository"}
+            </button>
+            <button type="button" className="branch__ghost" disabled={busy} onClick={close}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {panel?.kind === "undo" ? (
         <div className="branch__panel branch__panel--danger" role="alertdialog" aria-label={UNDO[panel.mode].title(b.branch)}>

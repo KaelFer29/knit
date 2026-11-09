@@ -13,8 +13,8 @@ Objective: make it easy to test what Cursor did (a "Test this branch" action tha
 
 | ID | Specs | What | Route | Status | Commit |
 | --- | --- | --- | --- | --- | --- |
-| B1 | S1 | Pure rule `decideCheckout`, `BranchState.checkedOut`, `GitBranchTools.checkout`, `checkout` in the branch overview | inline | pending | |
-| B2 | S1 | `knit branch … checkout` (dry run until `--yes`), the route, and the "Test this branch" action in the branch row | inline | pending | |
+| B1 | S1 | Pure rule `decideCheckout`, `BranchState.checkedOut`, `GitBranchTools.checkout`, `checkout` in the branch overview | inline | done (RED seen: 7 rule, 7 adapter, 2 overview tests) | 5f62df8 |
+| B2 | S1 | `knit branch … checkout` (dry run until `--yes`), the route, and the "Test this branch" action in the branch row | inline | done (RED seen: 5 CLI, 1 route, 4 page tests) | see git log |
 | B3 | S3 | `Workspace.restore` and `knit followup` recreating a missing worktree | inline | pending | |
 | B4 | S2 | `POST /api/runs/:id/tasks/:task/followup` | inline | pending | |
 | B5 | S2 | Claude modal: list of delivered tasks to iterate on, with their context, sent to the orchestrator as a follow-up | inline | pending | |

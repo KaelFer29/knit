@@ -15,6 +15,7 @@ const branch = (over: Record<string, unknown> = {}) => ({
   startSha: "aaaaaaa",
   state: { exists: true, head: "bbbbbbb", historyIntact: true, pushed: false, hasWorktree: true, dirty: false, ahead: [{ sha: "b1", subject: "docs: add prueba.md" }] },
   undo: { revert: ok, reset: { ok: true, effects: ["Moves docs/one back to the commit the task started from. 1 commit leaves the branch."] }, delete: { ok: true, effects: ["Deletes the branch docs/one and its worktree.", "1 commit of the task is lost from this repository."] } },
+  checkout: { ok: true as const, effects: ["Removes the worktree of T1. The branch docs/one and its 1 commit stay.", "Switches your repository to docs/one, so you can test it there. Your repository must have no uncommitted changes.", "To iterate on T1 again, switch back first (git checkout main): a branch can only be checked out in one place."] },
   pr: { ok: true, base: "main", head: "docs/one", options: ["main", "docs/two"], effects: ["Pushes docs/one to origin, without forcing.", "Opens a pull request from docs/one into main."] },
   ...over,
 });
@@ -68,6 +69,54 @@ describe("BranchesView", () => {
     expect(within(card).getByText("Local only")).toBeTruthy();
     expect(within(card).getByText("docs: add prueba.md")).toBeTruthy();
     expect((within(card).getByRole("button", { name: "Open pull request" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  describe("test this branch", () => {
+    const open = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(await screen.findByRole("button", { name: "Test this branch" }));
+      return screen.getByRole("alertdialog", { name: /Test docs\/one in your repository/i });
+    };
+
+    it("asks first, says exactly what it will do, and does nothing until it is confirmed", async () => {
+      const user = userEvent.setup();
+      show();
+      const dialog = await open(user);
+      expect(within(dialog).getByText(/Removes the worktree of T1/)).toBeTruthy();
+      expect(within(dialog).getByText(/git checkout main/)).toBeTruthy();
+      expect(posts()).toEqual([]);
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(posts()).toEqual([]);
+    });
+
+    it("sends the confirmation, says where the repository is now, and reads the branches again", async () => {
+      const user = userEvent.setup();
+      replies["POST checkout"] = { status: 200, body: { ok: true, dryRun: false, branch: "docs/one", effects: [], freedWorktree: true } };
+      show();
+      const dialog = await open(user);
+      await user.click(within(dialog).getByRole("button", { name: "Switch my repository" }));
+      await waitFor(() => expect(posts()).toEqual([{ method: "POST", url: "/api/runs/run-1/tasks/T1/checkout", body: { confirm: true } }]));
+      expect((await screen.findByRole("status")).textContent).toMatch(/Your repository is now on docs\/one/);
+      await waitFor(() => expect(calls.filter((c) => c.url.endsWith("/branches")).length).toBeGreaterThan(1));
+    });
+
+    it("shows why it was refused and keeps the confirmation open", async () => {
+      const user = userEvent.setup();
+      replies["POST checkout"] = { status: 409, body: { error: "Your repository has uncommitted changes. Commit or stash them first, so switching branches cannot touch them" } };
+      show();
+      const dialog = await open(user);
+      await user.click(within(dialog).getByRole("button", { name: "Switch my repository" }));
+      expect((await screen.findByRole("alert")).textContent).toContain("uncommitted changes");
+      expect(screen.getByRole("alertdialog")).toBeTruthy();
+    });
+
+    it("is disabled, with the reason, when the branch cannot be tested", async () => {
+      listing = { branches: [branch({ checkout: refuse("Your repository is already on docs/one."), state: { ...branch().state, checkedOut: true, hasWorktree: false } })] };
+      show();
+      const button = (await screen.findByRole("button", { name: "Test this branch" })) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      expect(screen.getByText("Your repository is already on docs/one.")).toBeTruthy();
+    });
   });
 
   describe("pull request state", () => {

@@ -226,6 +226,21 @@ describe("POST /api/runs/:id/tasks/:task/pr-draft and /pr", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("starts the checkout of a branch only when it is confirmed, and says what it did", async () => {
+    seed();
+    answer = { json: { ok: true, dryRun: false, branch: "docs/one", effects: ["Switches your repository to docs/one."], freedWorktree: true } };
+    const server = await launch();
+    const url = `/api/runs/${RUN}/tasks/T1/checkout`;
+    expect((await request(server, "POST", url, {})).status).toBe(400);
+    expect((await request(server, "POST", url, { confirm: false })).status).toBe(400);
+    expect((await request(server, "POST", url, { confirm: true, extra: 1 })).status).toBe(400);
+    expect(calls).toHaveLength(0);
+    const reply = await request(server, "POST", url, { confirm: true });
+    expect(reply.status).toBe(200);
+    expect(reply.json()).toMatchObject({ ok: true, branch: "docs/one", freedWorktree: true });
+    expect(calls[0]!.args).toEqual(["branch", RUN, "T1", "checkout", "--yes", "--json", "--data-dir", dataDir]);
+  });
+
   it("lists the branches origin has, for choosing where a pull request goes", async () => {
     seed();
     const bare = join(scratch, "origin.git");

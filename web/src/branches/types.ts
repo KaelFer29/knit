@@ -13,6 +13,8 @@ export interface BranchState {
   pushed: boolean;
   hasWorktree: boolean;
   dirty: boolean;
+  /** The branch is the one the user's own repository is on. */
+  checkedOut?: boolean;
 }
 
 export interface BranchView {
@@ -26,6 +28,8 @@ export interface BranchView {
   prState?: { state: "open" | "merged" | "closed"; base: string };
   state: BranchState;
   undo: Record<UndoMode, Decision>;
+  /** Whether the user's repository can be switched to this branch to test it. */
+  checkout: Decision;
   pr: PrDecision;
 }
 
@@ -56,3 +60,10 @@ export interface PrResult {
   base: string;
   head: string;
 }
+
+export interface CheckoutResult {
+  ok: true;
+  branch: string;
+  freedWorktree: boolean;
+}
+

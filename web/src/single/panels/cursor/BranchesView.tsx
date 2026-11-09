@@ -3,7 +3,7 @@ import type { BranchView } from "../../../branches/types";
 import { useList } from "../../../lists/useList";
 import { ListToolbar } from "../../../molecules/ListToolbar";
 import { Pager } from "../../../molecules/Pager";
-import { draftPullRequest, fetchRemoteBranches, openPullRequest, undoBranch } from "../../../branches/api";
+import { checkoutBranch, draftPullRequest, fetchRemoteBranches, openPullRequest, undoBranch } from "../../../branches/api";
 import { useBranches } from "../../../branches/useBranches";
 import { BranchCard, type BranchActions } from "../../../organisms/BranchCard";
 import "./BranchesView.css";
@@ -20,6 +20,7 @@ export function BranchesView({ runId, pollMs }: { runId: string; pollMs?: number
   const actions = useMemo<BranchActions>(
     () => ({
       remote: () => fetchRemoteBranches(runId),
+      checkout: (taskId) => checkoutBranch(runId, taskId),
       undo: (taskId, mode) => undoBranch(runId, taskId, mode),
       draft: (taskId, how) => draftPullRequest(runId, taskId, how),
       open: (taskId, title, body, into) => openPullRequest(runId, taskId, title, body, into),

@@ -182,6 +182,58 @@ function draftAgent(answer: string, fail = false) {
   return { seen, deps: (): CliDeps => ({ ...deps(), agent: (o) => (seen.options.push(o), agent) }) };
 }
 
+describe("knit branch checkout", () => {
+  const head = (): string => git(repo, "rev-parse", "--abbrev-ref", "HEAD");
+
+  it("without --yes only says what it would do, and changes nothing", async () => {
+    const { runId, worktree } = await runPlan();
+    const before = head();
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "checkout", "--json"], c.io, deps())).toBe(0);
+    const out = JSON.parse(c.out().trim());
+    expect(out).toMatchObject({ ok: true, dryRun: true, branch: "feat/create-a" });
+    expect(out.effects.join(" ")).toMatch(/Removes the worktree of T1/);
+    expect(existsSync(worktree)).toBe(true);
+    expect(head()).toBe(before);
+    expect(events(runId)).not.toContain("branch.checked_out");
+  });
+
+  it("with --yes frees the worktree and switches the repository to the branch, which keeps its commits, and records it", async () => {
+    const { runId, worktree } = await runPlan();
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "checkout", "--yes", "--json"], c.io, deps())).toBe(0);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: true, dryRun: false, branch: "feat/create-a", freedWorktree: true });
+    expect(existsSync(worktree)).toBe(false);
+    expect(head()).toBe("feat/create-a");
+    expect(existsSync(join(repo, "src/a.txt"))).toBe(true);
+    expect(events(runId)).toContain("branch.checked_out");
+  });
+
+  it("refuses, and changes nothing, when the user's repository has uncommitted changes", async () => {
+    const { runId, worktree } = await runPlan();
+    writeFileSync(join(repo, "wip.txt"), "wip\n");
+    const before = head();
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "checkout", "--yes", "--json"], c.io, deps())).toBe(1);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("uncommitted changes") });
+    expect(existsSync(worktree)).toBe(true);
+    expect(head()).toBe(before);
+  });
+
+  it("refuses a second time, saying the repository is already on the branch", async () => {
+    const { runId } = await runPlan();
+    await main(["branch", runId, "T1", "checkout", "--yes"], capture().io, deps());
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "checkout", "--yes", "--json"], c.io, deps())).toBe(1);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("already on feat/create-a") });
+  });
+
+  it("refuses a task that has no branch", async () => {
+    const { runId } = await runPlan();
+    expect(await main(["branch", runId, "T9", "checkout", "--yes"], capture().io, deps())).toBe(1);
+  });
+});
+
 describe("knit branch pr-draft", () => {
   it("asks the cheap model for a title and a body from the task and its diff, in a scratch directory, and prints them", async () => {
     const { runId, worktree } = await runPlan();

@@ -18,7 +18,7 @@ import { dataDirOf, openStoreIfExists } from "../support/paths.js";
 import type { CliDeps, CliIo } from "../types.js";
 
 const MODES: readonly UndoMode[] = ["revert", "reset", "delete"];
-const ACTIONS = ["undo", "pr-draft", "pr"] as const;
+const ACTIONS = ["undo", "pr-draft", "pr", "checkout"] as const;
 /** The cheap, fast model that drafts a pull request's text. */
 export const PR_DRAFT_MODEL = "composer-2.5-fast";
 const PR_DRAFT_TIMEOUT_MS = 120_000;
@@ -112,6 +112,7 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
     if (mine === undefined) return fail(io, json, `${taskId} has not started, so it has no branch.`);
 
     if (action === "undo") return undo({ io, json, store, runId, taskId, task, ref, mine, mode: mode!, yes: values.yes === true, now, tools });
+    if (action === "checkout") return checkout({ io, json, store, runId, taskId, task, ref, mine, yes: values.yes === true, now, tools });
     if (action === "pr-draft") return await prDraft({ io, json, task, ref, state: mine.state, tools, deps, model: values.model ?? PR_DRAFT_MODEL, template: values.template === true });
     const decision = mine.pr;
     if (!decision.ok) return fail(io, json, decision.reason);
@@ -171,6 +172,40 @@ function undo(i: UndoInput): number {
   }
   i.store.recordEvent({ runId: i.runId, taskId: i.taskId, ts: i.now(), type: "branch.undone", payload: { mode, branch: task.branch, ...(sha ? { sha } : {}) } });
   report(io, json, { ok: true, dryRun: false, mode, branch: task.branch, effects: decision.effects, ...(sha ? { sha } : {}) }, [...decision.effects, "Done."]);
+  return 0;
+}
+
+interface CheckoutInput {
+  io: CliIo;
+  json: boolean;
+  store: SqliteRunStore;
+  runId: string;
+  taskId: string;
+  task: TaskRecord;
+  ref: BranchRef | undefined;
+  mine: BranchOverview;
+  yes: boolean;
+  now: () => string;
+  tools: GitBranchTools;
+}
+
+/** Switches the user's repository to the task's branch so it can be tested there. Says what it would do until `--yes`. */
+function checkout(i: CheckoutInput): number {
+  const { io, json, task } = i;
+  const decision = i.mine.checkout;
+  if (!decision.ok) return fail(io, json, decision.reason);
+  if (!i.yes) {
+    report(io, json, { ok: true, dryRun: true, branch: task.branch, effects: decision.effects }, [...decision.effects, "Nothing was changed. Repeat with --yes to do it."]);
+    return 0;
+  }
+  let freedWorktree: boolean;
+  try {
+    ({ freedWorktree } = i.tools.checkout(i.ref!));
+  } catch (err) {
+    return fail(io, json, err instanceof Error ? err.message : String(err));
+  }
+  i.store.recordEvent({ runId: i.runId, taskId: i.taskId, ts: i.now(), type: "branch.checked_out", payload: { branch: task.branch, freedWorktree } });
+  report(io, json, { ok: true, dryRun: false, branch: task.branch, effects: decision.effects, freedWorktree }, [...decision.effects, `Done. Your repository is now on ${task.branch}.`]);
   return 0;
 }
 
