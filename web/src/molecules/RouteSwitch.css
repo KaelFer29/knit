@@ -10,7 +10,7 @@
   background: none;
   padding: 0.2rem var(--space-2);
   border-radius: 999px;
-  color: var(--text-muted);
+  color: var(--claude-text);
   font: inherit;
   font-size: var(--text-xs);
   font-weight: 600;
@@ -21,9 +21,7 @@
   background: var(--surface-2);
 }
 
-.route[data-on="true"] .route__switch {
-  color: var(--agent-knit);
-}
+
 
 .route__switch:focus-visible {
   outline: 2px solid var(--focus);
@@ -53,7 +51,7 @@
 }
 
 .route[data-on="true"] .route__track {
-  background: var(--agent-knit);
+  background: var(--agent-claude);
 }
 
 .route[data-on="true"] .route__thumb {

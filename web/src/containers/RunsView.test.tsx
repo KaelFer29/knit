@@ -52,10 +52,11 @@ describe("RunsView", () => {
     expect(onSelect).toHaveBeenCalledWith(undefined);
   });
 
-  it("explains an empty list", async () => {
+  it("explains an empty list, and says plans come from Claude", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(200, { runs: [] })));
     render(<RunsView pollMs={60_000} onSelect={onSelect} selectedId="r2" />);
     expect(await screen.findByText("No runs yet")).toBeTruthy();
+    expect(screen.getByText(/Plans come from Claude/)).toBeTruthy();
   });
 
   it("shows a load error and loads again on request", async () => {
@@ -68,37 +69,12 @@ describe("RunsView", () => {
     expect(await screen.findByRole("button", { name: /plan-r1/ })).toBeTruthy();
   });
 
-  it("starts a run with the form options and shows it", async () => {
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) =>
-      init?.method === "POST" ? reply(202, { runId: "new-1", pid: 5, logPath: "/l" }) : reply(200, { runs: [] }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    const user = userEvent.setup();
-    render(<RunsView pollMs={60_000} onSelect={onSelect} selectedId="r2" />);
-    await screen.findByText("No runs yet");
-    const submit = screen.getByRole("button", { name: "Start run" }) as HTMLButtonElement;
-    expect(submit.disabled).toBe(true);
-    await user.type(screen.getByLabelText(/plan file/i), "/work/plan.md");
-    await user.click(screen.getByLabelText("Push"));
-    await user.type(screen.getByLabelText("Max attempts"), "4");
-    await user.click(submit);
-    await waitFor(() => expect(onSelect).toHaveBeenCalledWith("new-1"));
-    const post = fetchMock.mock.calls.find((c) => c[1]?.method === "POST")!;
-    expect(post[0]).toBe("/api/runs");
-    expect(JSON.parse(post[1]!.body as string)).toEqual({ planPath: "/work/plan.md", push: true, pr: false, maxAttempts: 4 });
-  });
-
-  it("shows why a run could not be started", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string, init?: RequestInit) => (init?.method === "POST" ? reply(400, { error: "Invalid plan: no tasks" }) : reply(200, { runs: [] }))),
-    );
-    const user = userEvent.setup();
-    render(<RunsView pollMs={60_000} onSelect={onSelect} selectedId="r2" />);
-    await screen.findByText("No runs yet");
-    await user.type(screen.getByLabelText(/plan file/i), "/work/plan.md");
-    await user.click(screen.getByRole("button", { name: "Start run" }));
-    expect((await screen.findByRole("alert")).textContent).toContain("Invalid plan: no tasks");
-    expect(onSelect).not.toHaveBeenCalled();
+  it("does not start runs itself: no form, no start button, only the picker", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(200, { runs: [item("run-1", "passed")] })));
+    render(<RunsView onSelect={onSelect} />);
+    await screen.findByRole("button", { name: /run-1/ });
+    expect(screen.queryByText("Start a run")).toBeNull();
+    expect(screen.queryByRole("button", { name: /start run/i })).toBeNull();
+    expect(screen.queryByLabelText(/plan file/i)).toBeNull();
   });
 });

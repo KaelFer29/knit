@@ -13,20 +13,6 @@
   min-height: 0;
 }
 
-.claude-panel__scroll {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.claude-panel__scroll .chat-timeline {
-  flex: 1 0 auto;
-  min-height: 10rem;
-}
-
 .claude-panel__note {
   margin: auto;
   color: var(--text-muted);
@@ -130,48 +116,51 @@
   border-color: var(--claude-line);
 }
 
-.claude-panel__scroll {
+/* The chat on the left and a mini sidebar of usage on the right, each with its own scrollbar. */
+.claude-panel__body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem);
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.claude-panel__chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 0;
+}
+
+.claude-panel__chat > .chat-timeline {
+  flex: 1;
+  min-height: 0;
+}
+
+.claude-panel__drafts {
+  flex: none;
+  max-height: 45%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.claude-panel__aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+  padding: 0 var(--space-3) var(--space-2) var(--space-1);
+  overflow-y: auto;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--text) 25%, transparent) transparent;
 }
 
-/* The usage view: Claude's scene and the plan bars, centered with air around them. */
-.claude-usage {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  width: min(30rem, 100%);
-  margin: var(--space-3) auto;
-  padding: 0 var(--space-3);
-}
-
-/* Two tabs under the session bar: the conversation and the usage view. */
-.claude-tabs {
-  display: flex;
-  gap: var(--space-4);
-  border-bottom: 1px solid var(--claude-line);
-}
-
-.claude-tabs__tab {
-  margin-bottom: -1px;
-  padding: var(--space-1) 0 var(--space-2);
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: none;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.claude-tabs__tab[aria-selected="true"] {
-  border-bottom-color: var(--agent-claude);
-  color: var(--text);
-  font-weight: 600;
-}
-
-.claude-tabs__tab:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+@media (max-width: 800px) {
+  .claude-panel__body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 13rem);
+  }
 }

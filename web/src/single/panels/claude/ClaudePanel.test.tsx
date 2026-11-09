@@ -108,11 +108,8 @@ describe("ClaudePanel: an open session", () => {
   });
 
   it("shows the plan usage and the tokens, and no terminal command card", async () => {
-    const user = userEvent.setup();
     render(panel());
     await screen.findByText("<b>Here is the plan</b>");
-    expect(screen.queryByRole("region", { name: "Plan usage" })).toBeNull();
-    await user.click(screen.getByRole("tab", { name: "Usage" }));
     expect((await screen.findByRole("meter", { name: "Current session" })).getAttribute("aria-valuenow")).toBe("36");
     expect(screen.getByText("1.2k tokens in this conversation")).toBeTruthy();
     expect(screen.queryByText(/continue in a terminal/i)).toBeNull();
@@ -349,21 +346,23 @@ describe("ClaudePanel: the session bar", () => {
     expect(screen.queryByRole("button", { name: "Rename conversation" })).toBeNull();
   });
 
-  it("separates the chat from the usage view with two tabs, and only reads the plan while the usage tab is open", async () => {
-    const user = userEvent.setup();
+  it("shows the chat and the usage side by side, each with its own scroll, and no tabs", async () => {
     render(panel());
     await screen.findByText("<b>Here is the plan</b>");
-    const usageCalls = () => (globalThis.fetch as unknown as { mock: { calls: string[][] } }).mock.calls.filter((c) => String(c[0]).endsWith("/usage")).length;
-    expect(screen.getByRole("tab", { name: "Chat" }).getAttribute("aria-selected")).toBe("true");
-    expect(usageCalls()).toBe(0);
-    await user.click(screen.getByRole("tab", { name: "Usage" }));
-    expect(screen.queryByText("<b>Here is the plan</b>")).toBeNull();
-    expect(screen.getByRole("region", { name: "Claude" })).toBeTruthy();
-    await screen.findByRole("meter", { name: "Current session" });
-    expect(usageCalls()).toBeGreaterThan(0);
+    expect(screen.queryByRole("tab")).toBeNull();
+    const chat = screen.getByRole("log", { name: "Conversation" });
+    const side = screen.getByRole("complementary", { name: "Usage and status" });
+    expect(chat.contains(side)).toBe(false);
+    expect(within(side).getByRole("region", { name: "Claude" })).toBeTruthy();
+    expect(await within(side).findByRole("meter", { name: "Current session" })).toBeTruthy();
     expect(screen.getByRole("combobox", { name: /message alpha/i })).toBeTruthy();
-    await user.click(screen.getByRole("tab", { name: "Chat" }));
-    expect(screen.getByText("<b>Here is the plan</b>")).toBeTruthy();
+  });
+
+  it("keeps the usage sidebar in a conversation that has not started", async () => {
+    const user = userEvent.setup();
+    render(panel());
+    await user.click(await screen.findByRole("button", { name: "New session" }));
+    expect(screen.getByRole("complementary", { name: "Usage and status" })).toBeTruthy();
   });
 
   it("keeps the model chip and the pick visible", async () => {

@@ -36,7 +36,7 @@ describe("KnitPanel", () => {
     expect(screen.queryByRole("button", { name: "Resume" })).toBeNull();
     unmount();
     render(<KnitPanel {...props()} board={undefined} runId={undefined} />);
-    expect(screen.getByText(/No run to show yet/)).toBeTruthy();
+    expect(screen.getByText(/Ask Claude for a plan/)).toBeTruthy();
   });
 
   it("draws the run as five stages, each with what it holds now", () => {
@@ -58,17 +58,22 @@ describe("KnitPanel", () => {
     expect(summary.getByText("Elapsed")).toBeTruthy();
   });
 
-  it("opens the form that starts a run when there is no run, instead of hiding it", async () => {
+  it("has no form to start a run: runs start from Claude, with or without a run on screen", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(200, { runs: [] })));
+    const { unmount } = render(<KnitPanel {...props()} />);
+    expect(screen.queryByText("Start a run")).toBeNull();
+    expect(screen.queryByLabelText(/plan file/i)).toBeNull();
+    unmount();
+    render(<KnitPanel {...props()} board={undefined} runId={undefined} />);
+    expect(screen.queryByText("Start a run")).toBeNull();
+    expect(screen.queryByLabelText(/plan file/i)).toBeNull();
+  });
+
+  it("says where a run comes from when there is none: Claude drafts the plan and you send it", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(200, { runs: [] })));
     render(<KnitPanel {...props()} board={undefined} runId={undefined} />);
     expect(screen.getByRole("heading", { name: "No run yet" })).toBeTruthy();
-    expect(screen.getByLabelText("Plan file (absolute path)")).toBeTruthy();
-    expect(await screen.findByText(/Start one from a plan file above/)).toBeTruthy();
-  });
-
-  it("keeps the form folded while a run is shown", () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(200, { runs: [] })));
-    render(<KnitPanel {...props()} />);
-    expect((screen.getByText("Start a run").closest("details") as HTMLDetailsElement).open).toBe(false);
+    expect(screen.getByText(/Ask Claude for a plan/)).toBeTruthy();
+    expect(await screen.findByText(/Plans come from Claude/)).toBeTruthy();
   });
 });

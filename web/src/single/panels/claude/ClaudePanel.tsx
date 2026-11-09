@@ -44,7 +44,6 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [models, setModels] = useState<Record<string, string[]>>({});
   const [routeOn, setRouteOn] = useState(false);
-  const [view, setView] = useState<"chat" | "usage">("chat");
   const { titleOf, rename } = useSessionTitles();
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | undefined>();
@@ -116,8 +115,7 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
     };
   }, [wantsModels, agentId]);
 
-  // The plan is read only while someone looks at it: each read starts the agent's own usage command.
-  const usage = usePlanUsage(agent?.id, agent?.capabilities.planUsage === true && view === "usage");
+  const usage = usePlanUsage(agent?.id, agent?.capabilities.planUsage === true);
   const items = useMemo(() => (live.detail ? buildTimeline(live.detail.turns, live.events) : []), [live.detail, live.events]);
   const commands = useMemo(() => paletteCommands(agent, live.detail?.meta.commands ?? []), [agent, live.detail]);
 
@@ -182,51 +180,49 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
     : { input: 0, output: 0 };
 
   const usageView = (
-    <div className="claude-usage" aria-label="Usage and status">
+    <aside className="claude-panel__aside" aria-label="Usage and status">
       <ClaudeAtWork working={running} tokens={tokens} />
       {agent?.capabilities.planUsage ? <PlanUsageCard windows={usage.windows} checkedAt={usage.checkedAt} now={now} loading={usage.loading} error={usage.error} onRefresh={usage.refresh} /> : null}
-    </div>
+    </aside>
   );
 
   return (
     <div className="claude-panel">
       <ClaudePanelHeader sessions={mine} selectedId={isNew ? undefined : sessionId} session={isNew ? undefined : session} titleOf={titleOf} onRename={rename} now={now} onSelect={(id) => go(id)} onNew={() => go(NEW_SESSION)} />
-      <div className="claude-tabs" role="tablist" aria-label="Conversation views">
-        {(["chat", "usage"] as const).map((v) => (
-          <button key={v} type="button" role="tab" id={`claude-tab-${v}`} aria-selected={view === v} aria-controls="claude-view" tabIndex={view === v ? 0 : -1} className="claude-tabs__tab" onClick={() => setView(v)} onKeyDown={(e) => (e.key === "ArrowRight" || e.key === "ArrowLeft") && setView(view === "chat" ? "usage" : "chat")}>
-            {v === "chat" ? "Chat" : "Usage"}
-          </button>
-        ))}
-      </div>
       {listError ? (
         <p className="claude-panel__error" role="alert">
           {listError}
         </p>
       ) : null}
-      <div className="claude-panel__scroll" role="tabpanel" id="claude-view" aria-labelledby={`claude-tab-${view}`}>
-        {view === "usage" ? (
-          usageView
-        ) : isNew ? (
-          agent === undefined ? (
-            <p className="claude-panel__note">{agents.length === 0 ? "No agents are available on this server." : `${identityOf(wanted ?? "", wanted).label} is not available on this server.`}</p>
+      <div className="claude-panel__body">
+        <section className="claude-panel__chat" aria-label="Chat">
+          {isNew ? (
+            agent === undefined ? (
+              <p className="claude-panel__note">{agents.length === 0 ? "No agents are available on this server." : `${identityOf(wanted ?? "", wanted).label} is not available on this server.`}</p>
+            ) : (
+              <EmptyConversation identity={identityOf(agent.id, agent.label)} />
+            )
+          ) : session === undefined ? (
+            <p className="claude-panel__note" role={live.error ? "alert" : "status"}>
+              {live.error ?? "Loading session…"}
+            </p>
           ) : (
-            <EmptyConversation identity={identityOf(agent.id, agent.label)} />
-          )
-        ) : session === undefined ? (
-          <p className="claude-panel__note" role={live.error ? "alert" : "status"}>
-            {live.error ?? "Loading session…"}
-          </p>
-        ) : (
-          <>
-            <Timeline items={items} emptyText="No messages yet." />
-            {drafts.listing ? <PlanDrafts dir={drafts.listing.dir} plans={drafts.listing.plans} launching={launching} error={launchError} onLaunch={(plan) => void launch(plan)} /> : null}
-            {live.error ? (
-              <p className="claude-panel__error" role="alert">
-                {live.error}
-              </p>
-            ) : null}
-          </>
-        )}
+            <>
+              <Timeline items={items} emptyText="No messages yet." />
+              {drafts.listing ? (
+                <div className="claude-panel__drafts">
+                  <PlanDrafts dir={drafts.listing.dir} plans={drafts.listing.plans} launching={launching} error={launchError} onLaunch={(plan) => void launch(plan)} />
+                </div>
+              ) : null}
+              {live.error ? (
+                <p className="claude-panel__error" role="alert">
+                  {live.error}
+                </p>
+              ) : null}
+            </>
+          )}
+        </section>
+        {usageView}
       </div>
       {agent !== undefined && (isNew || session !== undefined) ? (
         cannotContinue ? (

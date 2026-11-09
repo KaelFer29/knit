@@ -203,7 +203,7 @@
 }
 
 .block[data-skin="terminal"]:hover .block__frame {
-  border-color: color-mix(in srgb, var(--agent-claude) 50%, var(--claude-line));
+  border-color: color-mix(in srgb, var(--agent-claude) 30%, var(--claude-line));
 }
 
 .block[data-skin="terminal"] .block__name {
@@ -317,9 +317,7 @@
 /* ---- Orchestrator: a delivery pipeline in light brown on warm white. ---- */
 .block[data-skin="pipeline"] .block__frame {
   border-color: var(--knit-line);
-  background:
-    radial-gradient(90% 55% at 50% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
-    var(--knit-canvas);
+  background: var(--knit-canvas);
 }
 
 .block[data-skin="pipeline"]:hover .block__frame {

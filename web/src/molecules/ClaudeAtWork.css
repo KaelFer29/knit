@@ -7,7 +7,7 @@
   border: 1px solid var(--claude-line);
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(80% 70% at 50% 100%, color-mix(in srgb, var(--agent-claude) 10%, transparent), transparent 70%),
+    radial-gradient(80% 70% at 50% 100%, color-mix(in srgb, var(--agent-claude) 5%, transparent), transparent 70%),
     var(--claude-paper);
   box-shadow: var(--shadow-sm);
   text-align: center;
