@@ -8,8 +8,12 @@ export const fetchBranches = (runId: string): Promise<BranchListing> => apiGet<B
 /** Undoes what a task did on its branch. `confirm` is always true: the server refuses an undo that was not asked for explicitly. */
 export const undoBranch = (runId: string, taskId: string, mode: UndoMode): Promise<UndoResult> => apiPost<UndoResult>(`${base(runId, taskId)}/undo`, { mode, confirm: true });
 
-/** Has the cheap model write the title and body of the task's pull request. Nothing is pushed or opened. */
-export const draftPullRequest = (runId: string, taskId: string): Promise<PrDraft> => apiPost<PrDraft>(`${base(runId, taskId)}/pr-draft`, {});
+/**
+ * The title and body of the task's pull request. `template` builds them from the task itself (no model, no tokens);
+ * `model` has the cheap model write them. Nothing is pushed or opened.
+ */
+export const draftPullRequest = (runId: string, taskId: string, how: "template" | "model"): Promise<PrDraft> =>
+  apiPost<PrDraft>(`${base(runId, taskId)}/pr-draft`, how === "template" ? { template: true } : {});
 
 /** Pushes the branch and opens the pull request with exactly this text. `into` is sent only when the person chose a branch other than the recommended one. */
 export const openPullRequest = (runId: string, taskId: string, title: string, body: string, into?: string): Promise<PrResult> =>

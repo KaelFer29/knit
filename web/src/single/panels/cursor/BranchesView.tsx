@@ -20,7 +20,7 @@ export function BranchesView({ runId, pollMs }: { runId: string; pollMs?: number
   const actions = useMemo<BranchActions>(
     () => ({
       undo: (taskId, mode) => undoBranch(runId, taskId, mode),
-      draft: (taskId) => draftPullRequest(runId, taskId),
+      draft: (taskId, how) => draftPullRequest(runId, taskId, how),
       open: (taskId, title, body, into) => openPullRequest(runId, taskId, title, body, into),
     }),
     [runId],

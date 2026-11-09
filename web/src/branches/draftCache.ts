@@ -59,16 +59,17 @@ export function forgetDraft(key: string): void {
  * Asks the model once per key: a second request while the first is still running shares its answer, so closing the form
  * and opening it again while the text is being written does not pay for a second one. A good answer is saved.
  */
-export function draftOnce(key: string, ask: () => Promise<PrDraft>): Promise<PrDraft> {
-  const running = inFlight.get(key);
+export function draftOnce(key: string, ask: () => Promise<PrDraft>, how = ""): Promise<PrDraft> {
+  const flight = `${key}|${how}`;
+  const running = inFlight.get(flight);
   if (running) return running;
   const call = ask()
     .then((d) => {
       saveDraft(key, { title: d.title, body: d.body, model: d.model });
       return d;
     })
-    .finally(() => inFlight.delete(key));
-  inFlight.set(key, call);
+    .finally(() => inFlight.delete(flight));
+  inFlight.set(flight, call);
   return call;
 }
 

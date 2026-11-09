@@ -13,6 +13,7 @@ Objective: make the runs list, the branches and the changed files of `knit ui` u
 - **S8. Pull request target.** "permitiría que al levantar la PR se elija hacia donde se quiere levantar, por defecto, con la opción recomendada por el orquestador o claude dependiendo de si depende de una tarea o no." Default: the base the rules already compute (the branch of the task it depends on, else the run's base).
 - **S9. Claude session title.** "en el modal de Claude, se sigue viendo el nombre de la sesión actual antigua sin el título que se modificó, en mi caso se ve /usage en lugar del nombre "prueba cursor" que le puse."
 - **S10. Orchestrator modal.** "no me terminó de convencer su tono café claro, se ve raro, y no me gusta su formato tan moderno con tanto hover y sombras, lo mostraría más minimalista y a lo mejor volviendo al tono anterior de blanco y medio verdoso, ya no café. Las tarjetas de tareas acá igualmente deberían ser mucho más comprimidas. Los detalles del desplegable me parecen bien. También, re-implementaría la visual en general del apartado de tareas y run, como que se viera que una run o runs dependen de una tarea, ahora parecen eventos independientes sin conexión. [...] las tarjetas se ven demasiada cargadas de hover y sombras en general, no me gusta. Sobre todo ese borde en las tarjetas de runs." Assumption: runs and tasks must read as one hierarchy (the selected run holds its tasks, nested under it), not as two unrelated columns.
+- **S11. Description without tokens.** "Podríamos armar estructuras predeterminadas por medio del orquestador para el cuerpo de las PRs y que Cursor no tenga que estar haciendo esto por medio de tokens, ya que sería un desperdicio aunque sea un modelo pequeño." Confirmed: "Sí, haz este último cambio para despues probar."
 - **S4. Overall.** "necesito full flexibilidad y visibilidad clara, solo lo que me interesa, no ruido visual." Nothing new is shown by default beyond what identifies and states each item.
 
 ## Tasks
@@ -29,6 +30,7 @@ Objective: make the runs list, the branches and the changed files of `knit ui` u
 | L7 | S8 | Pull request target choice with the computed base as default (core rule, CLI `--base`, route, page); free branch name validated by `isBranchName` | inline | done (RED seen: 7 core, 3 integration, 3 page tests); the CLI and route commit is separate | see git log |
 | L8 | S9 | Claude block and modal show the renamed session title (shared titles store) | inline | done (RED seen: 1 test) | see git log |
 | L9 | S10 | Orchestrator modal: flat, white with a faint green (scoped to the modal), one-line tasks nested under their run, runs list below | inline | done (RED seen: 1 test); not looked at in a browser | see git log |
+| L10 | S11 | Pull request description built by the orchestrator from the task (no tokens); the model only on request | inline | done (RED seen: 4 core, 2 integration, 2 page tests) | see git log |
 
 Route evidence: sequential work, no Writer trigger applies.
 

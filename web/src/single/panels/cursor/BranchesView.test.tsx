@@ -261,7 +261,34 @@ describe("BranchesView", () => {
       expect((await screen.findByRole("status")).textContent).toContain("https://example.test/pull/7");
     });
 
-    it("shows that it is working while the model writes: a spinner, a busy form and fields that wait", async () => {
+    it("builds the description from the task when the form opens, without asking a model", async () => {
+      const user = userEvent.setup();
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Create prueba.md", body: "## Summary\nCreate a file.", model: "template" } };
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      await waitFor(() => expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("## Summary\nCreate a file."));
+      expect(posts().filter((p) => p.url.endsWith("pr-draft")).map((p) => p.body)).toEqual([{ template: true }]);
+      expect(within(form).getByText(/built from the task/i)).toBeTruthy();
+      expect(within(form).queryByText(/composer/i)).toBeNull();
+    });
+
+    it("improves the description with the model only when asked, and says which model wrote it", async () => {
+      const user = userEvent.setup();
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Create prueba.md", body: "from the task", model: "template" } };
+      show();
+      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
+      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      await waitFor(() => expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("from the task"));
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Add prueba.md", body: "polished", model: "composer-2.5-fast" } };
+      await user.click(within(form).getByRole("button", { name: "Improve with the model" }));
+      await waitFor(() => expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).value).toBe("polished"));
+      expect(posts().filter((p) => p.url.endsWith("pr-draft")).map((p) => p.body)).toEqual([{ template: true }, {}]);
+      expect(within(form).getByText(/written by composer-2.5-fast/i)).toBeTruthy();
+      expect(within(form).queryByRole("button", { name: "Improve with the model" })).toBeNull();
+    });
+
+    it("shows that it is working while the description is prepared: a spinner, a busy form and fields that wait", async () => {
       const user = userEvent.setup();
       let release: () => void = () => {};
       const gate = new Promise<void>((r) => (release = r));
@@ -278,7 +305,7 @@ describe("BranchesView", () => {
       await user.click(await screen.findByRole("button", { name: "Open pull request" }));
       const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
       expect(form.getAttribute("aria-busy")).toBe("true");
-      expect(within(form).getByRole("progressbar", { name: /writing the description/i })).toBeTruthy();
+      expect(within(form).getByRole("progressbar", { name: /preparing the description/i })).toBeTruthy();
       expect((within(form).getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).disabled).toBe(true);
       expect((within(form).getByRole("button", { name: "Push and open pull request" }) as HTMLButtonElement).disabled).toBe(true);
       release();

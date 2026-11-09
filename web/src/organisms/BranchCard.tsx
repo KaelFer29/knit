@@ -9,7 +9,7 @@ import "./BranchCard.css";
 
 export interface BranchActions {
   undo: (taskId: string, mode: UndoMode) => Promise<UndoResult>;
-  draft: (taskId: string) => Promise<PrDraft>;
+  draft: (taskId: string, how: "template" | "model") => Promise<PrDraft>;
   open: (taskId: string, title: string, body: string, into?: string) => Promise<PrResult>;
 }
 
@@ -40,6 +40,8 @@ const UNDO: Record<UndoMode, { menu: string; hint: string; title: (branch: strin
 const messageOf = (err: unknown): string => (err instanceof ApiError || err instanceof Error ? err.message : String(err));
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
 const DRAFT_MODEL = "composer-2.5-fast";
+/** What the server calls a description built from the task, with no model. */
+const TEMPLATE = "template";
 
 type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | undefined;
 
@@ -57,7 +59,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [result, setResult] = useState<{ text: string; url?: string }>();
-  const [draft, setDraft] = useState<{ state: "writing" | "ready" | "failed"; title: string; body: string; model: string; saved: boolean }>({ state: "writing", title: b.title, body: "", model: DRAFT_MODEL, saved: false });
+  const [draft, setDraft] = useState<{ state: "writing" | "ready" | "failed"; title: string; body: string; model: string; saved: boolean }>({ state: "writing", title: b.title, body: "", model: TEMPLATE, saved: false });
   const key = draftKey(runId, b.taskId, b.state.head);
   const titleId = useId();
   const bodyId = useId();
@@ -82,11 +84,14 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
     }
   };
 
-  /** Asks the model, or joins the call already running for this state of the branch; the answer is saved. */
-  const askModel = (): void => {
+  /**
+   * Gets the description: built from the task (no model, no tokens), or written by the model when the person asks.
+   * Joins the call already running for this state of the branch; the answer is saved.
+   */
+  const askDraft = (how: "template" | "model"): void => {
     setError(undefined);
-    setDraft({ state: "writing", title: b.title, body: "", model: DRAFT_MODEL, saved: false });
-    draftOnce(key, () => actions.draft(b.taskId)).then(
+    setDraft({ state: "writing", title: b.title, body: "", model: how === "template" ? TEMPLATE : DRAFT_MODEL, saved: false });
+    draftOnce(key, () => actions.draft(b.taskId, how), how).then(
       (d) => setDraft({ state: "ready", title: d.title || b.title, body: d.body, model: d.model, saved: false }),
       (err: unknown) => {
         setDraft((current) => ({ ...current, state: "failed" }));
@@ -103,7 +108,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
     setPanel({ kind: "pr" });
     const saved = loadDraft(key);
     if (saved) setDraft({ state: "ready", title: saved.title, body: saved.body, model: saved.model, saved: true });
-    else askModel();
+    else askDraft("template");
   };
 
   const edit = (next: { title?: string; body?: string }): void => {
@@ -258,15 +263,27 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
         >
           {draft.state === "writing" ? (
             <p className="branch__panel-note branch__writing" role="status">
-              <span className="branch__spinner" role="progressbar" aria-label={`Writing the description with ${draft.model}`} />
-              Writing the description with {draft.model}… this takes a few seconds.
+              <span className="branch__spinner" role="progressbar" aria-label={draft.model === TEMPLATE ? "Preparing the description" : `Writing the description with ${draft.model}`} />
+              {draft.model === TEMPLATE ? "Preparing the description…" : `Writing the description with ${draft.model}… this takes a few seconds.`}
             </p>
           ) : (
             <p className="branch__panel-note">
-              {draft.state === "failed" ? "Write the description yourself, or ask the model again." : draft.saved ? `Saved description (written by ${draft.model}). Edit it, or write it again.` : `Description written by ${draft.model}. Edit it before sending.`}{" "}
-              <button type="button" className="branch__link" disabled={busy} onClick={askModel}>
-                Write it again
-              </button>
+              {draft.state === "failed"
+                ? "Write the description yourself, or ask the model."
+                : draft.model === TEMPLATE
+                  ? "Description built from the task: summary, specs, commits and files. Edit it before sending."
+                  : draft.saved
+                    ? `Saved description (written by ${draft.model}). Edit it, or write it again.`
+                    : `Description written by ${draft.model}. Edit it before sending.`}{" "}
+              {draft.model === TEMPLATE && draft.state === "ready" ? (
+                <button type="button" className="branch__link" disabled={busy} onClick={() => askDraft("model")}>
+                  Improve with the model
+                </button>
+              ) : (
+                <button type="button" className="branch__link" disabled={busy} onClick={() => askDraft("model")}>
+                  Write it again
+                </button>
+              )}
             </p>
           )}
           <label className="branch__label" htmlFor={titleId}>
