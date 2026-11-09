@@ -34,4 +34,11 @@ describe("IterateTasks", () => {
     const { container } = render(<IterateTasks tasks={[]} selected={undefined} onSelect={() => {}} />);
     expect(container.firstChild).toBeNull();
   });
+
+  it("says on the chosen row that its corrections go to the orchestrator", () => {
+    render(<IterateTasks tasks={tasks} selected="T1" onSelect={() => {}} />);
+    expect(within(screen.getByRole("button", { name: /T1/ })).getByText(/orchestrator/i)).toBeTruthy();
+    expect(within(screen.getByRole("button", { name: /T2/ })).queryByText(/orchestrator/i)).toBeNull();
+  });
 });
+

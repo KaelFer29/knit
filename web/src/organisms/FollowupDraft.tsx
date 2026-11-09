@@ -37,7 +37,14 @@ export function FollowupDraft({ taskId, initial, onSend, onOpenCursor }: Props) 
 
   return (
     <section className="followup-draft" aria-label={`Follow-up for ${taskId}`}>
-      <h3 className="followup-draft__heading">Follow-up for {taskId}</h3>
+      <div className="followup-draft__head">
+        <h3 className="followup-draft__heading">Follow-up for {taskId}</h3>
+        {state === "sent" ? null : (
+          <p className="followup-draft__note" id={`${id}-note`}>
+            Claude wrote this. Edit it if you want, then send it.
+          </p>
+        )}
+      </div>
       {state === "sent" ? (
         <p className="followup-draft__sent" role="status">
           Sent. Cursor is working on {taskId} in its own chat, on the same branch.
@@ -52,18 +59,17 @@ export function FollowupDraft({ taskId, initial, onSend, onOpenCursor }: Props) 
         </p>
       ) : (
         <>
-          <p className="followup-draft__note" id={`${id}-note`}>
-            Claude wrote this. Edit it if you want, then send it to the orchestrator.
-          </p>
-          <textarea className="followup-draft__text" aria-label="Follow-up instruction" aria-describedby={`${id}-note`} rows={5} value={text} disabled={state === "sending"} onChange={(e) => setText(e.target.value)} />
+          <textarea className="followup-draft__text" aria-label="Follow-up instruction" aria-describedby={`${id}-note`} rows={3} value={text} disabled={state === "sending"} onChange={(e) => setText(e.target.value)} />
           {error === undefined ? null : (
             <p className="followup-draft__error" role="alert">
               {error}
             </p>
           )}
-          <button type="button" className="followup-draft__send" disabled={state === "sending" || text.trim() === ""} onClick={() => void send()}>
-            {state === "sending" ? "Sending…" : "Send to the orchestrator"}
-          </button>
+          <div className="followup-draft__foot">
+            <button type="button" className="followup-draft__send" disabled={state === "sending" || text.trim() === ""} onClick={() => void send()}>
+              {state === "sending" ? "Sending…" : "Send to the orchestrator"}
+            </button>
+          </div>
         </>
       )}
     </section>

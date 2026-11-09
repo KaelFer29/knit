@@ -1,0 +1,198 @@
+/* A white bar with Claude's orange and ink: it reads as part of Claude's modal and as something to press. */
+.iterate-bar {
+  border: 1px solid var(--claude-line);
+  border-radius: var(--radius-lg);
+  background: var(--claude-paper);
+  overflow: hidden;
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.iterate-bar:hover,
+.iterate-bar[data-open] {
+  border-color: color-mix(in srgb, var(--agent-claude) 45%, var(--claude-line));
+}
+
+.iterate-bar[data-selected] {
+  border-color: var(--agent-claude);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--agent-claude) 14%, transparent);
+}
+
+.iterate-bar__row {
+  display: flex;
+  align-items: center;
+}
+
+.iterate-bar__toggle {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--claude-ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.iterate-bar__toggle:focus-visible,
+.iterate-bar__stop:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.iterate-bar__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--agent-claude-soft);
+  color: var(--claude-text);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.iterate-bar__toggle:hover .iterate-bar__icon {
+  transform: rotate(-35deg);
+}
+
+.iterate-bar[data-selected] .iterate-bar__icon {
+  background: var(--agent-claude);
+}
+
+/* A soft beat while a task is chosen: the next prompts are about it. */
+.iterate-bar__pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--claude-paper);
+  animation: iterate-pulse 1.8s var(--ease-out) infinite;
+}
+
+@keyframes iterate-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.7);
+  }
+}
+
+.iterate-bar__title {
+  flex: none;
+  font-weight: 650;
+}
+
+.iterate-bar__count {
+  flex: none;
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  background: var(--claude-ink);
+  color: var(--claude-paper);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.iterate-bar__hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--claude-ink-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iterate-bar__branch {
+  flex: none;
+  max-width: 14rem;
+  overflow: hidden;
+  color: var(--claude-ink-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iterate-bar__dest {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--claude-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iterate-bar__toggle .chevron {
+  margin-left: auto;
+}
+
+.iterate-bar__stop {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: var(--space-2);
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--claude-ink-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.iterate-bar__stop:hover {
+  background: var(--agent-claude-soft);
+  color: var(--claude-text);
+}
+
+.iterate-bar__panel {
+  border-top: 1px solid var(--claude-line);
+  animation: iterate-open var(--duration-base) var(--ease-out);
+}
+
+@keyframes iterate-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (max-width: 640px) {
+  .iterate-bar__hint,
+  .iterate-bar__branch {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iterate-bar,
+  .iterate-bar__icon,
+  .iterate-bar__stop {
+    transition: none;
+  }
+
+  .iterate-bar__toggle:hover .iterate-bar__icon {
+    transform: none;
+  }
+
+  .iterate-bar__pulse,
+  .iterate-bar__panel {
+    animation: none;
+  }
+}

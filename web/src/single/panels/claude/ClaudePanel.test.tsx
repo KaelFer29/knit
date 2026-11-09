@@ -524,5 +524,32 @@ describe("ClaudePanel: iterating on a delivered task", () => {
     await user.click(await screen.findByRole("button", { name: "Open Cursor" }));
     expect(openPanel).toHaveBeenCalledWith("cursor");
   });
+
+  it("turns the switch to the orchestrator off and disables it while a task is chosen, and gives it back after", async () => {
+    const user = userEvent.setup();
+    render(withRun());
+    await screen.findByText("<b>Here is the plan</b>");
+    const toggle = screen.getByRole("switch", { name: "Send to the orchestrator" }) as HTMLButtonElement;
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    await choose(user);
+    const off = screen.getByRole("switch", { name: "Send to the orchestrator" }) as HTMLButtonElement;
+    expect(off.disabled).toBe(true);
+    expect(off.getAttribute("aria-checked")).toBe("false");
+    expect(off.getAttribute("title")).toMatch(new RegExp(`iterating on ${target.taskId}`, "i"));
+    await user.click(screen.getByRole("button", { name: "Stop iterating" }));
+    expect((screen.getByRole("switch", { name: "Send to the orchestrator" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("closes the list once a task is chosen, says it goes to the orchestrator, and marks the chosen row when it opens again", async () => {
+    const user = userEvent.setup();
+    render(withRun());
+    await choose(user);
+    expect(screen.queryByRole("list", { name: "Tasks to iterate on" })).toBeNull();
+    expect(within(screen.getByRole("region", { name: "Task iteration" })).getByText(/to the orchestrator/i)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /Iterate on a task/ }));
+    const row = within(screen.getByRole("list", { name: "Tasks to iterate on" })).getByRole("button", { name: new RegExp(target.taskId) });
+    expect(row.getAttribute("aria-pressed")).toBe("true");
+  });
 });
 

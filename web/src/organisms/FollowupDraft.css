@@ -1,13 +1,32 @@
+/* The instruction for Cursor, as a card in Claude's colors right under the iteration bar. */
 .followup-draft {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3) 0;
-  border-top: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--claude-line);
+  border-radius: var(--radius-lg);
+  background: var(--claude-paper);
+  animation: followup-in var(--duration-base) var(--ease-out);
+}
+
+@keyframes followup-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.followup-draft__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
 }
 
 .followup-draft__heading {
   margin: 0;
+  color: var(--claude-ink);
   font-size: var(--text-sm);
   font-weight: 650;
 }
@@ -15,21 +34,27 @@
 .followup-draft__note,
 .followup-draft__sent {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--claude-ink-muted);
   font-size: var(--text-xs);
 }
 
 .followup-draft__text {
   width: 100%;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--claude-line);
   border-radius: var(--radius-md);
-  background: var(--surface-1);
-  color: var(--text);
+  background: var(--claude-ivory);
+  color: var(--claude-ink);
   font: inherit;
   font-size: var(--text-sm);
   line-height: 1.45;
   resize: vertical;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.followup-draft__text:focus {
+  border-color: var(--agent-claude);
+  outline: none;
 }
 
 .followup-draft__text:focus-visible,
@@ -45,17 +70,29 @@
   font-size: var(--text-xs);
 }
 
+.followup-draft__foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .followup-draft__send {
-  align-self: flex-start;
-  padding: 0.35rem var(--space-4);
-  border: 1px solid var(--text);
+  padding: 0.3rem var(--space-4);
+  border: 1px solid var(--claude-ink);
   border-radius: 999px;
-  background: var(--text);
-  color: var(--surface-0);
+  background: var(--claude-ink);
+  color: var(--claude-paper);
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 600;
   cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.followup-draft__send:hover:not(:disabled) {
+  border-color: var(--agent-claude);
+  background: var(--agent-claude);
 }
 
 .followup-draft__send:disabled {
@@ -67,9 +104,19 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--text);
+  color: var(--claude-text);
   font: inherit;
   font-size: var(--text-xs);
+  font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .followup-draft,
+  .followup-draft__text,
+  .followup-draft__send {
+    animation: none;
+    transition: none;
+  }
 }

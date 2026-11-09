@@ -2,7 +2,7 @@ import type { PanelProps } from "../registry";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../../api/client";
 import { FollowupDraft } from "../../../organisms/FollowupDraft";
-import { IterateTasks } from "../../../organisms/IterateTasks";
+import { IterateBar } from "../../../organisms/IterateBar";
 import { PlanDrafts } from "../../../organisms/PlanDrafts";
 import { Composer } from "../../../organisms/Composer";
 import { Timeline } from "../../../organisms/Timeline";
@@ -51,7 +51,6 @@ export function ClaudePanel({ agentId: panelAgent, board, runId, live: runIsLive
   const [draftsOpen, setDraftsOpen] = useState(true);
   /** The delivered task the person is iterating on, and whether the list of tasks is open. */
   const [iterating, setIterating] = useState<string | undefined>();
-  const [iterateOpen, setIterateOpen] = useState(false);
   /** Runs started from a draft since the last prompt: shown as a small line until the next prompt is sent. */
   const [launched, setLaunched] = useState<{ runId: string; path: string }[]>([]);
   const { titleOf, rename } = useSessionTitles();
@@ -291,34 +290,15 @@ export function ClaudePanel({ agentId: panelAgent, board, runId, live: runIsLive
       </div>
       {targets.length > 0 ? (
         <div className="claude-panel__iterate">
-          <button type="button" className="claude-panel__drafts-toggle" aria-expanded={iterateOpen} aria-controls="claude-iterate" onClick={() => setIterateOpen((v) => !v)}>
-            <span>
-              Iterate on a task <span className="claude-panel__count">{targets.length}</span>
-            </span>
-            <span className="claude-panel__chevron" aria-hidden="true">
-              ▾
-            </span>
-          </button>
-          {iterateOpen ? (
-            <div id="claude-iterate">
-              <IterateTasks
-                tasks={targets}
-                selected={iterating}
-                onSelect={(id) => {
-                  setIterating(id);
-                  if (id !== undefined) setRouteOn(false);
-                }}
-              />
-            </div>
-          ) : null}
-          {target === undefined ? null : (
-            <p className="claude-panel__iterating">
-              Iterating on {target.taskId} · {target.branch}{" "}
-              <button type="button" className="claude-panel__link" onClick={() => setIterating(undefined)}>
-                Stop iterating
-              </button>
-            </p>
-          )}
+          <IterateBar
+            tasks={targets}
+            selected={iterating}
+            onSelect={(id) => {
+              setIterating(id);
+              // The follow-up already goes to the orchestrator: routing the same prompt to a plan too would send two contexts.
+              if (id !== undefined) setRouteOn(false);
+            }}
+          />
           {instruction === undefined || target === undefined || runId === undefined ? null : (
             <FollowupDraft
               key={`${latestTurn!.id}-${target.taskId}`}
@@ -344,7 +324,11 @@ export function ClaudePanel({ agentId: panelAgent, board, runId, live: runIsLive
             onProfileChange={(p) => setProfiles((all) => ({ ...all, [agent.id]: p }))}
             commands={commands}
             onSubmit={(prompt) => submit(prepare(prompt))}
-            routing={{ on: routeOn, onChange: setRouteOn }}
+            routing={{
+              on: routeOn && target === undefined,
+              onChange: setRouteOn,
+              ...(target === undefined ? {} : { disabled: true, reason: `Off while iterating on ${target.taskId}: its correction already goes to the orchestrator.` }),
+            }}
             onKnitCommand={onKnitCommand}
             busy={sending || running}
             busyLabel={sending ? "Starting the turn…" : "A turn is running…"}

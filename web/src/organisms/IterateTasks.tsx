@@ -24,6 +24,14 @@ export function IterateTasks({ tasks, selected, onSelect }: Props) {
             <span className="iterate-tasks__id">{task.taskId}</span>
             <span className="iterate-tasks__title">{task.title}</span>
             {task.branch === undefined ? null : <span className="iterate-tasks__branch">{task.branch}</span>}
+            {selected === task.taskId ? (
+              <span className="iterate-tasks__mark">
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                  <path d="m3.5 8.5 3 3 6-7" />
+                </svg>
+                Goes to the orchestrator
+              </span>
+            ) : null}
           </button>
         </li>
       ))}

@@ -261,33 +261,10 @@
   }
 }
 
-/* Iterating on a delivered task: the list, the task chosen and the instruction Claude wrote for it. */
+/* Iterating on a delivered task: the bar, and the instruction Claude wrote under it. No line of its own: the bar has its border. */
 .claude-panel__iterate {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  border-top: 1px solid var(--border);
-}
-
-.claude-panel__iterating {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-}
-
-.claude-panel__link {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  font-size: var(--text-xs);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.claude-panel__link:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  padding: var(--space-2) var(--space-4) 0;
 }
