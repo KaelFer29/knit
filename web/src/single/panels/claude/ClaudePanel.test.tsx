@@ -278,6 +278,53 @@ describe("ClaudePanel: plan handoff", () => {
     await waitFor(() => expect(posted).toEqual([{ url: "/api/runs", body: { planPath: "/repo/docs/plans/login.md" } }]));
   });
 
+  const ago = (ms: number): string => new Date(Date.now() + ms).toISOString();
+  const show = (extra: Partial<Parameters<typeof ClaudePanel>[0]> = {}) => {
+    const selectRun = vi.fn();
+    const openPanel = vi.fn();
+    render(<ClaudePanel {...PROPS} selectRun={selectRun} openPanel={openPanel} {...extra} />);
+    return { selectRun, openPanel };
+  };
+
+  it("lets the draft be hidden to read the chat above it, and shown again", async () => {
+    const user = userEvent.setup();
+    withPlans([draft()]);
+    show();
+    await screen.findByText("Add login");
+    const toggle = screen.getByRole("button", { name: /draft plans/i });
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    await user.click(toggle);
+    expect(screen.queryByRole("button", { name: "Send plan to the orchestrator" })).toBeNull();
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    await user.click(toggle);
+    expect(screen.getByRole("button", { name: "Send plan to the orchestrator" })).toBeTruthy();
+  });
+
+  it("does not offer a plan again once a run was started from it after it was last written, and offers it again if it changed since", async () => {
+    withPlans([draft({ runs: [{ id: "run-9", status: "passed", startedAt: ago(60_000) }] })]);
+    const first = render(panel());
+    await screen.findByText("<b>Here is the plan</b>");
+    expect(screen.queryByRole("button", { name: "Send plan to the orchestrator" })).toBeNull();
+    first.unmount();
+    withPlans([draft({ runs: [{ id: "run-9", status: "passed", startedAt: ago(-3_600_000) }] })]);
+    render(panel());
+    expect(await screen.findByRole("button", { name: "Send plan to the orchestrator" })).toBeTruthy();
+  });
+
+  it("replaces the draft with a small Runs line that opens the orchestrator on that run, and drops it with the next prompt", async () => {
+    const user = userEvent.setup();
+    withPlans([draft()]);
+    const { selectRun, openPanel } = show();
+    await user.click(await screen.findByRole("button", { name: "Send plan to the orchestrator" }));
+    const strip = await screen.findByRole("group", { name: "Runs started" });
+    expect(screen.queryByRole("button", { name: "Send plan to the orchestrator" })).toBeNull();
+    await user.click(within(strip).getByRole("button", { name: /run-1/ }));
+    expect(selectRun).toHaveBeenCalledWith("run-1");
+    expect(openPanel).toHaveBeenCalledWith("knit");
+    await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "Next{Enter}");
+    await waitFor(() => expect(screen.queryByRole("group", { name: "Runs started" })).toBeNull());
+  });
+
   it("shows the issues of an invalid draft and cannot launch it", async () => {
     withPlans([draft({ valid: false, issues: ["T1 has no goal"], tasks: [] })]);
     render(panel());

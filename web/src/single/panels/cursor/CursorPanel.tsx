@@ -3,13 +3,11 @@ import type { BoardModel, TaskView } from "@board";
 import { BrandArt } from "../../../atoms/BrandArt";
 import { AGENTS } from "../../../identity/agents";
 import { StatusBadge } from "../../../atoms/StatusBadge";
-import { FilesView } from "../../../containers/FilesView";
-import { demoFilesApi } from "../../../files/demo";
-import { httpFilesApi } from "../../../files/api";
 import type { RenderDetail } from "../../../flow/detail";
 import { formatDuration, formatTokens } from "../../../flow/format";
 import { Disclosure } from "../../../molecules/Disclosure";
 import type { PanelProps } from "../registry";
+import { ChangedFiles } from "./ChangedFiles";
 import "./CursorPanel.css";
 
 type Tab = "agent" | "files";
@@ -45,7 +43,7 @@ function Waiting() {
         <ul className="cursor-panel__idle-list" aria-label="What will appear here">
           <li>Its reasoning and every tool it uses, live</li>
           <li>The changes it makes, task by task</li>
-          <li>The files it touched and the repository</li>
+          <li>The files it changed, task by task</li>
           <li>Tokens, attempts and time</li>
         </ul>
       </div>
@@ -88,13 +86,12 @@ function Summary({ board }: { board: BoardModel }) {
   );
 }
 
-/** Cursor's panel: where it is and a summary of the run, the active task and its live timeline, the history of the other tasks and the file explorer in a tab. It is watched, not written to. */
-export function CursorPanel({ board, runId, live, renderDetail }: PanelProps) {
+/** Cursor's panel: where it is and a summary of the run, the active task and its live timeline, the history of the other tasks and, in a tab, only the files Cursor changed, grouped by task. It is watched, not written to. */
+export function CursorPanel({ board, renderDetail, detailSource }: PanelProps) {
   const [tab, setTab] = useState<Tab>("agent");
   const id = useId();
   const primary = board === undefined ? undefined : (board.tasks.find((t) => t.taskId === board.active?.taskId) ?? board.tasks[board.tasks.length - 1]);
   const others = board?.tasks.filter((t) => t !== primary) ?? [];
-  const files = runId !== undefined && live ? httpFilesApi(runId) : board === undefined ? undefined : demoFilesApi();
   const tabs: { id: Tab; label: string }[] = [
     { id: "agent", label: "Agent" },
     { id: "files", label: "Files" },
@@ -131,7 +128,7 @@ export function CursorPanel({ board, runId, live, renderDetail }: PanelProps) {
       </div>
       <div className="cursor-panel__body" role="tabpanel" id={`${id}-body`} aria-labelledby={`${id}-${tab}`}>
         {tab === "files" ? (
-          files === undefined ? <p className="detail-note">No repository to show yet.</p> : <FilesView api={files} />
+          <ChangedFiles tasks={board.tasks} source={detailSource} />
         ) : primary === undefined ? (
           <p className="detail-note">No task has started yet.</p>
         ) : (

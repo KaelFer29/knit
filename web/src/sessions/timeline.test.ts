@@ -17,6 +17,21 @@ describe("buildTimeline", () => {
     expect(items.map((i) => ("at" in i ? i.at : undefined))).toEqual(["2026-11-09T10:00:00Z", "2026-11-09T10:00:05Z"]);
   });
 
+  it("does not say the closing text twice when it is the message the agent just wrote, and keeps it when it differs", () => {
+    const same = buildTimeline([turn()], [ev("message", { text: "Plan saved.\n" }), ev("result", { text: "Plan saved.", isError: false })]);
+    expect(same.filter((i) => i.type === "message" || i.type === "result").map((i) => [i.type, "text" in i ? i.text : ""])).toEqual([
+      ["message", "Plan saved.\n"],
+      ["result", ""],
+    ]);
+    const other = buildTimeline([turn()], [ev("message", { text: "Working on it" }), ev("result", { text: "Plan saved.", isError: false })]);
+    expect(other.find((i) => i.type === "result")).toMatchObject({ text: "Plan saved." });
+  });
+
+  it("does not repeat a stored result text either when no result event arrived", () => {
+    const items = buildTimeline([turn({ status: "passed", resultText: "All done" })], [ev("message", { text: "All done" })]);
+    expect(items.find((i) => i.type === "result")).toMatchObject({ text: "" });
+  });
+
   it("pairs a tool call with its result by call id and keeps arguments as text", () => {
     const items = buildTimeline(
       [turn()],

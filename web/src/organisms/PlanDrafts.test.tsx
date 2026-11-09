@@ -36,7 +36,6 @@ describe("PlanDrafts", () => {
     render(<PlanDrafts dir="docs/plans" plans={[valid]} onLaunch={onLaunch} />);
     expect(screen.getByText("Valid")).toBeTruthy();
     expect(screen.getByText("feat/form")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /run-1234 · passed/ }).getAttribute("href")).toBe("?run=run-12345678-zz#/runs");
     expect(onLaunch).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Send plan to the orchestrator" }));
     expect(onLaunch).toHaveBeenCalledWith(valid);

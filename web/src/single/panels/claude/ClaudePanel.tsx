@@ -34,7 +34,7 @@ const messageOf = (err: unknown): string => (err instanceof ApiError || err inst
  * its capabilities in `GET /api/agents`; nothing here looks at an agent's name. A turn never starts a run: only the
  * explicit "Send plan to the orchestrator" click does.
  */
-export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
+export function ClaudePanel({ agentId: panelAgent, selectRun, openPanel }: PanelProps) {
   const [picked, setPicked] = useState<string | undefined>();
   const [listed, setListed] = useState(false);
   const [agents, setAgents] = useState<AgentView[]>([]);
@@ -44,6 +44,9 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [models, setModels] = useState<Record<string, string[]>>({});
   const [routeOn, setRouteOn] = useState(false);
+  const [draftsOpen, setDraftsOpen] = useState(true);
+  /** Runs started from a draft since the last prompt: shown as a small line until the next prompt is sent. */
+  const [launched, setLaunched] = useState<{ runId: string; path: string }[]>([]);
   const { titleOf, rename } = useSessionTitles();
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | undefined>();
@@ -127,6 +130,7 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
   const submit = async (prompt: string): Promise<boolean> => {
     if (agent === undefined) return false;
     const profile = profiles[agent.id] ?? {};
+    setLaunched([]);
     setSending(true);
     setSendError(undefined);
     try {
@@ -155,7 +159,8 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
     setLaunching(plan.path);
     setLaunchError(undefined);
     try {
-      await launchPlan(plan.path);
+      const runId = await launchPlan(plan.path);
+      setLaunched((all) => [...all, { runId, path: plan.path }]);
       drafts.refresh();
     } catch (err) {
       setLaunchError(messageOf(err));
@@ -178,6 +183,10 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
   const tokens = live.detail
     ? live.detail.turns.reduce((sum, t) => ({ input: sum.input + (t.inputTokens ?? 0), output: sum.output + (t.outputTokens ?? 0) }), { input: 0, output: 0 })
     : { input: 0, output: 0 };
+
+  // A plan already run since it was last written is not offered again; one rewritten after its run is.
+  const pending = (drafts.listing?.plans ?? []).filter((p) => !launched.some((l) => l.path === p.path) && !p.runs.some((r) => Date.parse(r.startedAt) > Date.parse(p.modifiedAt)));
+  const statusOf = (l: { runId: string; path: string }): string => drafts.listing?.plans.find((p) => p.path === l.path)?.runs.find((r) => r.id === l.runId)?.status ?? "starting";
 
   const usageView = (
     <aside className="claude-panel__aside" aria-label="Usage and status">
@@ -209,9 +218,43 @@ export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
           ) : (
             <>
               <Timeline items={items} emptyText="No messages yet." />
-              {drafts.listing ? (
-                <div className="claude-panel__drafts">
-                  <PlanDrafts dir={drafts.listing.dir} plans={drafts.listing.plans} launching={launching} error={launchError} onLaunch={(plan) => void launch(plan)} />
+              {pending.length > 0 || launched.length > 0 ? (
+                <div className="claude-panel__overlay">
+                  {launched.length > 0 ? (
+                    <div className="claude-panel__runs" role="group" aria-label="Runs started">
+                      <span className="claude-panel__runs-label">Runs:</span>
+                      {launched.map((l) => (
+                        <button
+                          key={l.runId}
+                          type="button"
+                          className="claude-panel__run"
+                          onClick={() => {
+                            selectRun(l.runId);
+                            openPanel?.("knit");
+                          }}
+                        >
+                          {l.runId.slice(0, 8)} · {statusOf(l)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  {pending.length > 0 ? (
+                    <>
+                      <button type="button" className="claude-panel__drafts-toggle" aria-expanded={draftsOpen} aria-controls="claude-drafts" onClick={() => setDraftsOpen((v) => !v)}>
+                        <span>
+                          Draft plans <span className="claude-panel__count">{pending.length}</span>
+                        </span>
+                        <span className="claude-panel__chevron" aria-hidden="true">
+                          ▾
+                        </span>
+                      </button>
+                      {draftsOpen && drafts.listing ? (
+                        <div id="claude-drafts" className="claude-panel__drafts">
+                          <PlanDrafts dir={drafts.listing.dir} plans={pending} launching={launching} error={launchError} onLaunch={(plan) => void launch(plan)} />
+                        </div>
+                      ) : null}
+                    </>
+                  ) : null}
                 </div>
               ) : null}
               {live.error ? (
