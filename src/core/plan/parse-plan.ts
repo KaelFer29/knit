@@ -55,10 +55,15 @@ interface DraftTask {
 const TASK_HEADING = /^##\s+(T\d+):\s*(.*)$/;
 const PLAN_HEADING = /^#\s+Plan:\s*(.*)$/;
 const SPEC_ITEM = /^-\s+(S\d+):\s*(.*)$/;
-/** The ids the Cursor CLI lists (`auto`, `composer-2.5`, `grok-4.7-high`): letters, digits and `. _ : / -`, never starting like a flag. */
-const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$/;
+/**
+ * The ids the Cursor CLI lists (`auto`, `composer-2.5`, `grok-4.7-high`): letters, digits and `. _ : / -`, never starting
+ * like a flag. It also takes parameterized ones, `claude-opus-4-8[context=1m,effort=high]`: a name followed by one
+ * bracket group of `key=value` pairs (letters, digits, `. _ : / - = ,`), and nothing after it. The id is passed to the
+ * CLI as one argument, never through a shell.
+ */
+const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}(?:\[[A-Za-z0-9._:/=,-]{0,80}\])?$/;
 
-/** Whether `value` is a model id the agent CLIs take: one token, never starting like a flag. */
+/** Whether `value` is a model id the agent CLIs take: one token, never starting like a flag, with at most one trailing bracket group. */
 export function isModelId(value: string): boolean {
   return MODEL_ID.test(value);
 }

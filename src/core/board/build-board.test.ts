@@ -495,3 +495,30 @@ Checks:
   });
 });
 
+describe("the window of a parameterized plan model", () => {
+  const PLAN = `# Plan: demo
+
+## T1: First
+
+Branch: feat/one
+Model: claude-opus-4-8[context=1m,effort=high]
+Goal: first.
+Specs:
+- S1: first spec.
+Allowed files:
+- src/a.ts
+Checks:
+- true
+`;
+
+  it("takes the window the model id carries, and does not call it assumed", () => {
+    const b = board({
+      run: run({ planText: PLAN }),
+      tasks: [task("T1", { status: "passed" })],
+      attempts: [attempt("T1", 1)],
+      events: [ev("attempt.started", "T1", 1), ev("attempt.finished", "T1", 1, { payload: { passed: true, contextTokens: 250_000 } }, 5)],
+    });
+    expect(b.context).toEqual({ taskId: "T1", attempt: 1, tokens: 250_000, window: 1_000_000, share: 0.25, assumedWindow: false });
+  });
+});
+

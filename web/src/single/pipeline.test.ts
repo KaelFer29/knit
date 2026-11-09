@@ -230,3 +230,11 @@ describe("Cursor's context in the block details", () => {
   });
 });
 
+describe("long model ids on the blocks", () => {
+  it("show a parameterized model with dashes, never in brackets", () => {
+    const board = { ...runningRun, tasks: runningRun.tasks.map((t) => (t.taskId === "T3" ? { ...t, model: "claude-opus-4-8[context=1m,effort=high,fast=false]" } : t)) };
+    expect(deriveBlocks(board, claudeBusy).cursor.model).toBe("claude-opus-4-8-1m-high");
+    expect(deriveBlocks(runningRun, { ...claudeBusy, model: "composer-2[context=1m]" }).claude.model).toBe("composer-2-1m");
+  });
+});
+

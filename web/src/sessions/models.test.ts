@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modelChoices, modelInfo } from "./models";
+import { modelChoices, modelInfo, shortModelId } from "./models";
 
 describe("modelInfo", () => {
   it("names the known families with the description Claude's own picker gives", () => {
@@ -29,3 +29,32 @@ describe("modelChoices", () => {
     ]);
   });
 });
+
+describe("shortModelId", () => {
+  it("shows the parameters of an id after a dash instead of in long brackets", () => {
+    expect(shortModelId("claude-opus-4-8[context=1m,effort=high,fast=false]")).toBe("claude-opus-4-8-1m-high");
+    expect(shortModelId("gpt-5[effort=high]")).toBe("gpt-5-high");
+  });
+
+  it("keeps a flag that is on by its name, and drops one that is off", () => {
+    expect(shortModelId("m[fast=true]")).toBe("m-fast");
+    expect(shortModelId("m[fast=false,context=1m]")).toBe("m-1m");
+  });
+
+  it("leaves a plain id, an empty group and a key without a value as they are or short", () => {
+    expect(shortModelId("composer-2.5-fast")).toBe("composer-2.5-fast");
+    expect(shortModelId("m[]")).toBe("m");
+    expect(shortModelId("m[thinking]")).toBe("m-thinking");
+  });
+
+  it("never leaves a bracket in what it returns", () => {
+    for (const id of ["a[b=c]", "a[b=c,d=e,f=true]", "a[]", "weird]id[", "[x]"]) {
+      expect(shortModelId(id), id).not.toMatch(/[[\]]/);
+    }
+  });
+
+  it("is what the picker names an unknown parameterized model", () => {
+    expect(modelInfo("composer-2[context=1m,effort=high]")).toEqual({ name: "composer-2-1m-high" });
+  });
+});
+

@@ -6,6 +6,7 @@ import { FileList } from "../molecules/FileList";
 import { DiffView } from "../organisms/DiffView";
 import { VerdictList } from "../organisms/KnitDetail";
 import { TimelineList } from "../organisms/TimelineList";
+import { shortModelId } from "../sessions/models";
 import { Loaded } from "./Loaded";
 import "../organisms/detail.css";
 
@@ -69,7 +70,7 @@ export function TaskDetail({ task, source }: Props) {
                     <>
                       {model === undefined ? null : (
                         <p className="task-detail__model">
-                          <span className="detail-label">Model</span> <code>{model}</code>
+                          <span className="detail-label">Model</span> <code>{shortModelId(model)}</code>
                         </p>
                       )}
                       <TimelineList entries={entries} />
