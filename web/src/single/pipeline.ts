@@ -311,9 +311,12 @@ export function deriveDetails(board: BoardModel | undefined, session: SessionGli
   const cursorTokens = totals.tokens.cursor;
   cursorFacts.push({ label: "Tokens", value: formatTokens(cursorTokens.input + cursorTokens.output) });
   if (totals.agentMs > 0) cursorFacts.push({ label: "Agent time", value: formatDuration(totals.agentMs) });
+  // How full the chat of the builder is, when an attempt recorded it.
+  const context = board.context;
+  if (context !== undefined) cursorFacts.push({ label: "Context", value: `${formatTokens(context.tokens)} of ${formatTokens(context.window)}` });
   return {
     claude,
     knit: { facts: knitFacts, meters: [{ label: "Delivered", ratio }], agents: [] },
-    cursor: { facts: cursorFacts, meters: [], agents: [] },
+    cursor: { facts: cursorFacts, meters: context === undefined ? [] : [{ label: "Context", ratio: context.share }], agents: [] },
   };
 }

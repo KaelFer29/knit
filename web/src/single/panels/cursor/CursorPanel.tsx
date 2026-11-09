@@ -68,11 +68,19 @@ function stateLine(board: BoardModel): string {
 
 function Summary({ board }: { board: BoardModel }) {
   const { totals } = board;
-  const stats: [string, string][] = [
+  const { context } = board;
+  const stats: [string, string, string?][] = [
     ["Tasks", `${totals.tasks.delivered} of ${totals.tasks.total}`],
     ["Attempts", String(totals.attempts)],
     ["Tokens", formatTokens(totals.tokens.cursor.input + totals.tokens.cursor.output)],
     ["Agent time", formatDuration(totals.agentMs)],
+    [
+      "Context",
+      context === undefined ? "—" : `${formatTokens(context.tokens)} · ${Math.round(context.share * 100)}%`,
+      context === undefined
+        ? "How much of its memory the chat of the agent uses. Not recorded for this run: older runs and agents that do not report it have no figure."
+        : `How much of its memory the chat of ${context.taskId} (attempt ${context.attempt}) used: ${formatTokens(context.tokens)} of a window of ${formatTokens(context.window)}${context.assumedWindow ? ", assumed because the model does not say its own" : ""}. Counts what the chat sent plus what it read from the cache.`,
+    ],
   ];
   return (
     <section className="cursor-panel__summary" aria-label="Summary">
@@ -81,9 +89,9 @@ function Summary({ board }: { board: BoardModel }) {
         {stateLine(board)}
       </p>
       <dl className="cursor-panel__stats">
-        {stats.map(([label, value]) => (
+        {stats.map(([label, value, hint]) => (
           <div key={label} className="cursor-panel__stat">
-            <dt>{label}</dt>
+            <dt title={hint}>{label}</dt>
             <dd>{value}</dd>
           </div>
         ))}

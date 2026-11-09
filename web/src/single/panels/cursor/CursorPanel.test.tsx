@@ -116,4 +116,38 @@ describe("CursorPanel", () => {
     render(<CursorPanel {...props(deliveredRun)} />);
     expect(screen.getByRole("status", { name: "Cursor state" }).textContent).toMatch(/idle/i);
   });
+
+  describe("context of the builder's chat", () => {
+    const context = { taskId: "T3", attempt: 1, tokens: 100_000, window: 200_000, share: 0.5, assumedWindow: true };
+
+    it("shows how full the chat is in the summary, and what the figure rests on when the pointer rests on it", () => {
+      render(<CursorPanel {...props({ ...runningRun, context })} />);
+      const label = screen.getByText("Context");
+      expect(label.closest("div")!.textContent).toContain("100k · 50%");
+      expect(label.getAttribute("title")).toMatch(/T3/);
+      expect(label.getAttribute("title")).toMatch(/200k/);
+      expect(label.getAttribute("title")).toMatch(/assumed/i);
+    });
+
+    it("does not call the window assumed when the model carries its own", () => {
+      render(<CursorPanel {...props({ ...runningRun, context: { ...context, window: 1_000_000, share: 0.1, assumedWindow: false } })} />);
+      const title = screen.getByText("Context").getAttribute("title")!;
+      expect(title).toMatch(/1M/);
+      expect(title).not.toMatch(/assumed/i);
+    });
+
+    it("says it was not recorded when the run has no measure (older runs, or an agent that does not report it)", () => {
+      render(<CursorPanel {...props(runningRun)} />);
+      expect(screen.getByText("Context").closest("div")!.textContent).toContain("—");
+      expect(screen.getByText("Context").getAttribute("title")).toMatch(/not recorded/i);
+    });
+
+    it("shows the context each attempt's chat carried, next to its time and tokens", async () => {
+      const history = runningRun.tasks.map((t) => (t.taskId === "T2" ? { ...t, attempts: t.attempts.map((a) => ({ ...a, contextTokens: 12_381 })) } : t));
+      render(<CursorPanel {...props({ ...runningRun, tasks: history })} />);
+      await userEvent.setup().click(screen.getByRole("button", { name: /^T2/ }));
+      expect((await screen.findAllByText(/12\.4k context/)).length).toBeGreaterThan(0);
+    });
+  });
 });
+

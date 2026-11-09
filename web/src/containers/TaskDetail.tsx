@@ -50,7 +50,11 @@ export function TaskDetail({ task, source }: Props) {
               </span>
             </span>
           }
-          meta={[attempt.durationMs === undefined ? undefined : formatDuration(attempt.durationMs), attempt.outputTokens === undefined ? undefined : `${formatTokens((attempt.inputTokens ?? 0) + attempt.outputTokens)} tokens`]
+          meta={[
+            attempt.durationMs === undefined ? undefined : formatDuration(attempt.durationMs),
+            attempt.outputTokens === undefined ? undefined : `${formatTokens((attempt.inputTokens ?? 0) + attempt.outputTokens)} tokens`,
+            attempt.contextTokens === undefined ? undefined : `${formatTokens(attempt.contextTokens)} context`,
+          ]
             .filter((x) => x !== undefined)
             .join(" · ")}
         >

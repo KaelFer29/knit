@@ -213,3 +213,20 @@ describe("live plan usage", () => {
     expect(deriveDetails(runningRun, stored).claude.meters).toEqual([expect.objectContaining({ ratio: 0.42 })]);
   });
 });
+
+describe("Cursor's context in the block details", () => {
+  const context = { taskId: "T3", attempt: 1, tokens: 100_000, window: 200_000, share: 0.5, assumedWindow: true };
+
+  it("adds a Context fact and a meter when the chat was measured", () => {
+    const { cursor } = deriveDetails({ ...runningRun, context }, undefined);
+    expect(cursor.facts).toContainEqual({ label: "Context", value: "100k of 200k" });
+    expect(cursor.meters).toEqual([{ label: "Context", ratio: 0.5 }]);
+  });
+
+  it("adds nothing when it was not", () => {
+    const { cursor } = deriveDetails(runningRun, undefined);
+    expect(cursor.facts.some((f) => f.label === "Context")).toBe(false);
+    expect(cursor.meters).toEqual([]);
+  });
+});
+
