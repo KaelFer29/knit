@@ -4,11 +4,11 @@ Where Knit stands, what is not obvious from the code, and what comes next. Read 
 
 ## What exists
 
-Knit turns a plan into verified, stacked pull requests. A one-shot CLI (not a server) runs each task in its own git worktree on the plan's branch, with the Cursor CLI as implementer. The agent edits and commits its own work; Knit verifies it (process, scope, git hygiene, checks), retries with feedback, and can push and open stacked PRs. It also records everything: a run history in SQLite, the agent's full timeline, and raw transcripts. Commands: `run`, `resume`, `validate`, `runs`, `show`, `logs`, `clean`.
+Knit turns a plan into verified, stacked pull requests. A one-shot CLI (not a server) runs each task in its own git worktree on the plan's branch, with the Cursor CLI as implementer. The agent edits and commits its own work; Knit verifies it (process, scope, git hygiene, checks), retries with feedback, and can push and open stacked PRs. It also records everything: a run history in SQLite, the agent's full timeline, and raw transcripts. Commands: `run`, `resume`, `validate`, `runs`, `show`, `logs`, `clean`, `abort`, `chat`, `followup`, `branch`, `ui`.
 
-`knit ui` serves a web app on `127.0.0.1` with four pages: runs (live canvas, start, abort, resume, retry, task diffs), workspace (chat sessions with Claude and Cursor, plan drafts launched as runs), configuration (Claude and Cursor files, diff before saving) and a read-only file explorer. Chat turns run through `knit chat` (Claude by default, `claude -p` with the subscription), and `knit followup` sends more work to a task's Cursor chat.
+`knit ui` serves a web app on `127.0.0.1` that opens on one single view: three light blocks joined by an animated pipeline, Claude (the planner), the Orchestrator (Knit) and Cursor (the builder). Each block opens a modal. Claude's modal is a Claude Code style chat with session history, model and effort pickers, plan usage bars and a switch that routes the prompt to the orchestrator; a plan Claude writes shows as a draft over the chat and is sent to Knit with one click (everything starts from Claude; there is no "start a run" form). Cursor's modal is watched, not written to: state, summary, history, the files changed grouped by task, and a Branches tab to undo a task (revert, reset, delete) and open its pull request with a body drafted by the cheapest model. The configuration editor opens as a preview. The theme is light only. Claude picks Cursor's model per task with an optional `Model:` line in the plan. Chat turns run through `knit chat`, more work for a task through `knit followup`, and branch actions through `knit branch`.
 
-The run loop was verified end to end against the real Cursor CLI. On the branch `docs/web-interface-close`, `pnpm typecheck`, `pnpm test` (936 tests in 84 files) and `pnpm build` pass. Every commit typechecks and passes its own tests.
+The run loop was verified end to end against the real Cursor CLI. All the work is merged into `main` (PRs #1 to #33). On it, `pnpm typecheck`, `pnpm test` (1073 tests) and `pnpm build` pass; the repository has no CI, so these run locally. Every commit typechecks and passes its own tests.
 
 ## Findings that shaped the design
 
@@ -26,13 +26,13 @@ Project-wide rules (language, commits, where to look) live in `CLAUDE.md`, which
 
 ### Done
 
-- The web interface, tasks T1 to T17: the read side, `knit ui`, the canvas with live data, detail panels, runs and run control, the workspace and plan handoff, the configuration editor, the file explorer, and live file activity for task attempts. Then the single view (feature `odd/tasks/web-single-view.md`): one screen with the Claude, Knit and Cursor blocks joined by an animated pipeline, side panels for each, the configuration as a preview with an editor that keeps its undo history, and `/usage` sent as a turn. Known limits are in [web-interface.md](web-interface.md#known-limits-and-follow-ups).
+- The web interface, tasks T1 to T17: the read side, `knit ui`, the canvas with live data, detail panels, runs and run control, the workspace and plan handoff, the configuration editor, the file explorer, and live file activity for task attempts. Then the single view (feature `odd/tasks/web-single-view.md`), then its polish and identity pass (feature `odd/tasks/web-polish.md`: block redesign, modals, light theme, per-task model, changed files by task, undo and pull requests from the Cursor modal): one screen with the Claude, Knit and Cursor blocks joined by an animated pipeline, side panels for each, the configuration as a preview with an editor that keeps its undo history, and `/usage` sent as a turn. Known limits are in [web-interface.md](web-interface.md#known-limits-and-follow-ups).
 - The `knit-plan` skill (T13): Claude writes a valid plan and runs `knit validate`.
 
 ### Pending
 
-1. **Verification of the web interface**: an independent verifier for each task that names a high-risk item, then the native review, each with the user's consent per candidate.
-2. **The user's visual review** of the interface, once everything is implemented.
+1. **The user's end-to-end test** of the whole flow with a real run: plan in Claude, run, then the Branches tab (undo, pull request). It spends a little credit and pushes only when the user confirms.
+2. **Known limits of the branches tab**: "On origin" is a local tracking ref (can be stale); the branches listing skips the worktree ownership check (read only); no undo on origin; no pull requests for a failed task.
 3. **Interactive `claude --resume` of a `-p` session** is not verified: it cannot be tested headless. Session resume from the terminal rests on it (D10).
 4. **Known limits** of the web interface (see the link above), for example session-level file activity and polling for sessions.
 5. **A first real run on a real project** with a minimal docs-only task, since the agent has no sandbox.

@@ -1,6 +1,6 @@
 # Web interface
 
-`knit ui` is a local web app on `127.0.0.1` that joins Claude and Cursor into one workflow and is the single place to review everything. It is built as one interactive view (see [Single view](#single-view)): Claude, Knit and Cursor joined by a live pipeline, with runs, sessions, the file explorer and the configuration editor opening in a side panel. Known limits are listed at the end. Progress is tracked in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md).
+`knit ui` is a local web app on `127.0.0.1` that joins Claude and Cursor into one workflow and is the single place to review everything. It is built as one interactive view (see [Single view](#single-view)): Claude, Knit and Cursor joined by a live pipeline, with each block opening as a modal over the view (Claude chat and usage, Cursor work and branches) and the configuration editor as a preview. Known limits are listed at the end. Progress is tracked in [../odd/tasks/web-interface.md](../odd/tasks/web-interface.md).
 
 ## Workflow
 
