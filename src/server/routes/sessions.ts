@@ -214,7 +214,8 @@ export const sessionsRoutes: RouteModule = ({ control, pollIntervalMs }) => {
     {
       method: "GET",
       pattern: "/api/agents",
-      handler: ({ res }) => sendJson(res, 200, { agents: (sessions?.agents ?? []).map(agentView) }),
+      // `cwd` is where `knit ui` was launched: the default directory of a new session, so the page never asks for one.
+      handler: ({ res }) => sendJson(res, 200, sessions ? { agents: sessions.agents.map(agentView), cwd: process.cwd() } : { agents: [] }),
     },
     {
       method: "GET",

@@ -3,11 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../../api/client";
 import { PlanDrafts } from "../../../organisms/PlanDrafts";
 import { Composer } from "../../../organisms/Composer";
-import { NewSessionHeader } from "../../../organisms/NewSessionHeader";
 import { Timeline } from "../../../organisms/Timeline";
 import { UsagePanel } from "../../../organisms/UsagePanel";
 import { CopyCommand } from "../../../molecules/CopyCommand";
-import { fetchAgents, fetchModels, fetchSessions, sendTurn, startSession } from "../../../sessions/api";
+import { fetchAgentList, fetchModels, fetchSessions, sendTurn, startSession } from "../../../sessions/api";
+import { identityOf } from "../../../identity/agents";
 import { launchPlan, type PlanDraftView } from "../../../sessions/plans";
 import { paletteCommands, usageAction } from "../../../sessions/commands";
 import { routedPrompt } from "../../../sessions/route";
@@ -16,29 +16,12 @@ import type { AgentView, Profile, SessionListEntry } from "../../../sessions/typ
 import { usePlanDrafts } from "../../../sessions/usePlanDrafts";
 import { useSessionLive } from "../../../sessions/useSessionLive";
 import { ClaudePanelHeader } from "./ClaudePanelHeader";
+import { EmptyConversation } from "./EmptyConversation";
 import "./ClaudePanel.css";
 
 export const LIST_POLL_MS = 3000;
 const NEW_SESSION = "new";
-const CWD_KEY = "knit.workspace.cwd";
-
 const NO_CAPABILITIES = { resume: false, chooseModel: false, commandList: false, visibleReasoning: false, planUsage: false };
-
-function readCwd(): string {
-  try {
-    return window.localStorage.getItem(CWD_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function rememberCwd(cwd: string): void {
-  try {
-    window.localStorage.setItem(CWD_KEY, cwd);
-  } catch {
-    // Storage can be blocked; the field simply starts empty next time.
-  }
-}
 
 const messageOf = (err: unknown): string => (err instanceof ApiError || err instanceof Error ? err.message : String(err));
 
@@ -49,14 +32,13 @@ const messageOf = (err: unknown): string => (err instanceof ApiError || err inst
  * its capabilities in `GET /api/agents`; nothing here looks at an agent's name. A turn never starts a run: only the
  * explicit "Send plan to the orchestrator" click does.
  */
-export function ClaudePanel(_props: PanelProps) {
+export function ClaudePanel({ agentId: panelAgent }: PanelProps) {
   const [picked, setPicked] = useState<string | undefined>();
   const [listed, setListed] = useState(false);
   const [agents, setAgents] = useState<AgentView[]>([]);
   const [sessions, setSessions] = useState<SessionListEntry[]>([]);
   const [listError, setListError] = useState<string | undefined>();
-  const [draftAgent, setDraftAgent] = useState<string | undefined>();
-  const [cwd, setCwd] = useState(readCwd);
+  const [serverCwd, setServerCwd] = useState<string | undefined>();
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [models, setModels] = useState<Record<string, string[]>>({});
   const [routeOn, setRouteOn] = useState(false);
@@ -64,7 +46,10 @@ export function ClaudePanel(_props: PanelProps) {
   const [sendError, setSendError] = useState<string | undefined>();
   const [now, setNow] = useState(() => Date.now());
 
-  const sessionId = picked ?? (listed ? sessions[0]?.session.id : undefined);
+  // The panel is about one agent: its own sessions only, and new ones are started with it.
+  const wanted = panelAgent ?? agents[0]?.id;
+  const mine = useMemo(() => sessions.filter((e) => e.session.agent === wanted), [sessions, wanted]);
+  const sessionId = picked ?? (listed ? mine[0]?.session.id : undefined);
   const isNew = sessionId === undefined || sessionId === NEW_SESSION;
   const live = useSessionLive(isNew ? undefined : sessionId);
   const drafts = usePlanDrafts(isNew ? undefined : sessionId);
@@ -83,8 +68,12 @@ export function ClaudePanel(_props: PanelProps) {
 
   useEffect(() => {
     let stopped = false;
-    fetchAgents().then(
-      (list) => !stopped && setAgents(list),
+    fetchAgentList().then(
+      (list) => {
+        if (stopped) return;
+        setAgents(list.agents);
+        setServerCwd(list.cwd);
+      },
       (err: unknown) => !stopped && setListError(messageOf(err)),
     );
     return () => {
@@ -102,7 +91,7 @@ export function ClaudePanel(_props: PanelProps) {
   }, [loadSessions]);
 
   const session = live.detail?.session;
-  const activeId = isNew ? (draftAgent ?? agents[0]?.id) : session?.agent;
+  const activeId = wanted;
   const agent: AgentView | undefined = useMemo(() => {
     if (activeId === undefined) return undefined;
     return agents.find((a) => a.id === activeId) ?? (isNew ? undefined : { id: activeId, label: activeId, capabilities: NO_CAPABILITIES, profileFields: [] });
@@ -138,10 +127,9 @@ export function ClaudePanel(_props: PanelProps) {
     setSendError(undefined);
     try {
       if (isNew) {
-        const directory = cwd.trim();
-        if (directory === "") throw new Error("Enter the directory the agent should work in.");
+        const directory = serverCwd ?? mine[0]?.session.cwd;
+        if (directory === undefined) throw new Error("The server did not say which directory to work in.");
         const id = await startSession({ agent: agent.id, cwd: directory, prompt, profile });
-        rememberCwd(directory);
         void loadSessions();
         go(id);
       } else {
@@ -191,16 +179,7 @@ export function ClaudePanel(_props: PanelProps) {
 
   return (
     <div className="claude-panel">
-      <ClaudePanelHeader
-        sessions={sessions}
-        agents={agents}
-        selectedId={isNew ? undefined : sessionId}
-        session={isNew ? undefined : session}
-        agent={agent}
-        profile={agent ? (profiles[agent.id] ?? {}) : {}}
-        onSelect={(id) => go(id)}
-        onNew={() => go(NEW_SESSION)}
-      />
+      <ClaudePanelHeader sessions={mine} selectedId={isNew ? undefined : sessionId} session={isNew ? undefined : session} agent={agent} now={now} onSelect={(id) => go(id)} onNew={() => go(NEW_SESSION)} />
       {listError ? (
         <p className="claude-panel__error" role="alert">
           {listError}
@@ -209,12 +188,9 @@ export function ClaudePanel(_props: PanelProps) {
       <div className="claude-panel__scroll">
         {isNew ? (
           agent === undefined ? (
-            <p className="claude-panel__note">{agents.length === 0 ? "No agents are available on this server." : "Loading…"}</p>
+            <p className="claude-panel__note">{agents.length === 0 ? "No agents are available on this server." : `${identityOf(wanted ?? "", wanted).label} is not available on this server.`}</p>
           ) : (
-            <>
-              <NewSessionHeader agents={agents} agentId={agent.id} cwd={cwd} onAgentChange={setDraftAgent} onCwdChange={setCwd} />
-              <Timeline items={[]} emptyText={`Start a conversation with ${agent.label}. The first message creates the session.`} />
-            </>
+            <EmptyConversation identity={identityOf(agent.id, agent.label)} />
           )
         ) : session === undefined ? (
           <p className="claude-panel__note" role={live.error ? "alert" : "status"}>

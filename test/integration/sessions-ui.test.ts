@@ -131,8 +131,9 @@ const waitIdle = async (id: string): Promise<void> => {
 describe("session routes", () => {
   it("lists the agents with their capabilities and profile fields", async () => {
     await launch();
-    const { agents } = (await call("/api/agents")).json();
+    const { agents, cwd } = (await call("/api/agents")).json();
     expect(agents.map((a: any) => a.id)).toEqual(["claude", "cursor"]);
+    expect(cwd).toBe(process.cwd());
     expect(agents[0].capabilities).toMatchObject({ resume: true, chooseModel: true, commandList: true, planUsage: true });
     expect(agents[1].profileFields).toEqual(["model"]);
     expect(agents[1].capabilities.planUsage).toBe(false);

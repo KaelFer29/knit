@@ -3,8 +3,18 @@ import type { AgentView, Profile, SessionDetail, SessionEvent, SessionListEntry 
 
 const EVENTS_PAGE = 2000;
 
+export interface AgentList {
+  agents: AgentView[];
+  /** Where `knit ui` was launched: the default directory of a new session. Absent when the server has no sessions. */
+  cwd?: string;
+}
+
+export async function fetchAgentList(): Promise<AgentList> {
+  return apiGet<AgentList>("/api/agents");
+}
+
 export async function fetchAgents(): Promise<AgentView[]> {
-  return (await apiGet<{ agents: AgentView[] }>("/api/agents")).agents;
+  return (await fetchAgentList()).agents;
 }
 
 export async function fetchModels(agent: string): Promise<string[]> {

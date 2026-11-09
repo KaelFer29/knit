@@ -7,7 +7,7 @@ describe("agent identities", () => {
   });
 
   it("gives each agent a label, a role and a monogram", () => {
-    expect(AGENTS.claude).toMatchObject({ label: "Claude", role: "planner", monogram: "C" });
+    expect(AGENTS.claude).toMatchObject({ label: "Claude", role: "planner", monogram: "✻" });
     expect(AGENTS.knit).toMatchObject({ label: "Orchestrator", role: "orchestrator", monogram: "O" });
     expect(AGENTS.cursor).toMatchObject({ label: "Cursor", role: "builder", monogram: "C" });
   });

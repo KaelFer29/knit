@@ -80,3 +80,21 @@
 .claude-panel .composer__field {
   resize: none;
 }
+
+/* The conversation sits straight on the modal, like the Claude Code panel: no box around it. */
+.claude-panel .timeline {
+  padding: 0 var(--space-1);
+  border: 0;
+  background: none;
+}
+
+.claude-panel .tl-entry--prompt {
+  align-self: flex-start;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.claude-panel .tl-entry--result {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+}

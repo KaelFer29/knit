@@ -8,7 +8,7 @@ describe("Logo", () => {
     const { container } = render(<Logo identity={AGENTS.claude} />);
     const img = container.querySelector("img");
     expect(img?.getAttribute("src")).toBe("/brand/claude.svg");
-    expect(screen.getByText("C")).toBeTruthy();
+    expect(screen.getByText("✻")).toBeTruthy();
     expect(container.querySelector("[data-state]")?.getAttribute("data-state")).toBe("loading");
   });
 

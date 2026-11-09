@@ -4,9 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentView, SessionDetail, SessionEvent, SessionListEntry } from "../../../sessions/types";
 import { ClaudePanel } from "./ClaudePanel";
 
-const PROPS = { board: undefined, runId: undefined, live: false, renderDetail: undefined, selectRun: () => {} };
+const PROPS = { board: undefined, runId: undefined, live: false, renderDetail: undefined, selectRun: () => {}, agentId: "alpha" };
 const panel = () => <ClaudePanel {...PROPS} />;
-const pick = (user: ReturnType<typeof userEvent.setup>, name: RegExp) => user.selectOptions(screen.getByRole("combobox", { name: "Session" }), screen.getByRole("option", { name }));
+/** Opens the conversation history and picks a session from it. */
+async function pick(user: ReturnType<typeof userEvent.setup>, name: RegExp): Promise<void> {
+  await user.click(screen.getByRole("button", { name: "Conversation history" }));
+  await user.click(within(screen.getByRole("dialog", { name: "Conversation history" })).getByRole("button", { name }));
+}
 
 const NOW_ISO = new Date().toISOString();
 const caps = { resume: true, chooseModel: false, commandList: false, visibleReasoning: false, planUsage: false };
@@ -54,9 +58,9 @@ function stubFetch(): void {
         posted.push({ url, body: JSON.parse(init.body ?? "null") });
         return url === "/api/sessions" ? json({ sessionId: "chat-new" }, 202) : json({ sessionId: "a1" }, 202);
       }
-      if (url === "/api/agents") return json({ agents: AGENTS });
+      if (url === "/api/agents") return json({ agents: AGENTS, cwd: "/work/repo" });
       if (url === "/api/agents/alpha/models") return json({ models: ["alpha-fast", "alpha-deep"] });
-      if (url === "/api/sessions") return json({ sessions: [...(posted.some((p) => p.url === "/api/sessions") ? [entry("chat-new", "alpha")] : []), entry("a1", "alpha"), entry("b1", "beta")] });
+      if (url === "/api/sessions") return json({ sessions: [...(posted.some((p) => p.url === "/api/sessions") ? [entry("chat-new", "alpha")] : []), entry("a1", "alpha"), entry("a2", "alpha"), entry("b1", "beta")] });
       const events = /^\/api\/sessions\/([^/]+)\/events/.exec(url);
       if (events) return json({ events: events[1] === "a1" ? EVENTS : [], lastEventId: 2 });
       const one = /^\/api\/sessions\/([^/?]+)$/.exec(url);
@@ -73,6 +77,7 @@ beforeEach(() => {
       meta: { commands: ["compact"], planUsage: [{ name: "five_hour", utilization: 0.4 }] },
       continueCommand: "cd '/repo' && alpha --resume agent-sess-1",
     }),
+    a2: detail("a2", "alpha"),
     b1: detail("b1", "beta"),
   };
   window.localStorage.clear();
@@ -85,7 +90,6 @@ describe("ClaudePanel: an open session", () => {
   it("lists the sessions and shows the open one's timeline as text, with the reasoning note", async () => {
     render(panel());
     await screen.findByText("<b>Here is the plan</b>");
-    expect(screen.getByRole("option", { name: /Session b1/ })).toBeTruthy();
     expect(screen.getByText("Plan the board")).toBeTruthy();
     expect(screen.getByText("Reasoning not shared by the agent")).toBeTruthy();
     // Untrusted output never becomes markup.
@@ -109,12 +113,9 @@ describe("ClaudePanel: an open session", () => {
   });
 
   it("an agent without those capabilities gets no model picker, no /usage and no terminal command", async () => {
-    const user = userEvent.setup();
-    render(panel());
-    await screen.findByText("<b>Here is the plan</b>");
-    await pick(user, /Session b1/);
+    render(<ClaudePanel {...PROPS} agentId="beta" />);
     await screen.findByText("This agent does not report plan usage.");
-    expect(screen.queryByLabelText("Model")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Model and effort" })).toBeNull();
     expect(screen.queryByText("Continue in terminal")).toBeNull();
     // It cannot resume, so continuing here is not offered either.
     expect(screen.getByText(/cannot continue this conversation here/)).toBeTruthy();
@@ -125,9 +126,9 @@ describe("ClaudePanel: an open session", () => {
     const user = userEvent.setup();
     render(panel());
     await screen.findByText("<b>Here is the plan</b>");
-    await screen.findByRole("option", { name: "alpha-deep" });
-    await user.selectOptions(screen.getByLabelText("Model"), "alpha-deep");
-    await user.type(screen.getByLabelText("Effort"), "high");
+    await user.click(screen.getByRole("button", { name: "Model and effort" }));
+    await user.click(await screen.findByRole("radio", { name: "alpha-deep" }));
+    await user.click(within(screen.getByRole("radiogroup", { name: "Effort" })).getByRole("radio", { name: "high" }));
     await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "Next step{Enter}");
     await waitFor(() => expect(posted).toHaveLength(1));
     expect(posted[0]).toEqual({ url: "/api/sessions/a1/turns", body: { prompt: "Next step", profile: { model: "alpha-deep", effort: "high" } } });
@@ -171,7 +172,7 @@ describe("ClaudePanel: an open session", () => {
     render(panel());
     await screen.findByText("<b>Here is the plan</b>");
     await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "/clear{Enter}");
-    expect(await screen.findByRole("heading", { name: "New session" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Plan with Alpha" })).toBeTruthy();
     expect(window.location.hash).toBe("");
   });
 
@@ -179,46 +180,42 @@ describe("ClaudePanel: an open session", () => {
     const user = userEvent.setup();
     render(panel());
     await screen.findByText("<b>Here is the plan</b>");
-    await pick(user, /Session b1/);
-    expect(await screen.findByRole("combobox", { name: "Session" })).toHaveProperty("value", "b1");
+    await pick(user, /Session a2/);
+    expect(await within(screen.getByRole("banner")).findByRole("heading", { name: "Session a2" })).toBeTruthy();
     expect(window.location.hash).toBe("");
   });
 });
 
 describe("ClaudePanel: a new session", () => {
-  it("offers every agent the server lists and starts the session with the directory and profile", async () => {
+  it("starts in the directory the server reported, with the profile, and asks for no directory or agent", async () => {
     const user = userEvent.setup();
     details["chat-new"] = detail("chat-new", "alpha");
     render(panel());
     await user.click(await screen.findByRole("button", { name: "New session" }));
-    await screen.findByRole("radio", { name: "Beta" });
-    expect(screen.getAllByRole("radio").map((r) => (r as HTMLInputElement).value)).toEqual(["alpha", "beta"]);
-    await user.type(screen.getByLabelText("Directory"), "/work/repo");
+    expect(screen.queryByLabelText("Directory")).toBeNull();
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
+    expect(screen.queryByText(/first message creates the session/i)).toBeNull();
     await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "Plan it{Enter}");
     await waitFor(() => expect(posted).toHaveLength(1));
     expect(posted[0]).toEqual({ url: "/api/sessions", body: { agent: "alpha", cwd: "/work/repo", prompt: "Plan it", profile: {} } });
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Session" })).toHaveProperty("value", "chat-new"));
-    expect(window.localStorage.getItem("knit.workspace.cwd")).toBe("/work/repo");
+    expect(await within(screen.getByRole("banner")).findByRole("heading", { name: "Session chat-new" })).toBeTruthy();
   });
 
-  it("asks for a directory instead of sending without one", async () => {
+  it("is only about its own agent: the history lists that agent's sessions and no other", async () => {
+    const user = userEvent.setup();
+    render(panel());
+    await screen.findByText("<b>Here is the plan</b>");
+    await user.click(screen.getByRole("button", { name: "Conversation history" }));
+    const history = within(screen.getByRole("dialog", { name: "Conversation history" }));
+    expect(history.getByRole("button", { name: /Session a2/ })).toBeTruthy();
+    expect(history.queryByRole("button", { name: /Session b1/ })).toBeNull();
+  });
+
+  it("shows what to do first instead of a form", async () => {
     const user = userEvent.setup();
     render(panel());
     await user.click(await screen.findByRole("button", { name: "New session" }));
-    await screen.findByRole("radio", { name: "Alpha" });
-    await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "Plan it{Enter}");
-    expect((await screen.findByRole("alert")).textContent).toMatch(/directory/i);
-    expect(posted).toEqual([]);
-  });
-
-  it("changes the composer with the chosen agent's capabilities", async () => {
-    const user = userEvent.setup();
-    render(panel());
-    await user.click(await screen.findByRole("button", { name: "New session" }));
-    await screen.findByLabelText("Model");
-    await user.click(screen.getByRole("radio", { name: "Beta" }));
-    expect(screen.queryByLabelText("Model")).toBeNull();
-    expect(screen.getByRole("combobox", { name: /message beta/i })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Plan with Alpha" })).toBeTruthy();
   });
 });
 
@@ -272,61 +269,21 @@ describe("ClaudePanel: plan handoff", () => {
 });
 
 describe("ClaudePanel: header", () => {
-  it("shows the agent, its model and profile, and the working directory of the open session", async () => {
+  it("shows the session title and the working directory, and the model chip shows the pick", async () => {
     const user = userEvent.setup();
     render(panel());
     await screen.findByText("<b>Here is the plan</b>");
-    await screen.findByRole("option", { name: "alpha-deep" });
-    await user.selectOptions(screen.getByLabelText("Model"), "alpha-deep");
+    await user.click(screen.getByRole("button", { name: "Model and effort" }));
+    await user.click(await screen.findByRole("radio", { name: "alpha-deep" }));
     const header = screen.getByRole("banner");
-    expect(within(header).getByText("Alpha")).toBeTruthy();
-    expect(within(header).getByText("alpha-deep")).toBeTruthy();
+    expect(within(header).getByRole("heading", { name: "Session a1" })).toBeTruthy();
     expect(within(header).getByText("/repo")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Model and effort" }).textContent).toContain("alpha-deep");
   });
 
   it("opens on the most recent session and keeps the choice in the panel, not in the URL", async () => {
     render(panel());
     expect(await screen.findByText("<b>Here is the plan</b>")).toBeTruthy();
     expect(window.location.hash).toBe("");
-  });
-});
-
-describe("ClaudePanel: routing a prompt to the orchestrator", () => {
-  const routing = () => screen.getByRole("switch", { name: /send to the orchestrator/i });
-
-  it("is off by default and sends the prompt as it is", async () => {
-    const user = userEvent.setup();
-    render(panel());
-    await screen.findByText("<b>Here is the plan</b>");
-    expect(routing().getAttribute("aria-checked")).toBe("false");
-    await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "Just chat{Enter}");
-    await waitFor(() => expect(posted).toHaveLength(1));
-    expect(posted[0]).toMatchObject({ body: { prompt: "Just chat" } });
-  });
-
-  it("when on, asks the agent for a plan in the Knit format and starts no run", async () => {
-    const user = userEvent.setup();
-    render(panel());
-    await screen.findByText("<b>Here is the plan</b>");
-    await user.click(routing());
-    expect(routing().getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByText(/you confirm it before anything runs/i)).toBeTruthy();
-    await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "Add webhooks{Enter}");
-    await waitFor(() => expect(posted).toHaveLength(1));
-    const body = posted[0]!.body as { prompt: string };
-    expect(posted[0]!.url).toBe("/api/sessions/a1/turns");
-    expect(body.prompt).toContain("Add webhooks");
-    expect(body.prompt).toContain("docs/plans/");
-    expect(posted.some((p) => p.url === "/api/runs")).toBe(false);
-  });
-
-  it("does not wrap a Knit command such as /usage", async () => {
-    const user = userEvent.setup();
-    render(panel());
-    await screen.findByText("<b>Here is the plan</b>");
-    await user.click(routing());
-    await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "/usage{Enter}");
-    await waitFor(() => expect(posted).toHaveLength(1));
-    expect(posted[0]).toMatchObject({ body: { prompt: "/usage" } });
   });
 });

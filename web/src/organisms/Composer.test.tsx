@@ -12,8 +12,8 @@ const agent = (over: Partial<AgentView["capabilities"]> = {}, profileFields: Age
   profileFields,
 });
 
-function setup(a: AgentView = agent(), over: Partial<Parameters<typeof Composer>[0]> = {}) {
-  const props = {
+function baseProps(a: AgentView, over: Partial<Parameters<typeof Composer>[0]> = {}): Parameters<typeof Composer>[0] {
+  return {
     agent: a,
     models: ["m1", "m2"],
     profile: {},
@@ -24,6 +24,10 @@ function setup(a: AgentView = agent(), over: Partial<Parameters<typeof Composer>
     busy: false,
     ...over,
   };
+}
+
+function setup(a: AgentView = agent(), over: Partial<Parameters<typeof Composer>[0]> = {}) {
+  const props = baseProps(a, over);
   render(<Composer {...props} />);
   return { props, field: screen.getByRole("combobox", { name: /message zed/i }) as HTMLTextAreaElement };
 }
@@ -86,12 +90,21 @@ describe("Composer", () => {
     expect(field.value).toBe("");
   });
 
-  it("moves focus to the model field for /model", async () => {
+  it("opens the model menu for /model", async () => {
     const user = userEvent.setup();
     const { props, field } = setup();
     await user.type(field, "/model{Enter}");
-    expect(document.activeElement).toBe(screen.getByRole("combobox", { name: /model/i, hidden: false }));
+    expect(screen.getByRole("dialog", { name: "Model and effort" })).toBeTruthy();
     expect(props.onKnitCommand).not.toHaveBeenCalled();
+  });
+
+  it("opens the command palette from its button", async () => {
+    const user = userEvent.setup();
+    const { field } = setup();
+    await user.click(screen.getByRole("button", { name: "Commands" }));
+    expect(field.value).toBe("/");
+    expect(screen.getByRole("listbox", { name: "Commands" })).toBeTruthy();
+    expect(document.activeElement).toBe(field);
   });
 
   it("does not send while busy, and says why", async () => {
@@ -103,23 +116,30 @@ describe("Composer", () => {
     expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("shows the model picker only for an agent that can choose a model, and only the fields it takes", () => {
-    setup(agent({ chooseModel: false }, ["model", "effort"]));
-    expect(screen.queryByLabelText("Model")).toBeNull();
-    expect(screen.getByLabelText("Effort")).toBeTruthy();
-    expect(screen.queryByLabelText("Permission mode")).toBeNull();
+  it("shows the model chip only for an agent that can choose a model, and only the fields it takes", () => {
+    const first = render(<Composer {...baseProps(agent({ chooseModel: false }, ["model", "effort"]))} />);
+    expect(screen.getByRole("button", { name: "Model and effort" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Permission mode" })).toBeNull();
+    first.unmount();
+    render(<Composer {...baseProps(agent({ chooseModel: false }, ["permissionMode"]))} />);
+    expect(screen.queryByRole("button", { name: "Model and effort" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Permission mode" })).toBeTruthy();
   });
 
   it("reports the picked model through onProfileChange", async () => {
     const user = userEvent.setup();
     const { props } = setup();
-    await user.selectOptions(screen.getByLabelText("Model"), "m2");
+    await user.click(screen.getByRole("button", { name: "Model and effort" }));
+    await user.click(screen.getByRole("radio", { name: "m2" }));
     expect(props.onProfileChange).toHaveBeenCalledWith({ model: "m2" });
   });
 
-  it("falls back to free text for the model when the agent listed none", () => {
-    setup(agent(), { models: [] });
-    expect(screen.getByLabelText("Model").tagName).toBe("INPUT");
+  it("sends with a round button that is named Send", async () => {
+    const user = userEvent.setup();
+    const { props, field } = setup();
+    await user.type(field, "go");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(props.onSubmit).toHaveBeenCalledWith("go");
   });
 
   it("shows an error as an alert", () => {

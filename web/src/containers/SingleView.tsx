@@ -74,7 +74,7 @@ export function SingleView({ search = window.location.search, actions }: Props) 
         </section>
         {Panel === undefined || open === undefined ? null : (
           <PanelModal key={open} panelId={open} title={Panel.title} identity={(AGENT_ORDER as readonly string[]).includes(open) ? AGENTS[open as AgentId] : undefined} onClose={() => setOpen(undefined)}>
-            <Panel.Component board={board} runId={runId} live={runId !== undefined} renderDetail={renderDetail} selectRun={selectRun} />
+            <Panel.Component board={board} runId={runId} live={runId !== undefined} renderDetail={renderDetail} selectRun={selectRun} agentId={open} />
           </PanelModal>
         )}
       </div>

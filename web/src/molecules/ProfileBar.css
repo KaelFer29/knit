@@ -1,28 +1,114 @@
 .profile-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
-}
-
-.profile-bar__field {
-  display: flex;
   align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-xs);
+  gap: var(--space-1);
 }
 
-.profile-bar__label {
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  max-width: 14rem;
+  padding: 0.2rem var(--space-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.chip:hover,
+.popover[data-open] .chip {
+  border-color: var(--border);
+  background: var(--surface-3);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.chip__main {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip__sub {
   color: var(--text-muted);
 }
 
-.profile-bar__field select,
-.profile-bar__field input {
-  width: 9.5rem;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+.pick-group + .pick-group {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.pick-group__heading {
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.pick-group__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pick:hover,
+.pick:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+
+.pick:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--focus);
+}
+
+.pick__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.pick__hint {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.pick__check {
+  width: 1rem;
+  color: var(--agent-claude);
+  font-weight: 700;
+}
+
+.pick-input {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   background: var(--surface-1);
-  color: var(--text);
+  color: inherit;
   font: inherit;
   font-size: var(--text-sm);
 }

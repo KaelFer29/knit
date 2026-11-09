@@ -26,7 +26,7 @@ export interface AgentIdentity {
   logoFile?: string;
   /** The official logo is a single-color mark that must flip with the theme (drawn black, shown white on dark). */
   monochrome?: boolean;
-  /** One or two letters shown when the logo file is missing. */
+  /** One or two letters (or Claude's spark glyph) shown when the logo file is missing. */
   monogram: string;
   /** Never draws a mark or loads a file: only the monogram (an agent the interface has no brand for). */
   monogramOnly?: boolean;
@@ -35,7 +35,7 @@ export interface AgentIdentity {
 const tokens = (id: AgentId) => ({ accent: `var(--agent-${id})`, accentSoft: `var(--agent-${id}-soft)` });
 
 export const AGENTS: Record<AgentId, AgentIdentity> = {
-  claude: { id: "claude", label: "Claude", role: "planner", tagline: "planner", skin: "terminal", ...tokens("claude"), logoFile: "claude.svg", monogram: "C" },
+  claude: { id: "claude", label: "Claude", role: "planner", tagline: "planner", skin: "terminal", ...tokens("claude"), logoFile: "claude.svg", monogram: "✻" },
   // The orchestrator is part of Knit (the product), not a brand: its mark is drawn in code, so it needs no file.
   knit: { id: "knit", label: "Orchestrator", role: "orchestrator", tagline: "pipeline", skin: "pipeline", ...tokens("knit"), monogram: "O" },
   cursor: { id: "cursor", label: "Cursor", role: "builder", tagline: "builder", skin: "editor", ...tokens("cursor"), logoFile: "cursor.svg", monochrome: true, monogram: "C" },

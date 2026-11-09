@@ -34,6 +34,8 @@ export interface PanelProps {
   renderDetail: RenderDetail | undefined;
   /** Makes another run the one the view shows (`undefined` goes back to the most recent run). */
   selectRun: (runId: string | undefined) => void;
+  /** The agent the panel belongs to (the id of its block); a panel for an agent only talks to that agent. */
+  agentId?: string;
 }
 
 export interface PanelDefinition {

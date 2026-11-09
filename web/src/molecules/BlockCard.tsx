@@ -1,4 +1,5 @@
 import { useId, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { ClaudeMascot } from "../atoms/ClaudeMascot";
 import { Logo } from "../atoms/Logo";
 import { StatusBadge } from "../atoms/StatusBadge";
 import { NODE_STATUS_LABEL, NODE_STATUS_TONE } from "../flow/status";
@@ -15,9 +16,6 @@ interface Props {
   open: boolean;
   onOpen: () => void;
 }
-
-/** Claude Code's terminal mascot, drawn with block characters the way the CLI prints it. */
-const MASCOT = [" ▐▛███▜▌", "▝▜█████▛▘", "  ▘▘ ▝▝"];
 
 const STAGE_ICON: Record<StageView["status"], string> = { idle: "", active: "", done: "✓", failed: "✕" };
 
@@ -61,11 +59,7 @@ export function BlockCard({ identity, view, details, stages, open, onOpen }: Pro
   return (
     <article className="block" role="group" aria-label={identity.label} data-skin={identity.skin} data-agent={identity.id} data-status={view.status} data-expanded={expanded || undefined} style={style}>
       {identity.skin === "terminal" ? (
-        <span className="block__mascot" aria-hidden="true">
-          {MASCOT.map((row) => (
-            <span key={row}>{row}</span>
-          ))}
-        </span>
+        <ClaudeMascot className="block__mascot" />
       ) : null}
       <div className="block__frame">
         {identity.skin === "terminal" ? (

@@ -18,7 +18,6 @@ export function RouteSwitch({ on, onChange }: Props) {
         </span>
         <span className="route__label">Send to the orchestrator</span>
       </button>
-      <p className="route__hint">{on ? "The agent will write a plan; you confirm it before anything runs." : "Off: the prompt is just a message to the agent."}</p>
     </div>
   );
 }
