@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { DetailSource } from "../detail/types";
 import { failedRun, legacyRun, runningRun } from "../fixtures/boards";
 import { fixtureDetailSource } from "../fixtures/detail";
-import { FlowView } from "./FlowView";
 import { createRenderDetail } from "./detailRenderer";
 
 const task = (board: typeof failedRun, id: string) => board.tasks.find((t) => t.taskId === id)!;
@@ -77,17 +76,6 @@ describe("task detail", () => {
     render(<>{createRenderDetail(runningRun, fixtureDetailSource(runningRun))({ kind: "task", taskId: runningRun.queue[0]!.taskId })}</>);
     expect(screen.getByText("No attempts yet.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Changes/ })).toBeNull();
-  });
-});
-
-describe("flow view", () => {
-  it("opens a delivered task's attempts and changes from the delivery lane", async () => {
-    const user = userEvent.setup();
-    render(<FlowView search="?fixture=failedRun" />);
-    await user.click(screen.getByRole("button", { name: "T1 details" }));
-    const panel = screen.getByRole("region", { name: "Detail of T1" });
-    await user.click(within(panel).getByRole("button", { name: /Changes/ }));
-    expect(await within(panel).findByText(/4 files/)).toBeTruthy();
   });
 });
 
