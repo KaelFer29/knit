@@ -12,7 +12,7 @@ import { WorkspaceLayout } from "../organisms/WorkspaceLayout";
 import { NEW_SESSION, workspaceHash } from "../route";
 import { fetchAgents, fetchModels, fetchSessions, sendTurn, startSession } from "../sessions/api";
 import { launchPlan, type PlanDraftView } from "../sessions/plans";
-import { paletteCommands } from "../sessions/commands";
+import { paletteCommands, usageAction } from "../sessions/commands";
 import { buildTimeline } from "../sessions/timeline";
 import type { AgentView, Profile, SessionListEntry } from "../sessions/types";
 import { usePlanDrafts } from "../sessions/usePlanDrafts";
@@ -173,7 +173,12 @@ export function WorkspaceView({ sessionId }: Props) {
 
   const onKnitCommand = (name: string): void => {
     if (name === "clear") go(NEW_SESSION);
-    else if (name === "usage") setUsageOpen(true);
+    else if (name === "usage" && agent) {
+      setUsageOpen(true);
+      const action = usageAction(agent);
+      if (action.kind === "send") void submit(action.prompt);
+      else setSendError(action.text);
+    }
   };
 
   const running = session?.status === "running";

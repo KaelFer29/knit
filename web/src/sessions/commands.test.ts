@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { filterCommands, knitCommandOf, paletteCommands, paletteQuery } from "./commands";
+import { filterCommands, knitCommandOf, paletteCommands, paletteQuery, usageAction } from "./commands";
 import type { AgentView } from "./types";
 
 const caps = { resume: true, chooseModel: false, commandList: false, visibleReasoning: false, planUsage: false };
 const agent = (c: Partial<typeof caps>, label = "Agent"): AgentView => ({ id: "a", label, capabilities: { ...caps, ...c }, profileFields: [] });
 
 describe("paletteCommands", () => {
-  it("offers /clear to every agent and nothing else without capabilities", () => {
-    expect(paletteCommands(agent({}), ["compact"]).map((c) => c.name)).toEqual(["clear"]);
+  it("offers /clear and /usage to every agent and nothing else without capabilities", () => {
+    expect(paletteCommands(agent({}), ["compact"]).map((c) => c.name)).toEqual(["clear", "usage"]);
   });
 
   it("adds /model and /usage from the declared capabilities, not from a name", () => {
@@ -46,5 +46,15 @@ describe("filtering and parsing", () => {
     expect(knitCommandOf(" /clear ", cmds)?.name).toBe("clear");
     expect(knitCommandOf("/compact", cmds)).toBeUndefined();
     expect(knitCommandOf("/clear now", cmds)).toBeUndefined();
+  });
+});
+
+describe("usageAction", () => {
+  it("sends /usage to an agent that reports plan usage, so its answer shows in the session", () => {
+    expect(usageAction(agent({ planUsage: true }))).toEqual({ kind: "send", prompt: "/usage" });
+  });
+
+  it("says so for an agent that does not report plan usage, instead of doing nothing", () => {
+    expect(usageAction(agent({}, "Zed"))).toEqual({ kind: "notice", text: "Zed does not report plan usage." });
   });
 });
