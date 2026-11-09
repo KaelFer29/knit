@@ -260,3 +260,34 @@
     grid-template-rows: minmax(0, 1fr) minmax(0, 13rem);
   }
 }
+
+/* Iterating on a delivered task: the list, the task chosen and the instruction Claude wrote for it. */
+.claude-panel__iterate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.claude-panel__iterating {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.claude-panel__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.claude-panel__link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

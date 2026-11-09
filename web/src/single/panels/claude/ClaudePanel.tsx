@@ -1,6 +1,8 @@
 import type { PanelProps } from "../registry";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../../api/client";
+import { FollowupDraft } from "../../../organisms/FollowupDraft";
+import { IterateTasks } from "../../../organisms/IterateTasks";
 import { PlanDrafts } from "../../../organisms/PlanDrafts";
 import { Composer } from "../../../organisms/Composer";
 import { Timeline } from "../../../organisms/Timeline";
@@ -10,6 +12,8 @@ import { usePlanUsage } from "../../../sessions/usePlanUsage";
 import { useSessionTitles } from "../../../sessions/useSessionTitles";
 import { fetchAgentList, fetchModels, fetchSessions, sendTurn, startSession } from "../../../sessions/api";
 import { identityOf } from "../../../identity/agents";
+import { sendFollowup } from "../../../runs/api";
+import { extractFollowup, iterationPrompt } from "../../../sessions/iterate";
 import { launchPlan, type PlanDraftView } from "../../../sessions/plans";
 import { paletteCommands, usageAction } from "../../../sessions/commands";
 import { routedPrompt } from "../../../sessions/route";
@@ -34,7 +38,7 @@ const messageOf = (err: unknown): string => (err instanceof ApiError || err inst
  * its capabilities in `GET /api/agents`; nothing here looks at an agent's name. A turn never starts a run: only the
  * explicit "Send plan to the orchestrator" click does.
  */
-export function ClaudePanel({ agentId: panelAgent, selectRun, openPanel }: PanelProps) {
+export function ClaudePanel({ agentId: panelAgent, board, runId, live: runIsLive, selectRun, openPanel }: PanelProps) {
   const [picked, setPicked] = useState<string | undefined>();
   const [listed, setListed] = useState(false);
   const [agents, setAgents] = useState<AgentView[]>([]);
@@ -45,6 +49,9 @@ export function ClaudePanel({ agentId: panelAgent, selectRun, openPanel }: Panel
   const [models, setModels] = useState<Record<string, string[]>>({});
   const [routeOn, setRouteOn] = useState(false);
   const [draftsOpen, setDraftsOpen] = useState(true);
+  /** The delivered task the person is iterating on, and whether the list of tasks is open. */
+  const [iterating, setIterating] = useState<string | undefined>();
+  const [iterateOpen, setIterateOpen] = useState(false);
   /** Runs started from a draft since the last prompt: shown as a small line until the next prompt is sent. */
   const [launched, setLaunched] = useState<{ runId: string; path: string }[]>([]);
   const { titleOf, rename } = useSessionTitles();
@@ -178,6 +185,21 @@ export function ClaudePanel({ agentId: panelAgent, selectRun, openPanel }: Panel
     }
   };
 
+  // The delivered tasks of a real run can be iterated on: the same branch, the same Cursor chat, a new attempt.
+  const targets = useMemo(
+    () =>
+      runIsLive && runId !== undefined && board !== undefined
+        ? board.tasks.filter((t) => t.state === "delivered" && t.branch !== undefined).map((t) => ({ taskId: t.taskId, title: t.title, branch: t.branch, goal: t.goal, specs: t.specs }))
+        : [],
+    [board, runId, runIsLive],
+  );
+  const target = targets.find((t) => t.taskId === iterating);
+  const latestTurn = live.detail?.turns[live.detail.turns.length - 1];
+  // What Claude wrote for the chosen task in its last answer; nothing is sent before the person clicks.
+  const instruction = target !== undefined && latestTurn?.status === "passed" ? extractFollowup(latestTurn.resultText) : undefined;
+  /** What goes to the agent: a command as typed, the request with the chosen task's context, or the request routed to a plan. */
+  const prepare = (prompt: string): string => (prompt.startsWith("/") ? prompt : target !== undefined ? iterationPrompt(target, prompt) : routeOn ? routedPrompt(prompt) : prompt);
+
   const running = session?.status === "running";
   const cannotContinue = !isNew && agent !== undefined && !agent.capabilities.resume && session?.agentSessionId !== undefined;
   const tokens = live.detail
@@ -267,6 +289,49 @@ export function ClaudePanel({ agentId: panelAgent, selectRun, openPanel }: Panel
         </section>
         {usageView}
       </div>
+      {targets.length > 0 ? (
+        <div className="claude-panel__iterate">
+          <button type="button" className="claude-panel__drafts-toggle" aria-expanded={iterateOpen} aria-controls="claude-iterate" onClick={() => setIterateOpen((v) => !v)}>
+            <span>
+              Iterate on a task <span className="claude-panel__count">{targets.length}</span>
+            </span>
+            <span className="claude-panel__chevron" aria-hidden="true">
+              ▾
+            </span>
+          </button>
+          {iterateOpen ? (
+            <div id="claude-iterate">
+              <IterateTasks
+                tasks={targets}
+                selected={iterating}
+                onSelect={(id) => {
+                  setIterating(id);
+                  if (id !== undefined) setRouteOn(false);
+                }}
+              />
+            </div>
+          ) : null}
+          {target === undefined ? null : (
+            <p className="claude-panel__iterating">
+              Iterating on {target.taskId} · {target.branch}{" "}
+              <button type="button" className="claude-panel__link" onClick={() => setIterating(undefined)}>
+                Stop iterating
+              </button>
+            </p>
+          )}
+          {instruction === undefined || target === undefined || runId === undefined ? null : (
+            <FollowupDraft
+              key={`${latestTurn!.id}-${target.taskId}`}
+              taskId={target.taskId}
+              initial={instruction}
+              onSend={async (text) => {
+                await sendFollowup(runId, target.taskId, text);
+              }}
+              onOpenCursor={openPanel ? () => openPanel("cursor") : undefined}
+            />
+          )}
+        </div>
+      ) : null}
       {agent !== undefined && (isNew || session !== undefined) ? (
         cannotContinue ? (
           <p className="claude-panel__note">{agent.label} cannot continue this conversation here. Start a new session to keep working.</p>
@@ -278,7 +343,7 @@ export function ClaudePanel({ agentId: panelAgent, selectRun, openPanel }: Panel
             profile={profiles[agent.id] ?? {}}
             onProfileChange={(p) => setProfiles((all) => ({ ...all, [agent.id]: p }))}
             commands={commands}
-            onSubmit={(prompt) => submit(routeOn && !prompt.startsWith("/") ? routedPrompt(prompt) : prompt)}
+            onSubmit={(prompt) => submit(prepare(prompt))}
             routing={{ on: routeOn, onChange: setRouteOn }}
             onKnitCommand={onKnitCommand}
             busy={sending || running}
