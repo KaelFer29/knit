@@ -20,11 +20,12 @@ node dist/cli/index.js run plan.md --dry-run     # print the prompts, change not
 node dist/cli/index.js run plan.md               # run for real (local branches only)
 node dist/cli/index.js run plan.md --pr          # also push and open one PR per task
 node dist/cli/index.js resume <run-id>           # continue a run that stopped
+node dist/cli/index.js abort <run-id>            # stop a running run (SIGINT, then SIGKILL after 10 s)
 node dist/cli/index.js runs                      # list runs
 node dist/cli/index.js show <run-id>             # tasks, attempts, tokens, branches, PRs
 node dist/cli/index.js logs <run-id> --follow    # watch what the agent is doing, live
 node dist/cli/index.js clean <run-id>            # remove the run's worktrees
-node dist/cli/index.js ui [--port 4317]          # serve the web interface on 127.0.0.1 (read-only view of the runs)
+node dist/cli/index.js ui [--port 4317]          # serve the web interface on 127.0.0.1 (view of the runs; its API can start, abort and resume them)
 node dist/cli/index.js chat "Plan the board" --cwd ~/code/app    # one turn with Claude, recorded as a session
 node dist/cli/index.js chat "Split it in tasks" --session <id>   # next turn: Claude resumes the same conversation
 ```

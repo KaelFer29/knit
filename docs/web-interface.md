@@ -69,7 +69,7 @@ The port declares these as `AgentCapabilities` on each runner (`src/core/ports/a
 ```
 
 - `knit ui` is a separate, long-lived process. It **reads** the database through a read-only connection; only the processes it starts write. WAL lets it read while they write.
-- Runs stay one-shot processes. The server starts `knit run` or `knit resume` as detached children and aborts them by signalling their process group (pid recorded in `runs`), so a run survives the interface being closed.
+- Runs stay one-shot processes. The server starts `knit run` or `knit resume` as detached children (their own process group, so they survive the interface being closed) and stops a run by starting `knit abort <id>`, which signals the pid recorded in `runs` after checking that it really is that run. The server itself never signals anything.
 - A prompt from the interface becomes one `knit chat` process: it runs one agent turn, records the turn and its timeline, and exits. The server never writes the database itself.
 - Claude is driven through `claude -p --output-format stream-json --verbose --resume`, which uses the subscription. The Agent SDK is not used: its documentation expects API key authentication.
 - It binds to `127.0.0.1` only. Agent output contains file contents and paths, and the server can launch agents, so it is never served on the network.
@@ -163,6 +163,8 @@ knit ui [--port <n>] [--data-dir <dir>]
 | `--port <n>` | port to listen on, default `4317`; `0` picks a free one. A busy port stops with `Port <n> is already in use` and exit code 1; a malformed one is a usage error (exit code 2) |
 | `--data-dir <dir>` | where `knit.db` lives (default `~/.knit`, or `$KNIT_HOME`), like the other commands |
 
+Built-in run control (T8) starts the commands as children of the compiled CLI next to it, so it needs `pnpm build` first; from a source checkout without `dist/cli` the server is read-only (see [Run control](#run-control)).
+
 It prints one line, `http://127.0.0.1:<port>/?token=<token>`, and keeps running until `SIGINT` or `SIGTERM`, then closes its connections and exits with 0. It never opens a browser: open the address yourself. The host is not configurable. If `knit.db` does not exist yet, the server still starts (the runs list is empty) and opens the database, read-only, as soon as `knit run` creates it.
 
 ## Web app scaffold
@@ -207,7 +209,7 @@ The app asks for exactly these files and never commits them:
 
 ## HTTP API
 
-Built in task T3 (`src/server/`). Every route is a `GET` for now; the `POST` routes of the next tasks sit behind the same [security guard](#security).
+Built in tasks T3 (read routes) and T8 (run control, `src/server/routes/control.ts`). Every route sits behind the same [security guard](#security).
 
 | Route | Returns |
 | --- | --- |
@@ -217,7 +219,7 @@ Built in task T3 (`src/server/`). Every route is a `GET` for now; the `POST` rou
 | `GET /api/runs/:id/stream` | Server-Sent Events, see below |
 | `GET /*` | the built app from `dist/web` (or the directory the server was started with) |
 
-Errors are JSON, `{ "error": "<message>" }`, with the right status: `404` for an unknown run, task or API route, `400` for a malformed request (a non-numeric attempt, a bad `Last-Event-ID`, a malformed percent escape), `401` and `403` from the guard, `405` (with `Allow`) for a known path with another method, `500` when a handler fails. API responses carry `Cache-Control: no-store`.
+Errors are JSON, `{ "error": "<message>" }`, with the right status: `404` for an unknown run, task or API route, `400` for a malformed request (a non-numeric attempt, a bad `Last-Event-ID`, a malformed percent escape, an invalid body), `401` and `403` from the guard, `409` for a command the run's state does not allow, `413` and `415` for a body that is too large or not JSON, `405` (with `Allow`) for a known path with another method, `500` when a handler fails. API responses carry `Cache-Control: no-store`.
 
 ### Live stream
 
@@ -236,18 +238,30 @@ Errors are JSON, `{ "error": "<message>" }`, with the right status: `404` for an
 - **Cost.** Polling stops as soon as the client disconnects. A failed read (the database being migrated by another process) is retried on the next poll.
 - **Not in the stream.** `task` and `attempt` messages (rows without an increasing id) are not sent: the page derives them from the lifecycle events, or refetches `GET /api/runs/:id`.
 
-Commands (phase A; phase B adds sessions, turns and plan launch; phase D adds configuration). Not built yet:
+### Run control
 
-| Route | Does |
-| --- | --- |
-| `POST /api/runs` | start a plan (`knit run <plan>`) |
-| `POST /api/runs/:id/abort` | signal the run's process group |
-| `POST /api/runs/:id/resume` | `knit resume <id>` |
-| `POST /api/runs/:id/tasks/:task/retry` | resume from that failed task |
+Phase A commands. Phase B adds sessions, turns and plan launch; phase D adds configuration. Every one is a `POST` with `Content-Type: application/json` (`415` otherwise) and a body of at most 64 KB (`413`); an empty body counts as `{}`, anything that is not a JSON object is a `400`. The routes never write the database: each one starts a Knit command through the **spawner** that the composition root injects (`ServerOptions.control`: the data directory and a function that starts a child). Without it (a source checkout with no build, so no `dist/cli/index.js` to start) they answer `503` and the rest of the server is unaffected.
+
+| Route | Body | Does | Answers |
+| --- | --- | --- | --- |
+| `POST /api/runs` | `{ planPath, push?, pr?, maxAttempts? }` | `knit run <planPath> [--push] [--pr] [--max-attempts <n>]` | `202 { runId, pid, logPath }` |
+| `POST /api/runs/:id/abort` | none | `knit abort <id>` | `202 { runId, logPath }` |
+| `POST /api/runs/:id/resume` | none | `knit resume <id>` | `202 { runId, pid, logPath }` |
+| `POST /api/runs/:id/tasks/:task/retry` | none | `knit resume <id>`, which re-runs the failed task and then the ones that were skipped after it | `202 { runId, pid, logPath }` |
+
+Every child gets `--data-dir <the server's data directory>`, runs in its own process group (`detached`, `unref`), has stdin closed and appends stdout and stderr to `<data dir>/logs/_ui/<command>-<timestamp>-<random>.log` (`logPath` in the answer). Its environment is the server's, minus `KNIT_UI_TOKEN` and `KNIT_TOKEN`: the launch token is never put in an environment variable or an argument, and a child never receives it.
+
+**Start.** `planPath` must be an absolute path to a readable regular `.md` file of at most 1 MB that the core plan parser accepts; otherwise `400`, and for a plan that does not parse the body is `{ error, issues }` with **every** issue the parser found. Unknown fields, a non-boolean `push` or `pr`, and a `maxAttempts` that is not a whole number from 1 to 20 are `400`s. The child runs in the plan's directory (so a plan without `Repo:` resolves it from there). The run id is generated by the child, so the server waits (up to 10 s) until the reader shows a **new** run that is `running` with `pid` equal to the child's pid. If the child exits first the server looks once more (a trivial run can finish between two polls) and otherwise answers `502 { error, logPath }`; if nothing shows up in time it answers `504 { error, logPath }` and leaves the child alone. `502` is also the answer when the process cannot be started.
+
+**Abort.** `404` for an unknown run, `409` if it is not `running`. Otherwise `202` as soon as `knit abort` is started: the abort itself can take the whole grace period, so the page follows it through the stream (the run turns `failed` and a `run.aborted` event appears). What `knit abort` does, and what it refuses to do, is in [run-lifecycle.md](run-lifecycle.md#abort).
+
+**Resume and retry.** `404` for an unknown run (or task), `409` if the run is `running`; retry also needs the task to be `failed` (`409` otherwise). Both start `knit resume <id>` and wait, like start, until the run is `running` again with the child's pid before answering `202`; `502` and `504` as above. While one request waits, a second one for the same run is a `409` (two resumes of one run would be two writers).
+
+**Stale pids.** `runs.pid` is set while a run is `running` and cleared when it finishes or is aborted. A run killed with `SIGKILL`, or whose machine rebooted, keeps its stale pid and stays `running`. The interface shows it as running until someone runs `abort`, which notices that the process is gone, marks the run `failed` (`run.aborted`, reason `stale-pid`) and clears the pid; `resume` then works. Because pids are reused, `knit abort` signals a process only when its command line is a Knit `run`, or a `resume` of that same run id, and no other running run records the same pid; anything else is refused with nothing signalled.
 
 ### Adding routes
 
-A route module lives in `src/server/routes/<name>.ts` and exports a function from the server's dependencies to a list of `{ method, pattern, handler }` (patterns use `:name` segments, decoded for the handler; a handler throws `HttpError(status, message)` to answer an error). It is registered with one line in `src/server/routes/index.ts`. The guard runs before routing, so a new route, whatever its method, cannot skip it.
+A route module lives in `src/server/routes/<name>.ts` and exports a function from the server's dependencies (`ServerDeps`: the reader, timings and, when present, `control`) to a list of `{ method, pattern, handler }` (patterns use `:name` segments, decoded for the handler; a handler throws `HttpError(status, message)` to answer an error). It is registered with one line in `src/server/routes/index.ts`. The guard runs before routing, so a new route, whatever its method, cannot skip it.
 
 ## Visual model
 
@@ -291,6 +305,7 @@ Built in task T3 (`src/server/security.ts`, applied to every request before rout
 - **Static files.** The path is decoded and resolved inside the served directory; anything that leaves it (`..%2f`, an encoded NUL or backslash, a symlink pointing out) is a `400` or `403`, never a file.
 - **The token is never logged.** The only place it is written is the line that prints the launch URL.
 - The database connection is read-only; the server changes state only by starting Knit or agent processes.
+- **Run control is the dangerous part.** It starts agents that have no sandbox, so it relies on every check above: a cross-site page cannot get past the `Origin` check, and one that tried a simple form post is stopped by the JSON-only content type (`415`) before any command is started. The routes accept no executable, no agent command and no free-form argument: the command line is built by the server from a validated absolute plan path, two booleans and a bounded integer, or from a run id that must already exist in the database. Arguments are passed as an array, never through a shell. The server never signals a process itself; `knit abort` does, and only after verifying the target.
 - Agent output is untrusted. Render it as text; any Markdown rendering is sanitized. Never inject agent strings as HTML.
 
 ## Brand assets

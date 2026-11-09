@@ -1,5 +1,7 @@
 import type { AgentRunner } from "../core/ports/agent-runner.js";
+import type { ProcessControl } from "../core/ports/process-control.js";
 import type { PullRequests } from "../core/ports/pull-requests.js";
+import type { Spawner } from "../server/index.js";
 
 export interface CliIo {
   out: (text: string) => void;
@@ -20,6 +22,10 @@ export interface CliDeps {
    * only; `effort` and `permissionMode` are set by `chat` for Claude only. Plan runs always use Cursor.
    */
   agent?: (options: AgentOptions) => AgentRunner;
+  /** Process inspection and signalling used by `abort` and `ui` (override in tests). Default: the system adapter. */
+  processControl?: ProcessControl;
+  /** Starts `knit` child processes for the web interface's run control (override in tests). Default: detached children of this CLI. */
+  spawnKnit?: Spawner;
   /** Pull request adapter (override in tests). Default: GitHub CLI. */
   pullRequests?: PullRequests;
   /** Extra git args for every git call (tests disable hooks with this). */

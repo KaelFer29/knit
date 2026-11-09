@@ -262,7 +262,7 @@ describe("HTTP API", () => {
 
   it("answers 405 with Allow for a known path with another method", async () => {
     const server = await launch();
-    const res = await request(server, "/api/runs", { method: "POST", headers: { origin: `http://127.0.0.1:${server.port}` } });
+    const res = await request(server, "/api/runs/run-1", { method: "POST", headers: { origin: `http://127.0.0.1:${server.port}` } });
     expect(res.status).toBe(405);
     expect(res.headers.allow).toBe("GET");
   });
@@ -357,18 +357,18 @@ describe("security", () => {
     const server = await launch();
     const own = `http://127.0.0.1:${server.port}`;
     for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
-      const none = await request(server, "/api/runs", { method });
+      const none = await request(server, "/api/runs/run-1", { method });
       expect(none.status, `${method} without origin`).toBe(403);
       for (const origin of ["http://evil.example", `http://127.0.0.1:${server.port + 1}`, `https://127.0.0.1:${server.port}`, "null"]) {
-        const cross = await request(server, "/api/runs", { method, headers: { origin } });
+        const cross = await request(server, "/api/runs/run-1", { method, headers: { origin } });
         expect(cross.status, `${method} from ${origin}`).toBe(403);
       }
       // Same origin passes the guard and reaches routing (this route is GET-only).
-      const ok = await request(server, "/api/runs", { method, headers: { origin: own } });
+      const ok = await request(server, "/api/runs/run-1", { method, headers: { origin: own } });
       expect(ok.status, `${method} same origin`).toBe(405);
     }
     // A cross-origin request without a token is rejected for the token first.
-    const noToken = await request(server, "/api/runs", { method: "POST", auth: false, headers: { origin: "http://evil.example" } });
+    const noToken = await request(server, "/api/runs/run-1", { method: "POST", auth: false, headers: { origin: "http://evil.example" } });
     expect(noToken.status).toBe(401);
     // GET does not need an Origin.
     expect((await request(server, "/api/runs")).status).toBe(200);
