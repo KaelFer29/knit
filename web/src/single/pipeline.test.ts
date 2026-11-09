@@ -3,7 +3,7 @@ import { deliveredRun, failedRun, retryingRun, runningRun, verifyingRun } from "
 import { clipLine, deriveBlocks, deriveDetails, deriveHops, deriveStages, hopProgress, type SessionGlimpse } from "./pipeline";
 
 const hop = (hops: ReturnType<typeof deriveHops>, id: string) => hops.find((h) => h.id === id)!;
-const claudeBusy: SessionGlimpse = { status: "running", title: "Plan billing", lastPrompt: "Write the plan for webhooks", lines: ["Reading the repo"] };
+const claudeBusy: SessionGlimpse = { id: "s1", status: "running", title: "Plan billing", lastPrompt: "Write the plan for webhooks", lines: ["Reading the repo"] };
 
 describe("deriveHops", () => {
   it("is idle on all three hops with no board and no session", () => {
@@ -142,6 +142,7 @@ describe("deriveStages", () => {
 
 describe("deriveDetails", () => {
   const session: SessionGlimpse = {
+    id: "s1",
     status: "running",
     title: "Plan billing",
     lines: [],

@@ -28,6 +28,7 @@ export interface HopView {
 
 /** What the page knows about the latest Claude session. */
 export interface SessionGlimpse {
+  id: string;
   status: "idle" | "running";
   title: string;
   lastPrompt?: string;

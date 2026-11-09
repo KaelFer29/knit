@@ -26,6 +26,7 @@ describe("glimpseOf", () => {
     };
     const events: SessionEvent[] = [1, 2, 3].map((n) => ({ id: n, turnId: 1, ts: "t", kind: "message", payload: { text: `step ${n}` }, agent: "claude" }));
     const g = glimpseOf(detail, events);
+    expect(g.id).toBe(detail.session.id);
     expect(g).toMatchObject({ status: "running", title: "Plan", lastPrompt: "Write the plan" });
     expect(g.lines).toEqual(["step 1", "step 2", "step 3"]);
   });

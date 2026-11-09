@@ -13,6 +13,7 @@ import { runsHash, useRoute } from "../route";
 import { useRuns } from "../runs/useRuns";
 import { deriveBlocks, deriveDetails, deriveHops, deriveStages } from "../single/pipeline";
 import { PANELS, type PanelId } from "../single/panels/registry";
+import { useSessionTitles } from "../sessions/useSessionTitles";
 import { useWorkspace } from "../sessions/useWorkspace";
 import { useLatestSession } from "../single/useLatestSession";
 import { createRenderDetail } from "./detailRenderer";
@@ -42,7 +43,10 @@ export function SingleView({ search = window.location.search, actions }: Props) 
   const live = useBoard(runId);
   const board = runId === undefined ? (fixtureMode ? ALL_FIXTURES[params.fixture] : undefined) : live.board;
   const workspace = useWorkspace(!fixtureMode);
-  const session = useLatestSession(!fixtureMode || runId !== undefined);
+  const latest = useLatestSession(!fixtureMode || runId !== undefined);
+  const { titleOf } = useSessionTitles();
+  // The block shows the name the person gave the conversation, not the one Claude derived from its first prompt.
+  const session = useMemo(() => (latest === undefined ? undefined : { ...latest, title: titleOf(latest.id, latest.title) }), [latest, titleOf]);
   const detailSource = useMemo(() => {
     if (board === undefined) return undefined;
     if (runId === undefined) return fixtureDetailSource(board);

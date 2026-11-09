@@ -48,6 +48,7 @@ export function glimpseOf(detail: SessionDetail, events: SessionEvent[]): Sessio
   const finished = [...detail.turns].reverse().find((t) => t.inputTokens !== undefined);
   const agents = items.filter((i): i is Extract<TimelineItem, { type: "tool" }> => i.type === "tool" && !i.done && SUBAGENT_TOOLS.has(i.tool)).map(agentName);
   return {
+    id: detail.session.id,
     status: detail.session.status,
     title: detail.session.title,
     ...(lastPrompt === undefined ? {} : { lastPrompt: oneLine(lastPrompt) }),
