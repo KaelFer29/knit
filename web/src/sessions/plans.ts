@@ -12,6 +12,8 @@ export interface PlanTask {
   title: string;
   branch: string;
   dependsOn?: string;
+  /** The model the planner chose for Cursor on this task. */
+  model?: string;
 }
 
 export interface PlanDraftView {

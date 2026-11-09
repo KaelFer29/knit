@@ -46,7 +46,7 @@ function inspect(path: string, file: string, size: number): Omit<PlanDraft, "mod
       name: plan.name,
       valid: true,
       issues: [],
-      tasks: plan.tasks.map((t) => ({ id: t.id, title: t.title, branch: t.branch, ...(t.dependsOn ? { dependsOn: t.dependsOn } : {}) })),
+      tasks: plan.tasks.map((t) => ({ id: t.id, title: t.title, branch: t.branch, ...(t.dependsOn ? { dependsOn: t.dependsOn } : {}), ...(t.model ? { model: t.model } : {}) })),
     };
   } catch (err) {
     if (err instanceof PlanParseError) return { ...base, issues: err.issues };

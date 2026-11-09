@@ -14,7 +14,7 @@ export async function runCommand(args: string[], io: CliIo, deps: CliDeps, env: 
     io.out(`Dry run: plan '${plan.name}', repo ${plan.repo}\n`);
     if (plan.setup.length > 0) io.out(`Setup in every worktree: ${plan.setup.join(" && ")}\n`);
     for (const task of plan.tasks) {
-      io.out(`\n===== ${task.id}: ${task.title} (branch ${task.branch}${task.dependsOn ? `, from ${task.dependsOn}` : ""}) =====\n`);
+      io.out(`\n===== ${task.id}: ${task.title} (branch ${task.branch}${task.dependsOn ? `, from ${task.dependsOn}` : ""}${task.model ? `, model ${task.model}` : ""}) =====\n`);
       io.out(renderPrompt(task));
       io.out(`Checks: ${task.checks.length > 0 ? task.checks.join(" ; ") : "(none)"}\n`);
     }

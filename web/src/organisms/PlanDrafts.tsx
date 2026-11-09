@@ -56,6 +56,11 @@ export function PlanDrafts({ dir, plans, launching, error, onLaunch }: Props) {
                 {plan.tasks.map((task) => (
                   <li key={task.id}>
                     <span className="plan-draft__task-id">{task.id}</span> {task.title} <span className="plan-draft__branch">{task.branch}</span>
+                    {task.model === undefined ? null : (
+                      <span className="plan-draft__model" title={`Model Cursor will use for ${task.id}`}>
+                        {task.model}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ol>

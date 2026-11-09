@@ -73,6 +73,7 @@ interface Options {
 function harness(options: Options = {}) {
   const state: State = { changed: [], outside: [], inspection: {} };
   const prompts: string[] = [];
+  const requests: AgentRunRequest[] = [];
   const prepared: PrepareWorkspaceInput[] = [];
   const attached: string[] = [];
   const pushed: string[] = [];
@@ -93,6 +94,7 @@ function harness(options: Options = {}) {
     run: async (req, onEvent) => {
       order.push("agent");
       prompts.push(req.prompt);
+      requests.push(req);
       for (const e of options.agentEvents ?? []) onEvent?.(e);
       if (options.agentThrows) throw new Error("agent exploded");
       const override = options.agent?.(agentCalls++, req, state) ?? {};
@@ -174,7 +176,7 @@ function harness(options: Options = {}) {
     );
 
   return {
-    run, state, prompts, prepared, attached, pushed, created, checkCalls, order, attempts, events, tasks, runs, agentRecords, transcripts,
+    run, state, prompts, requests, prepared, attached, pushed, created, checkCalls, order, attempts, events, tasks, runs, agentRecords, transcripts,
     preflights: () => preflights,
   };
 }
@@ -229,6 +231,19 @@ describe("runPlan: core loop", () => {
       position: 2,
       specs: [{ id: "S1", text: "second spec" }],
     });
+  });
+
+  it("runs a task with the model its plan names, on every attempt, and the others with the agent's own default", async () => {
+    const md = PLAN_MD.replace("Branch: feat/first\n", "Branch: feat/first\nModel: composer-2.5\n");
+    const h = harness({
+      planMd: md,
+      agent: writes(["src/a.ts"], ["src/a.ts"], ["src/b.ts"]),
+      check: (command, call) => (command === "npm test" && call === 1 ? { exitCode: 1, output: "FAIL" } : {}),
+    });
+    await h.run();
+    expect(h.requests[0]!.profile).toEqual({ model: "composer-2.5" });
+    expect(h.requests[1]!.profile).toEqual({ model: "composer-2.5" });
+    expect(h.requests[2]!.profile).toBeUndefined();
   });
 
   it("never commits itself: the agent owns the commits", async () => {

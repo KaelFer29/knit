@@ -45,6 +45,12 @@ describe("FsPlanDrafts", () => {
     expect(draft!.tasks).toEqual([{ id: "T1", title: "Form", branch: "feat/form" }]);
   });
 
+  it("carries the model a task names, so the draft shows what Cursor will use", () => {
+    put("modeled.md", VALID.replace("Branch: feat/form\n", "Branch: feat/form\nModel: grok-4.7-high\n"));
+    const [draft] = new FsPlanDrafts().list(repo);
+    expect(draft!.tasks).toEqual([{ id: "T1", title: "Form", branch: "feat/form", model: "grok-4.7-high" }]);
+  });
+
   it("reports the issues of an invalid plan and keeps the file name as its name", () => {
     put("bad.md", "# Plan: Broken\n\n## T1: Only a title\n");
     const [draft] = new FsPlanDrafts().list(repo);

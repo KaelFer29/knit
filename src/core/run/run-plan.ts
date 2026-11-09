@@ -291,7 +291,7 @@ export async function runPlan(plan: ResolvedPlan, deps: RunDeps, options: RunOpt
         let result: AgentRunResult;
         try {
           result = await agent.run(
-            { cwd: ws.path, prompt: renderPrompt(task, retry), timeoutMs: agentTimeoutMs },
+            { cwd: ws.path, prompt: renderPrompt(task, retry), timeoutMs: agentTimeoutMs, ...(task.model ? { profile: { model: task.model } } : {}) },
             (e) => {
               transcript?.append(e);
               record(normalizer.push(e.raw));
