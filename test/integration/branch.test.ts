@@ -272,6 +272,43 @@ describe("knit branch pr-draft", () => {
     expect(await main(["branch", runId, "T1", "pr", "--template", "--title", "t", "--body", "b"], capture().io, deps())).toBe(2);
   });
 
+  describe("a description for a second pull request", () => {
+    const record = (runId: string, type: string, payload?: object): void => {
+      const store = new SqliteRunStore(join(dataDir, "knit.db"));
+      store.recordEvent({ runId, taskId: "T1", ts: "2026-11-09T12:00:00.000Z", type, ...(payload ? { payload } : {}) });
+      store.close();
+    };
+    const body = async (runId: string): Promise<string> => {
+      const c = capture();
+      expect(await main(["branch", runId, "T1", "pr-draft", "--template", "--json"], c.io, draftAgent("x").deps())).toBe(0);
+      return (JSON.parse(c.out().trim()) as { body: string }).body;
+    };
+
+    it("says what the follow-ups after the previous pull request asked for, and not what was asked before it", async () => {
+      const { runId } = await runPlan();
+      record(runId, "followup.started", { prompt: "an old correction, already in the first pull request" });
+      record(runId, "branch.pr_opened", { url: "https://example.test/pull/7", base: "main", head: "feat/create-a" });
+      record(runId, "followup.started", { prompt: "Make the heading a level 2 heading." });
+      record(runId, "followup.started", { prompt: "Keep the rest of the file." });
+      const text = await body(runId);
+      expect(text).toContain("## Correction\n- Make the heading a level 2 heading.\n- Keep the rest of the file.");
+      expect(text).not.toContain("an old correction");
+    });
+
+    it("says everything the follow-ups asked when no pull request was opened before, and nothing without follow-ups", async () => {
+      const { runId } = await runPlan();
+      expect(await body(runId)).not.toContain("## Correction");
+      record(runId, "followup.started", { prompt: "Tweak it." });
+      expect(await body(runId)).toContain("## Correction\n- Tweak it.");
+    });
+
+    it("skips a follow-up that recorded no prompt (older runs)", async () => {
+      const { runId } = await runPlan();
+      record(runId, "followup.started", { sessionId: "s", chatId: "c" });
+      expect(await body(runId)).not.toContain("## Correction");
+    });
+  });
+
   it("uses the model it is given instead of the default", async () => {
     const { runId } = await runPlan();
     const d = draftAgent("Title: T\n\nB");

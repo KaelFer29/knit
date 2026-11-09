@@ -25,6 +25,9 @@ export interface FollowupDeps {
   onAgentEvent?: (event: SessionEventRecord) => void;
 }
 
+/** How much of the instruction is kept with the event, so a pull request can say what the follow-up fixed. */
+const MAX_RECORDED_PROMPT = 4000;
+
 export interface FollowupInput {
   runId: string;
   /** The task as recorded by the run: its worktree, branch and start commit. */
@@ -104,7 +107,7 @@ export async function runFollowup(deps: FollowupDeps, input: FollowupInput): Pro
   const started = now().getTime();
 
   runs.upsertTask({ runId, taskId: task.taskId, title: task.title, status: "running" });
-  emit("followup.started", { sessionId: session.id, chatId: session.agentSessionId });
+  emit("followup.started", { sessionId: session.id, chatId: session.agentSessionId, prompt: input.prompt.slice(0, MAX_RECORDED_PROMPT) });
   // A follow-up always continues the chat of the task, so it always resumes.
   emit("attempt.started", { chat: "resumed" });
 

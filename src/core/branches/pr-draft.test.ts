@@ -56,6 +56,21 @@ describe("buildPrDraftPrompt", () => {
   });
 });
 
+describe("buildPrDraftPrompt with corrections", () => {
+  const base = { taskId: "T1", title: "Create prueba.md", specs: [], commits: [{ sha: "b1", subject: "docs: add" }], stat: "", patch: "", truncated: false };
+
+  it("tells the model it is a second pull request and what the follow-ups asked for", () => {
+    const text = buildPrDraftPrompt({ ...base, corrections: ["Make the heading level 2."] });
+    expect(text).toMatch(/second pull request/i);
+    expect(text).toContain("- Make the heading level 2.");
+  });
+
+  it("says nothing of the kind for a first pull request", () => {
+    expect(buildPrDraftPrompt(base)).not.toMatch(/second pull request/i);
+    expect(buildPrDraftPrompt({ ...base, corrections: [] })).not.toMatch(/second pull request/i);
+  });
+});
+
 describe("parsePrDraft", () => {
   it("reads the title from a Title: line and keeps the rest as the body", () => {
     expect(parsePrDraft("Title: Add prueba.md\n\n## Summary\n- adds the file\n", "T1")).toEqual({ title: "Add prueba.md", body: "## Summary\n- adds the file" });
@@ -127,4 +142,19 @@ describe("buildPrTemplate", () => {
   it("says when there are no file stats instead of printing an empty block", () => {
     expect(buildPrTemplate({ ...input, stat: "  " }).body).not.toContain("```");
   });
+
+  it("adds what the follow-ups after the previous pull request asked for, between the summary and the verification", () => {
+    const t = buildPrTemplate({ ...input, corrections: ["Change the heading to a level 2 heading.", "Keep the rest of the file."] });
+    expect(t.body).toContain("## Correction\n- Change the heading to a level 2 heading.\n- Keep the rest of the file.");
+    expect(t.body.indexOf("## Correction")).toBeGreaterThan(t.body.indexOf("## Specs"));
+    expect(t.body.indexOf("## Correction")).toBeLessThan(t.body.indexOf("## Verification"));
+  });
+
+  it("keeps a multi-line instruction as one item, and has no section without corrections", () => {
+    const t = buildPrTemplate({ ...input, corrections: ["First line.\nSecond line."] });
+    expect(t.body).toContain("- First line.\n  Second line.");
+    expect(buildPrTemplate({ ...input, corrections: [] }).body).not.toContain("## Correction");
+    expect(buildPrTemplate(input).body).not.toContain("## Correction");
+  });
 });
+

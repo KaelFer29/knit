@@ -209,6 +209,8 @@ describe("knit followup that passes", () => {
     expect(c.out()).toMatch(/new task/i);
     const events = readRun(runId).events.filter((e) => e.attempt === 2);
     expect(events.find((e) => e.type === "attempt.started")!.payload).toMatchObject({ chat: "resumed" });
+    // What was asked is kept with the event, so a pull request description can say what the follow-up fixed.
+    expect(readRun(runId).events.find((e) => e.type === "followup.started")!.payload).toMatchObject({ prompt: "please EDIT the file FULL" });
     expect(events.find((e) => e.type === "attempt.finished")!.payload).toMatchObject({ contextTokens: 160_000 });
   });
 

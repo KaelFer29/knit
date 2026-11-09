@@ -6,6 +6,7 @@ import { CursorAgentRunner } from "../../adapters/agents/cursor/cursor-runner.js
 import { isModelId } from "../../core/plan/parse-plan.js";
 import { GitBranchTools } from "../../adapters/vcs/git/git-branch-tools.js";
 import { GhPullRequests } from "../../adapters/vcs/github/gh-pull-requests.js";
+import { correctionsSince } from "../../core/branches/corrections.js";
 import { priorPrOf } from "../../core/branches/pr-info.js";
 import { isBranchName, type PriorPr } from "../../core/branches/pr-rules.js";
 import { buildPrDraftPrompt, buildPrTemplate, parsePrDraft } from "../../core/branches/pr-draft.js";
@@ -127,7 +128,7 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
 
     if (action === "undo") return undo({ io, json, store, runId, taskId, task, ref, mine, mode: mode!, yes: values.yes === true, now, tools });
     if (action === "checkout") return checkout({ io, json, store, runId, taskId, task, ref, mine, yes: values.yes === true, now, tools });
-    if (action === "pr-draft") return await prDraft({ io, json, task, ref, state: mine.state, tools, deps, model: values.model ?? PR_DRAFT_MODEL, template: values.template === true });
+    if (action === "pr-draft") return await prDraft({ io, json, task, ref, state: mine.state, tools, deps, model: values.model ?? PR_DRAFT_MODEL, template: values.template === true, corrections: correctionsSince(store.getEvents(runId), taskId) });
     const decision = mine.pr;
     if (!decision.ok) return fail(io, json, decision.reason);
 
@@ -233,6 +234,8 @@ interface DraftInput {
   model: string;
   /** Build the text from the task, without a model. */
   template: boolean;
+  /** What the follow-ups after the previous pull request asked for; empty for a first pull request. */
+  corrections: string[];
 }
 
 /** Has the cheap model write a title and a body from the task and its diff. It runs in an empty scratch directory: it only writes text. */
@@ -250,6 +253,7 @@ async function prDraft(i: DraftInput): Promise<number> {
     stat: diff.stat,
     patch: diff.patch,
     truncated: diff.truncated,
+    corrections: i.corrections,
   };
   if (i.template) {
     // No model, no tokens: the orchestrator already knows everything a description needs.
