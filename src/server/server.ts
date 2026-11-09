@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { FileTree } from "../core/ports/file-tree.js";
 import type { PlanDrafts } from "../core/ports/plan-drafts.js";
 import type { RunReader } from "../core/ports/run-reader.js";
+import type { BranchInspector } from "../core/ports/branch-tools.js";
 import type { TaskDiff } from "../core/ports/task-diff.js";
 import type { FileActivity } from "../core/ports/file-activity.js";
 import { BASE_HEADERS, HttpError, sendError } from "./http.js";
@@ -32,6 +33,8 @@ export interface ServerOptions {
   files?: FileTree;
   /** Reads what a task changed from its worktree. Without it the diff route answers 503. */
   taskDiff?: TaskDiff;
+  /** Reads the state of the branches the tasks created. Without it the branches route answers 503. */
+  branches?: BranchInspector;
   /** Draft plan detection. Without it the plans route answers 503. */
   plans?: PlanDrafts;
   /** Reads the files a task worktree has changed. Without it the activity route leaves the worktree list out. */
@@ -64,6 +67,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     ...(options.control ? { control: options.control } : {}),
     ...(options.files ? { files: options.files } : {}),
     ...(options.taskDiff ? { taskDiff: options.taskDiff } : {}),
+    ...(options.branches ? { branches: options.branches } : {}),
     ...(options.plans ? { plans: options.plans } : {}),
     ...(options.fileActivity ? { fileActivity: options.fileActivity } : {}),
   };

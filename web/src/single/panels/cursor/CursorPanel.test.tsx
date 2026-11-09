@@ -75,6 +75,25 @@ describe("CursorPanel", () => {
     expect(await screen.findByText(/has not changed any file yet/i)).toBeTruthy();
   });
 
+  it("has a Branches tab that says it needs a real run when it shows sample data", async () => {
+    const user = userEvent.setup();
+    render(<CursorPanel {...props(runningRun)} />);
+    await user.click(screen.getByRole("tab", { name: "Branches" }));
+    expect(screen.getByText(/only available for a real run/i)).toBeTruthy();
+  });
+
+  it("lists the branches of a real run in the Branches tab", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ runId: "run-9", runStatus: "passed", base: "main", branches: [] }), { status: 200 })),
+    );
+    render(<CursorPanel {...props(runningRun)} runId="run-9" live />);
+    await user.click(screen.getByRole("tab", { name: "Branches" }));
+    expect(await screen.findByText(/no branches yet/i)).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
   it("shows a waiting state with what Cursor will show, not an empty box, when there is no run", () => {
     render(<CursorPanel {...props(undefined)} />);
     const idle = screen.getByRole("region", { name: "Cursor is idle" });

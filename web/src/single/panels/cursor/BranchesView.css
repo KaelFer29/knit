@@ -1,0 +1,11 @@
+.branches {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.branches__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}

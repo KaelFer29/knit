@@ -1,0 +1,335 @@
+.branch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-sm);
+}
+
+.branch__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.branch__id {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.branch__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch__name {
+  margin: 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.branch__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.branch__chips > li {
+  padding: 0.1rem var(--space-2);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.branch__chips > li[data-tone="ok"] {
+  background: var(--status-delivered-soft);
+  color: var(--status-delivered);
+}
+
+.branch__chips > li[data-tone="warn"] {
+  background: var(--status-retrying-soft);
+  color: var(--status-retrying);
+}
+
+.branch__chips a {
+  color: inherit;
+}
+
+.branch__commits {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.branch__commits code {
+  color: var(--text-faint);
+}
+
+.branch__more {
+  list-style: none;
+  margin-left: calc(var(--space-4) * -1);
+  color: var(--text-faint);
+}
+
+.branch__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.branch__primary,
+.branch__danger,
+.branch__ghost,
+.branch__undo {
+  padding: 0.35rem var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-1);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.branch__primary {
+  border-color: var(--cursor-bg);
+  background: var(--cursor-bg);
+  color: var(--cursor-ink);
+  font-weight: 600;
+}
+
+.branch__danger {
+  border-color: var(--status-failed);
+  background: var(--status-failed);
+  color: #fff;
+  font-weight: 600;
+}
+
+.branch__primary:disabled,
+.branch__danger:disabled,
+.branch__ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.branch__primary:focus-visible,
+.branch__danger:focus-visible,
+.branch__ghost:focus-visible,
+.branch__undo:focus-visible,
+.branch__item:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.branch__undo:hover,
+.branch__ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.branch__menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 17rem;
+}
+
+.branch__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.branch__item:hover {
+  background: var(--surface-2);
+}
+
+.branch__item[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.branch__item-hint {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.branch__why {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.branch__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.branch__panel--danger {
+  border-color: color-mix(in srgb, var(--status-failed) 45%, var(--border));
+  background: color-mix(in srgb, var(--status-failed) 5%, var(--surface-1));
+}
+
+.branch__panel-title {
+  margin: 0;
+  font-weight: 650;
+}
+
+.branch__panel-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.branch__effects {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.branch__label {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.branch__field {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.branch__body {
+  font-family: var(--font-mono);
+  resize: vertical;
+}
+
+.branch__field:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.branch__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.branch__error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--status-failed-soft);
+  color: var(--status-failed);
+  font-size: var(--text-sm);
+}
+
+.branch__result {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--status-delivered-soft);
+  color: var(--status-delivered);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* While the model writes: a turning ring beside the text, and fields that wait. */
+.branch__writing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+.branch__spinner {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--cursor-bg);
+  border-radius: 50%;
+  animation: branch-spin 0.8s linear infinite;
+}
+
+.branch__field:disabled {
+  background: var(--surface-2);
+  color: var(--text-faint);
+  cursor: progress;
+}
+
+.branch__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.branch__link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.branch__link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@keyframes branch-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .branch__spinner {
+    animation: none;
+    border-top-color: var(--border-strong);
+    border-right-color: var(--cursor-bg);
+  }
+}

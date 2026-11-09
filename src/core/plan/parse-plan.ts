@@ -57,6 +57,11 @@ const PLAN_HEADING = /^#\s+Plan:\s*(.*)$/;
 const SPEC_ITEM = /^-\s+(S\d+):\s*(.*)$/;
 /** The ids the Cursor CLI lists (`auto`, `composer-2.5`, `grok-4.7-high`): letters, digits and `. _ : / -`, never starting like a flag. */
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$/;
+
+/** Whether `value` is a model id the agent CLIs take: one token, never starting like a flag. */
+export function isModelId(value: string): boolean {
+  return MODEL_ID.test(value);
+}
 const BRANCH_NAME = /^(feat|fix|refactor|docs|chore|test)\/[a-z0-9][a-z0-9._-]*$/;
 
 function stripBackticks(value: string): string {
