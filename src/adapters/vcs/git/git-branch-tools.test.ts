@@ -256,3 +256,29 @@ describe("GitBranchTools.push", () => {
     expect(() => tools.push(ref)).toThrow(/origin/i);
   });
 });
+
+describe("GitBranchTools.remoteBranches", () => {
+  it("lists the branches origin has right now, sorted, asking the remote and not the local tracking refs", () => {
+    const bare = join(scratch, "origin.git");
+    git(scratch, "init", "-q", "--bare", bare);
+    git(repo, "remote", "add", "origin", bare);
+    git(repo, "push", "-q", "origin", "HEAD:refs/heads/main");
+    git(repo, "push", "-q", "origin", "HEAD:refs/heads/release/1.2");
+    expect(tools.remoteBranches(repo)).toEqual(["main", "release/1.2"]);
+    // A branch pushed by someone else, and one deleted, with no fetch in this clone: the list still follows the remote.
+    git(bare, "update-ref", "refs/heads/docs/new", git(bare, "rev-parse", "main"));
+    git(bare, "update-ref", "-d", "refs/heads/release/1.2");
+    expect(tools.remoteBranches(repo)).toEqual(["docs/new", "main"]);
+  });
+
+  it("is empty for a remote without branches", () => {
+    const bare = join(scratch, "origin.git");
+    git(scratch, "init", "-q", "--bare", bare);
+    git(repo, "remote", "add", "origin", bare);
+    expect(tools.remoteBranches(repo)).toEqual([]);
+  });
+
+  it("says so when there is no origin or it cannot be reached", () => {
+    expect(() => tools.remoteBranches(repo)).toThrow(/origin/i);
+  });
+});

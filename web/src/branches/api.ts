@@ -5,6 +5,9 @@ const base = (runId: string, taskId: string): string => `/api/runs/${encodeURICo
 
 export const fetchBranches = (runId: string): Promise<BranchListing> => apiGet<BranchListing>(`/api/runs/${encodeURIComponent(runId)}/branches`);
 
+/** The branches `origin` has right now: the ones a pull request can go into. */
+export const fetchRemoteBranches = async (runId: string): Promise<string[]> => (await apiGet<{ branches: string[] }>(`/api/runs/${encodeURIComponent(runId)}/remote-branches`)).branches;
+
 /** Undoes what a task did on its branch. `confirm` is always true: the server refuses an undo that was not asked for explicitly. */
 export const undoBranch = (runId: string, taskId: string, mode: UndoMode): Promise<UndoResult> => apiPost<UndoResult>(`${base(runId, taskId)}/undo`, { mode, confirm: true });
 

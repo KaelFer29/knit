@@ -44,6 +44,8 @@ export interface BranchInspector {
   state(ref: BranchRef): BranchState;
   /** What the branch changed since the start; empty for a branch that does not exist. */
   diff(ref: BranchRef, maxBytes: number): BranchDiff;
+  /** The branches `origin` has right now, sorted (asks the remote, so it is never stale). Throws without an origin or when it cannot be reached. */
+  remoteBranches(repo: string): string[];
 }
 
 export interface BranchEditor {

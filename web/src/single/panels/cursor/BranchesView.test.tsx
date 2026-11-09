@@ -27,6 +27,7 @@ interface Call {
 let calls: Call[];
 let listing: { branches: unknown[] };
 let replies: Record<string, { status: number; body: unknown }>;
+let remote: string[];
 
 beforeEach(() => {
   window.sessionStorage.clear();
@@ -34,12 +35,17 @@ beforeEach(() => {
   calls = [];
   listing = { branches: [branch()] };
   replies = {};
+  remote = ["docs/one", "docs/two", "main"];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string, init?: { method?: string; body?: string }) => {
       const url = String(input);
       const method = init?.method ?? "GET";
       calls.push({ method, url, ...(init?.body ? { body: JSON.parse(init.body) } : {}) });
+      if (method === "GET" && url.endsWith("/remote-branches")) {
+        const refused = replies["GET remote-branches"];
+        return new Response(JSON.stringify(refused ? refused.body : { branches: remote }), { status: refused?.status ?? 200 });
+      }
       const forced = replies[`${method} ${url.replace(/^\/api\/runs\/run-1\/tasks\/T1\//, "")}`];
       const body = forced ? forced.body : url.endsWith("/branches") ? { runId: "run-1", runStatus: "passed", base: "main", ...listing } : {};
       return new Response(JSON.stringify(body), { status: forced?.status ?? 200 });
@@ -149,42 +155,60 @@ describe("BranchesView", () => {
   });
 
   describe("where the pull request goes", () => {
-    it("proposes the recommended branch, suggests the others and says so in what it will do", async () => {
-      const user = userEvent.setup();
-      show();
+    const open = async (user: ReturnType<typeof userEvent.setup>) => {
       await user.click(await screen.findByRole("button", { name: "Open pull request" }));
       const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
-      const into = within(form).getByRole("combobox", { name: "Into branch" }) as HTMLInputElement;
-      expect(into.value).toBe("main");
-      expect(within(form).getByText("Recommended: main")).toBeTruthy();
-      expect(Array.from(form.querySelectorAll("datalist option")).map((o) => o.getAttribute("value"))).toEqual(["main", "docs/two"]);
-      await user.clear(into);
-      await user.type(into, "docs/two");
+      return form;
+    };
+    const into = (form: HTMLElement) => within(form).getByRole("combobox", { name: "Into branch" }) as HTMLSelectElement;
+    const optionsOf = (select: HTMLSelectElement) => Array.from(select.options).map((o) => o.textContent);
+
+    it("lists the branches origin has in a dropdown, the recommended one first and chosen, and never the branch itself", async () => {
+      remote = ["docs/one", "docs/two", "main", "release/1.2"];
+      const user = userEvent.setup();
+      show();
+      const form = await open(user);
+      await waitFor(() => expect(optionsOf(into(form))).toEqual(["main (recommended)", "docs/two", "release/1.2"]));
+      expect(into(form).value).toBe("main");
+      expect(calls.some((c) => c.method === "GET" && c.url === "/api/runs/run-1/remote-branches")).toBe(true);
+      await user.selectOptions(into(form), "docs/two");
       expect(within(form).getByText("Opens a pull request from docs/one into docs/two.")).toBeTruthy();
     });
 
     it("sends the branch only when it was changed, and keeps the old request when it was not", async () => {
       const user = userEvent.setup();
       replies["POST pr"] = { status: 200, body: { ok: true, url: "https://example.test/pull/7", base: "docs/two", head: "docs/one" } };
-      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Add prueba.md", body: "- adds it", model: "composer-2.5-fast" } };
+      replies["POST pr-draft"] = { status: 200, body: { ok: true, title: "Add prueba.md", body: "- adds it", model: "template" } };
       show();
-      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
-      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
+      const form = await open(user);
       await within(form).findByDisplayValue("- adds it");
-      const into = within(form).getByRole("combobox", { name: "Into branch" });
-      await user.clear(into);
-      await user.type(into, "docs/two");
+      await waitFor(() => expect(into(form).options.length).toBeGreaterThan(1));
+      await user.selectOptions(into(form), "docs/two");
       await user.click(within(form).getByRole("button", { name: "Push and open pull request" }));
       await waitFor(() => expect(posts().find((c) => c.url.endsWith("/pr"))?.body).toEqual({ title: "Add prueba.md", body: "- adds it", base: "docs/two" }));
     });
 
-    it("cannot be sent with the branch field empty", async () => {
+    it("asks to choose when the recommended branch is not on origin, and cannot be sent until one is chosen", async () => {
+      remote = ["docs/one", "release/1.2"];
       const user = userEvent.setup();
       show();
-      await user.click(await screen.findByRole("button", { name: "Open pull request" }));
-      const form = await screen.findByRole("form", { name: /pull request for docs\/one/i });
-      await user.clear(within(form).getByRole("combobox", { name: "Into branch" }));
+      const form = await open(user);
+      await waitFor(() => expect(within(form).getByText(/main is not on origin/)).toBeTruthy());
+      expect(into(form).value).toBe("");
+      expect(optionsOf(into(form))).toEqual(["Choose a branch…", "release/1.2"]);
       expect((within(form).getByRole("button", { name: "Push and open pull request" }) as HTMLButtonElement).disabled).toBe(true);
+      await user.selectOptions(into(form), "release/1.2");
+      await waitFor(() => expect((within(form).getByRole("button", { name: "Push and open pull request" }) as HTMLButtonElement).disabled).toBe(false));
+    });
+
+    it("falls back to the suggested branches and says so when origin cannot be asked", async () => {
+      replies["GET remote-branches"] = { status: 502, body: { error: "Could not ask origin which branches it has: no network" } };
+      const user = userEvent.setup();
+      show();
+      const form = await open(user);
+      await waitFor(() => expect(within(form).getByText(/no network/)).toBeTruthy());
+      expect(optionsOf(into(form))).toEqual(["main (recommended)", "docs/two"]);
+      expect(into(form).value).toBe("main");
     });
   });
 

@@ -224,6 +224,28 @@ describe("POST /api/runs/:id/tasks/:task/pr-draft and /pr", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("lists the branches origin has, for choosing where a pull request goes", async () => {
+    seed();
+    const bare = join(scratch, "origin.git");
+    git(scratch, "init", "-q", "--bare", bare);
+    git(repo, "remote", "add", "origin", bare);
+    git(repo, "push", "-q", "origin", "main", "docs/one");
+    const server = await launch();
+    const reply = await request(server, "GET", `/api/runs/${RUN}/remote-branches`);
+    expect(reply.status).toBe(200);
+    expect(reply.json()).toEqual({ branches: ["docs/one", "main"] });
+    expect((await request(server, "GET", `/api/runs/${RUN}/remote-branches`, {}, false)).status).toBe(401);
+    expect((await request(server, "GET", "/api/runs/nope/remote-branches")).status).toBe(404);
+    expect((await request(await launch({ branches: false }), "GET", `/api/runs/${RUN}/remote-branches`)).status).toBe(503);
+  });
+
+  it("explains why the branches of origin cannot be listed when there is no origin", async () => {
+    seed();
+    const reply = await request(await launch(), "GET", `/api/runs/${RUN}/remote-branches`);
+    expect(reply.status).toBe(502);
+    expect(reply.json().error).toMatch(/origin/i);
+  });
+
   it("asks for the description built from the task, with no model, when template is true, and refuses anything else", async () => {
     seed();
     answer = { json: { ok: true, title: "Create prueba.md", body: "## Summary", model: "template" } };

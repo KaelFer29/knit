@@ -95,6 +95,20 @@ export class GitBranchTools implements BranchInspector, BranchEditor {
     return { stat, patch: bytes.subarray(0, maxBytes).toString("utf8").replace(/\uFFFD+$/, ""), truncated: true };
   }
 
+  remoteBranches(repo: string): string[] {
+    if (!this.ok(repo, ["remote", "get-url", "origin"])) throw new Error("The repository has no 'origin' remote");
+    try {
+      const out = execFileSync("git", [...this.gitArgs, "ls-remote", "--heads", "origin"], { cwd: repo, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 16 * 1024 * 1024 });
+      return out
+        .split("\n")
+        .map((line) => /\trefs\/heads\/(.+)$/.exec(line)?.[1])
+        .filter((name): name is string => name !== undefined)
+        .sort();
+    } catch (err) {
+      throw new Error(`Could not ask origin which branches it has: ${String((err as { stderr?: Buffer | string }).stderr ?? "").trim() || "git ls-remote failed"}`);
+    }
+  }
+
   onOrigin(repo: string, branch: string): boolean {
     try {
       execFileSync("git", [...this.gitArgs, "ls-remote", "--exit-code", "--heads", "origin", `refs/heads/${branch}`], { cwd: repo, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });

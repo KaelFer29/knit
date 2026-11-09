@@ -8,6 +8,8 @@ import { Popover } from "../molecules/Popover";
 import "./BranchCard.css";
 
 export interface BranchActions {
+  /** The branches origin has now, asked each time the pull request form opens. */
+  remote: () => Promise<string[]>;
   undo: (taskId: string, mode: UndoMode) => Promise<UndoResult>;
   draft: (taskId: string, how: "template" | "model") => Promise<PrDraft>;
   open: (taskId: string, title: string, body: string, into?: string) => Promise<PrResult>;
@@ -56,6 +58,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
   const [panel, setPanel] = useState<Panel>();
   /** The branch typed in the form; undefined until the person edits it, so the recommended one stays the default. */
   const [into, setInto] = useState<string>();
+  const [remote, setRemote] = useState<{ state: "loading" } | { state: "ready"; names: string[] } | { state: "failed"; message: string }>({ state: "loading" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [result, setResult] = useState<{ text: string; url?: string }>();
@@ -105,6 +108,11 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
     setResult(undefined);
     setError(undefined);
     setInto(undefined);
+    setRemote({ state: "loading" });
+    actions.remote().then(
+      (names) => setRemote({ state: "ready", names }),
+      (err: unknown) => setRemote({ state: "failed", message: messageOf(err) }),
+    );
     setPanel({ kind: "pr" });
     const saved = loadDraft(key);
     if (saved) setDraft({ state: "ready", title: saved.title, body: saved.body, model: saved.model, saved: true });
@@ -137,7 +145,11 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
   const { state } = b;
   const prReason = b.pr.ok ? undefined : b.pr.reason;
   const recommended = b.pr.ok ? b.pr.base : "";
-  const baseValue = into ?? recommended;
+  const head = b.pr.ok ? b.pr.head : b.branch;
+  // Where a pull request can go: what origin has right now (GitHub needs the base there); the suggestions when origin cannot be asked.
+  const candidates = remote.state === "ready" ? remote.names.filter((n) => n !== head) : remote.state === "failed" ? (b.pr.ok ? b.pr.options : []) : [];
+  const recommendedThere = candidates.includes(recommended);
+  const baseValue = into ?? (recommendedThere ? recommended : "");
   const intoId = useId();
 
   return (
@@ -299,13 +311,24 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
               <label className="branch__label" htmlFor={intoId}>
                 Into branch
               </label>
-              <input id={intoId} className="branch__field" list={`${intoId}-options`} value={baseValue} maxLength={200} spellCheck={false} disabled={busy} onChange={(e) => setInto(e.target.value)} />
-              <datalist id={`${intoId}-options`}>
-                {b.pr.options.map((o) => (
-                  <option key={o} value={o} />
-                ))}
-              </datalist>
-              <p className="branch__panel-note">Recommended: {recommended}</p>
+              <select id={intoId} className="branch__field" value={baseValue} disabled={busy || remote.state === "loading"} onChange={(e) => setInto(e.target.value)}>
+                {remote.state === "loading" ? <option value="">Reading the branches of origin…</option> : null}
+                {remote.state !== "loading" && !recommendedThere ? (
+                  <option value="" disabled>
+                    Choose a branch…
+                  </option>
+                ) : null}
+                {recommendedThere ? <option value={recommended}>{recommended} (recommended)</option> : null}
+                {candidates
+                  .filter((n) => n !== recommended)
+                  .map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+              </select>
+              {remote.state === "failed" ? <p className="branch__panel-note">Could not read the branches of origin: {remote.message}</p> : null}
+              {remote.state === "ready" && !recommendedThere ? <p className="branch__panel-note">The recommended branch {recommended} is not on origin. Choose where to open the pull request.</p> : null}
               <ul className="branch__effects">
                 <li>{b.pr.effects[0]}</li>
                 <li>{`Opens a pull request from ${b.pr.head} into ${baseValue.trim() === "" ? "…" : baseValue.trim()}.`}</li>

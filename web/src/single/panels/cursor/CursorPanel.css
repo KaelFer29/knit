@@ -82,7 +82,26 @@
   flex: 1 1 8rem;
   min-width: 0;
   overflow-wrap: anywhere;
-  font-weight: 600;
+  font-size: var(--text-md);
+  font-weight: 650;
+}
+
+/*
+ * An opened task reads as part of its row: the detail hangs from the title by a guide line, tight under it, and its
+ * text (12px) is clearly smaller than the title (15px).
+ */
+.cursor-panel__others .disclosure__trigger[aria-expanded="true"] {
+  padding-bottom: var(--space-1);
+}
+
+.cursor-panel__others .disclosure__body {
+  margin-left: var(--space-2);
+  padding: 0 0 var(--space-3) var(--space-4);
+  border-left: 1px solid var(--border-strong);
+}
+
+.cursor-panel__primary .task-detail {
+  margin-top: var(--space-1);
 }
 
 /* Where Cursor is, and the numbers of the run. */

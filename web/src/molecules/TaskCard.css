@@ -22,6 +22,10 @@
   cursor: pointer;
 }
 
+.task-card__trigger[aria-expanded="true"] {
+  padding-bottom: var(--space-1);
+}
+
 .task-card__trigger:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;

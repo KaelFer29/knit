@@ -242,7 +242,7 @@
 
 /* Text hierarchy of an opened task: its title (13px, bold) > its goal and the attempts (12px) > labels and facts. */
 .task-detail__goal {
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--space-1);
   font-size: var(--text-xs);
   line-height: 1.5;
   color: var(--text-muted);

@@ -107,6 +107,19 @@ export const branchesRoutes: RouteModule = ({ reader, branches, control: control
       },
     },
     {
+      method: "GET",
+      pattern: "/api/runs/:id/remote-branches",
+      handler: ({ res, params }) => {
+        const snapshot = requireSnapshot(reader, params.id!);
+        if (!branches) throw new HttpError(503, "Branch information is not available on this server");
+        try {
+          sendJson(res, 200, { branches: branches.remoteBranches(snapshot.run.repo) });
+        } catch (err) {
+          throw new HttpError(502, err instanceof Error ? err.message : String(err));
+        }
+      },
+    },
+    {
       method: "POST",
       pattern: "/api/runs/:id/tasks/:task/undo",
       handler: async ({ req, res, params }) => {
