@@ -55,7 +55,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-const show = () => render(<BranchesView runId="run-1" pollMs={60_000} />);
+const show = (flashMs?: number) => render(<BranchesView runId="run-1" pollMs={60_000} {...(flashMs === undefined ? {} : { flashMs })} />);
 const posts = (): Call[] => calls.filter((c) => c.method === "POST");
 
 describe("BranchesView", () => {
@@ -89,15 +89,31 @@ describe("BranchesView", () => {
       expect(posts()).toEqual([]);
     });
 
-    it("sends the confirmation, says where the repository is now, and reads the branches again", async () => {
+    it("sends the confirmation and reads the branches again", async () => {
       const user = userEvent.setup();
       replies["POST checkout"] = { status: 200, body: { ok: true, dryRun: false, branch: "docs/one", effects: [], freedWorktree: true } };
       show();
       const dialog = await open(user);
       await user.click(within(dialog).getByRole("button", { name: "Switch my repository" }));
       await waitFor(() => expect(posts()).toEqual([{ method: "POST", url: "/api/runs/run-1/tasks/T1/checkout", body: { confirm: true } }]));
-      expect((await screen.findByRole("status")).textContent).toMatch(/Your repository is now on docs\/one/);
       await waitFor(() => expect(calls.filter((c) => c.url.endsWith("/branches")).length).toBeGreaterThan(1));
+    });
+
+    it("says it was done with a notice at the right end of the state tags, not a banner, and the notice goes away by itself", async () => {
+      const user = userEvent.setup();
+      replies["POST checkout"] = { status: 200, body: { ok: true, dryRun: false, branch: "docs/one", effects: [], freedWorktree: true } };
+      show(400);
+      const dialog = await open(user);
+      await user.click(within(dialog).getByRole("button", { name: "Switch my repository" }));
+      const tags = within(screen.getByRole("list", { name: "State of the branch" }));
+      const notice = await tags.findByRole("status");
+      expect(notice.textContent).toMatch(/Repository switched/);
+      // The last tag, so it sits at the far right of the row.
+      const items = tags.getAllByRole("listitem");
+      expect(items.at(-1)!.contains(notice)).toBe(true);
+      // No banner of its own.
+      expect(screen.queryByText(/Your repository is now on/)).toBeNull();
+      await waitFor(() => expect(tags.queryByRole("status")).toBeNull(), { timeout: 2000 });
     });
 
     it("shows why it was refused and keeps the confirmation open", async () => {

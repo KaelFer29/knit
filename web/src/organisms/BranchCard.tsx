@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { ApiError } from "../api/client";
 import { Chevron } from "../atoms/Chevron";
 import { StatusBadge } from "../atoms/StatusBadge";
@@ -54,8 +54,18 @@ type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | { kind: "checko
  * exactly what it will do; a pull request is drafted by a cheap model and edited before anything is pushed. The card
  * only renders and holds the state of its own forms; the actions come from the container.
  */
-export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen = false }: { runId: string; branch: BranchView; actions: BranchActions; onChanged: () => void; defaultOpen?: boolean }) {
+/** How long the notice of a finished checkout stays in the tag row. */
+export const FLASH_MS = 3000;
+
+export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen = false, flashMs = FLASH_MS }: { runId: string; branch: BranchView; actions: BranchActions; onChanged: () => void; defaultOpen?: boolean; flashMs?: number }) {
   const [open, setOpen] = useState(defaultOpen);
+  /** A short notice at the end of the state tags; it goes away by itself. */
+  const [flash, setFlash] = useState<{ text: string; key: number }>();
+  useEffect(() => {
+    if (flash === undefined) return;
+    const timer = window.setTimeout(() => setFlash(undefined), flashMs);
+    return () => window.clearTimeout(timer);
+  }, [flash, flashMs]);
   const sectionId = useId();
   const [panel, setPanel] = useState<Panel>();
   /** The branch typed in the form; undefined until the person edits it, so the recommended one stays the default. */
@@ -95,7 +105,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
     try {
       await actions.checkout(b.taskId);
       setPanel(undefined);
-      setResult({ text: `Your repository is now on ${b.branch}.` });
+      setFlash({ text: "Repository switched", key: Date.now() });
       onChanged();
     } catch (err) {
       setError(messageOf(err));
@@ -196,7 +206,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
       </button>
       {open ? (
         <div className="branch__body-wrap" id={sectionId}>
-      <ul className="branch__chips" aria-label="State of the branch">
+      <ul className="branch__chips" aria-label="State of the branch" style={{ "--flash-ms": `${flashMs}ms` } as React.CSSProperties}>
         <li>{plural(state.ahead.length, "commit")}</li>
         <li data-tone={state.pushed ? "ok" : undefined}>{state.pushed ? "On origin" : "Local only"}</li>
         <li>{state.hasWorktree ? "Has a worktree" : "No worktree"}</li>
@@ -209,6 +219,16 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
             </a>
           </li>
         ) : null}
+              {flash === undefined ? null : (
+          <li key={flash.key} className="branch__flash" data-tone="ok">
+            <span role="status">
+              <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <path d="m3.5 8.5 3 3 6-7" />
+              </svg>{" "}
+              {flash.text}
+            </span>
+          </li>
+        )}
       </ul>
       {state.ahead.length > 0 ? (
         <ol className="branch__commits" aria-label="Commits of the task">

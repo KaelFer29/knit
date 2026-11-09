@@ -15,7 +15,7 @@ const searchable = (b: BranchView): string[] => [b.taskId, b.title, b.branch];
  * The branches Cursor created for a run: what each holds and what can be done with it (undo it, or open its pull
  * request). Container: it reads the branches, runs the actions and reads again after each one.
  */
-export function BranchesView({ runId, pollMs }: { runId: string; pollMs?: number }) {
+export function BranchesView({ runId, pollMs, flashMs }: { runId: string; pollMs?: number; flashMs?: number }) {
   const { listing, error, reload } = useBranches(runId, pollMs);
   const actions = useMemo<BranchActions>(
     () => ({
@@ -50,7 +50,7 @@ export function BranchesView({ runId, pollMs }: { runId: string; pollMs?: number
       {listing.branches.length > 1 ? <ListToolbar label="Search branches" query={list.query} onQuery={list.setQuery} summary={list.narrowed ? `${list.matching} of ${listing.branches.length} branches` : undefined} /> : null}
       {list.view.total === 0 ? <p className="detail-note">No branch matches this search.</p> : null}
       {list.view.items.map((b) => (
-        <BranchCard key={b.taskId} runId={runId} branch={b} actions={actions} onChanged={reload} defaultOpen={listing.branches.length === 1} />
+        <BranchCard key={b.taskId} runId={runId} branch={b} actions={actions} onChanged={reload} defaultOpen={listing.branches.length === 1} {...(flashMs === undefined ? {} : { flashMs })} />
       ))}
       <Pager page={list.view} onPage={list.setPage} noun="branches" />
     </div>
