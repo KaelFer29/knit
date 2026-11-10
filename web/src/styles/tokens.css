@@ -59,7 +59,7 @@
   --claude-line: #e6e6e3;
   /* Claude's orange, in three steps: a strong fill for what is chosen, a dark one for text on white (about 6:1), and a
      pale tint and line for the soft backgrounds. The brand terracotta stays the identity colour; these are the modal's. */
-  --claude-orange: #e0592a;
+  --claude-orange: #d04e21;
   --claude-orange-ink: #a8401a;
   --claude-orange-tint: #fff2ec;
   --claude-orange-line: #f2b7a0;

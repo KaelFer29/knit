@@ -56,21 +56,33 @@
   line-height: 1.45;
 }
 
+/* Yours: a solid orange bubble with white text (about 4.9:1). Claude's: white, with an orange rule on its edge. */
 .claude-panel .tl-entry--prompt {
   align-self: flex-end;
-  border: 1px solid var(--claude-line);
+  border: 0;
   border-bottom-right-radius: 4px;
-  background: var(--claude-paper);
-  box-shadow: 0 1px 1px rgb(20 20 15 / 5%);
+  background: var(--claude-orange);
+  color: #fff;
+  box-shadow: 0 2px 6px rgb(208 78 33 / 25%);
+}
+
+.claude-panel .tl-entry--prompt .tl-entry__time {
+  color: rgb(255 255 255 / 75%);
 }
 
 .claude-panel .tl-entry--message,
 .claude-panel .tl-entry--result {
   align-self: flex-start;
-  border: 1px solid var(--claude-line);
+  border: 1px solid var(--claude-orange-line);
+  border-left: 3px solid var(--claude-orange);
   border-bottom-left-radius: 4px;
   background: var(--claude-paper);
-  box-shadow: 0 1px 1px rgb(20 20 15 / 5%);
+  box-shadow: 0 1px 2px rgb(20 20 15 / 5%);
+}
+
+/* Claude's modal is taller than the others: the conversation is the work, so it gets the room. */
+.modal__dialog[data-agent="claude"] {
+  height: min(60rem, 100%);
 }
 
 .claude-panel .tl-entry__time {
