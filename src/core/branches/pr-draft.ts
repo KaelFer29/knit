@@ -34,6 +34,8 @@ export interface PrDraftInput {
   patch: string;
   /** The patch was cut to fit. */
   truncated: boolean;
+  /** What the follow-ups after the previous pull request asked for, oldest first; empty for a first pull request. */
+  corrections?: string[];
 }
 
 /** What the cheap model is asked: write the title and body of the pull request, as text only. */
@@ -48,6 +50,7 @@ export function buildPrDraftPrompt(input: PrDraftInput): string {
     ...(input.goal ? [`Goal: ${input.goal}`] : []),
     ...(input.specs.length > 0 ? ["Specs:", ...input.specs.map((s) => `- ${s.id}: ${s.text}`)] : []),
     "",
+    ...((input.corrections ?? []).length > 0 ? ["This is a second pull request for the same task: the first one was merged. The change below includes what these follow-ups asked for after it:", ...(input.corrections ?? []).map((c) => `- ${c.trim()}`), ""] : []),
     "Commits:",
     ...(input.commits.length > 0 ? input.commits.map((c) => `- ${c.subject}`) : ["- (none)"]),
     "",
@@ -72,6 +75,8 @@ export function buildPrTemplate(input: PrDraftInput): { title: string; body: str
     "## Summary",
     (input.goal ?? "").trim() === "" ? title : input.goal!.trim(),
     ...(input.specs.length > 0 ? ["", "## Specs", ...input.specs.map((s) => `- ${s.id}: ${s.text}`)] : []),
+    // The goal and the specs are the task's and do not change; what a follow-up fixed is what makes this pull request different.
+    ...((input.corrections ?? []).length > 0 ? ["", "## Correction", ...(input.corrections ?? []).map((c) => `- ${c.trim().replace(/\r?\n/g, "\n  ")}`)] : []),
     "",
     "## Verification",
     `Passed Knit's checks for ${input.taskId}: the agent process, the files it touched, git hygiene and the task's own checks.`,

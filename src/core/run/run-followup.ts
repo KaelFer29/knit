@@ -1,5 +1,6 @@
 import { contextShare, contextWindowOf, shouldSwitchChat } from "../context/index.js";
 import { runTurn } from "../chat/run-turn.js";
+import { renderFollowupPrompt } from "../prompt/render-prompt.js";
 import type { Task } from "../plan/parse-plan.js";
 import { capabilitiesOf, type AgentProfile, type AgentRunner } from "../ports/agent-runner.js";
 import type { CheckRunner } from "../ports/check-runner.js";
@@ -24,6 +25,9 @@ export interface FollowupDeps {
   /** Each timeline entry of the turn, right after it is stored. */
   onAgentEvent?: (event: SessionEventRecord) => void;
 }
+
+/** How much of the instruction is kept with the event, so a pull request can say what the follow-up fixed. */
+const MAX_RECORDED_PROMPT = 4000;
 
 export interface FollowupInput {
   runId: string;
@@ -104,7 +108,7 @@ export async function runFollowup(deps: FollowupDeps, input: FollowupInput): Pro
   const started = now().getTime();
 
   runs.upsertTask({ runId, taskId: task.taskId, title: task.title, status: "running" });
-  emit("followup.started", { sessionId: session.id, chatId: session.agentSessionId });
+  emit("followup.started", { sessionId: session.id, chatId: session.agentSessionId, prompt: input.prompt.slice(0, MAX_RECORDED_PROMPT) });
   // A follow-up always continues the chat of the task, so it always resumes.
   emit("attempt.started", { chat: "resumed" });
 
@@ -122,7 +126,7 @@ export async function runFollowup(deps: FollowupDeps, input: FollowupInput): Pro
       { agent, store: sessions, now },
       {
         sessionId: session.id,
-        prompt: input.prompt,
+        prompt: renderFollowupPrompt(input.prompt, task.branch),
         timeoutMs: input.agentTimeoutMs,
         ...(input.profile ? { profile: input.profile } : {}),
         ...(input.pid !== undefined ? { pid: input.pid } : {}),

@@ -23,6 +23,11 @@ export interface AttachWorkspaceInput {
   startSha: string;
 }
 
+export interface RestoreWorkspaceInput extends AttachWorkspaceInput {
+  /** The repository the worktree belongs to. */
+  repo: string;
+}
+
 export interface BaseRef {
   sha: string;
   /** Local branch name of the base, when it is one (needed as the PR target). */
@@ -52,6 +57,12 @@ export interface Workspace {
   prepare(input: PrepareWorkspaceInput): TaskWorkspace;
   /** Re-opens a worktree kept from an earlier run; undefined when it no longer exists. */
   attach(input: AttachWorkspaceInput): TaskWorkspace | undefined;
+  /**
+   * Recreates the worktree of a task whose folder is gone, at the same path, from its existing branch: the commits the
+   * agent made are on the branch, so nothing is lost. Throws, saying why, when the branch no longer exists or is checked
+   * out somewhere else (a branch lives in one place at a time).
+   */
+  restore(input: RestoreWorkspaceInput): TaskWorkspace;
   /** Paths that differ from the start commit: committed, uncommitted and untracked. */
   changedPaths(ws: TaskWorkspace): string[];
   /** Entries created next to the worktree since it was prepared, as `../name`. */

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentView, SessionDetail, SessionEvent, SessionListEntry } from "../../../sessions/types";
 import { resetSessionTitles } from "../../../sessions/useSessionTitles";
+import { ALL_FIXTURES } from "../../../fixtures/boards";
 import { ClaudePanel } from "./ClaudePanel";
 
 const PROPS = { board: undefined, runId: undefined, live: false, renderDetail: undefined, selectRun: () => {}, agentId: "alpha" };
@@ -432,3 +433,141 @@ describe("ClaudePanel: the session bar", () => {
     expect(window.location.hash).toBe("");
   });
 });
+
+describe("ClaudePanel: iterating on a delivered task", () => {
+  const board = ALL_FIXTURES.deliveredRun;
+  const target = board.tasks[0]!;
+  const withRun = (over: object = {}) => <ClaudePanel {...PROPS} board={board} runId="run-1" live {...over} />;
+  const FOLLOWUP = "Done.\n\n```followup\nMake the heading a level 2 heading.\n```";
+  const openList = async (user: ReturnType<typeof userEvent.setup>) => {
+    await screen.findByText("<b>Here is the plan</b>");
+    await user.click(screen.getByRole("button", { name: /Iterate on a task/ }));
+  };
+  const choose = async (user: ReturnType<typeof userEvent.setup>) => {
+    await openList(user);
+    await user.click(within(screen.getByRole("list", { name: "Tasks to iterate on" })).getByRole("button", { name: new RegExp(target.taskId) }));
+  };
+
+  it("lists the delivered and the failed tasks of the run, and not the ones still working", async () => {
+    const mixed = { ...board, tasks: board.tasks.map((t, i) => (i === 0 ? t : { ...t, state: "running" as const })) };
+    const user = userEvent.setup();
+    render(withRun({ board: mixed }));
+    await openList(user);
+    expect(within(screen.getByRole("list", { name: "Tasks to iterate on" })).getAllByRole("button")).toHaveLength(1);
+  });
+
+  it("offers a failed task too, since a follow-up is how it gets fixed", async () => {
+    const failed = { ...board, tasks: board.tasks.map((t, i) => (i === 0 ? { ...t, state: "failed" as const } : t)) };
+    const user = userEvent.setup();
+    render(withRun({ board: failed }));
+    await openList(user);
+    expect(within(screen.getByRole("list", { name: "Tasks to iterate on" })).getByRole("button", { name: new RegExp(target.taskId) })).toBeTruthy();
+  });
+
+  it("is not offered for a sample run or without a run", async () => {
+    const { unmount } = render(withRun({ live: false }));
+    await screen.findByText("<b>Here is the plan</b>");
+    expect(screen.queryByRole("button", { name: /Iterate on a task/ })).toBeNull();
+    unmount();
+    render(withRun({ board: undefined, runId: undefined }));
+    await screen.findByText("<b>Here is the plan</b>");
+    expect(screen.queryByRole("button", { name: /Iterate on a task/ })).toBeNull();
+  });
+
+  it("marks the chosen task and sends Claude its context with what to change, last and untouched", async () => {
+    const user = userEvent.setup();
+    render(withRun());
+    await choose(user);
+    expect(screen.getByText(new RegExp(`Next correction for ${target.taskId}`))).toBeTruthy();
+    await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "The heading is wrong");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    const prompt = (posted[0]!.body as { prompt: string }).prompt;
+    expect(prompt).toContain(`Task ${target.taskId}: ${target.title}`);
+    expect(prompt).toContain("```followup");
+    expect(prompt.trimEnd().endsWith("The heading is wrong")).toBe(true);
+  });
+
+  it("stops iterating on request, and the next prompt goes as typed", async () => {
+    const user = userEvent.setup();
+    render(withRun());
+    await choose(user);
+    await user.click(screen.getByRole("button", { name: "Stop iterating" }));
+    expect(screen.queryByText(new RegExp(`Next correction for ${target.taskId}`))).toBeNull();
+    await user.type(screen.getByRole("combobox", { name: /message alpha/i }), "Next step");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect((posted[0]!.body as { prompt: string }).prompt).toBe("Next step");
+  });
+
+  it("shows the instruction Claude wrote for the chosen task, editable, and sends it to the orchestrator as a follow-up", async () => {
+    details.a1 = detail("a1", "alpha", { turns: [{ id: 1, sessionId: "a1", seq: 1, prompt: "x", startedAt: NOW_ISO, status: "passed", resultText: FOLLOWUP }] });
+    const user = userEvent.setup();
+    render(withRun());
+    await choose(user);
+    const box = (await screen.findByRole("textbox", { name: "Follow-up instruction" })) as HTMLTextAreaElement;
+    expect(box.value).toBe("Make the heading a level 2 heading.");
+    await user.type(box, " Keep the text.");
+    await user.click(screen.getByRole("button", { name: "Send to the orchestrator" }));
+    await waitFor(() => expect(posted.some((p) => p.url.endsWith(`/api/runs/run-1/tasks/${target.taskId}/followup`))).toBe(true));
+    expect(posted.find((p) => p.url.endsWith("/followup"))!.body).toEqual({ prompt: "Make the heading a level 2 heading. Keep the text." });
+    const region = screen.getByRole("region", { name: `Follow-up for ${target.taskId}` });
+    expect((await within(region).findByRole("status")).textContent).toMatch(/Cursor is working/);
+  });
+
+  it("makes the page listen to the run again once the follow-up was sent, so it shows up on the board", async () => {
+    details.a1 = detail("a1", "alpha", { turns: [{ id: 1, sessionId: "a1", seq: 1, prompt: "x", startedAt: NOW_ISO, status: "passed", resultText: FOLLOWUP }] });
+    const refreshRun = vi.fn();
+    const user = userEvent.setup();
+    render(withRun({ refreshRun }));
+    await choose(user);
+    await user.click(await screen.findByRole("button", { name: "Send to the orchestrator" }));
+    await waitFor(() => expect(refreshRun).toHaveBeenCalledTimes(1));
+  });
+
+  it("offers no follow-up while no task is chosen, even if the answer has a followup block", async () => {
+    details.a1 = detail("a1", "alpha", { turns: [{ id: 1, sessionId: "a1", seq: 1, prompt: "x", startedAt: NOW_ISO, status: "passed", resultText: FOLLOWUP }] });
+    render(withRun());
+    await screen.findByText("<b>Here is the plan</b>");
+    expect(screen.queryByRole("textbox", { name: "Follow-up instruction" })).toBeNull();
+  });
+
+  it("opens Cursor from the follow-up once it was sent", async () => {
+    details.a1 = detail("a1", "alpha", { turns: [{ id: 1, sessionId: "a1", seq: 1, prompt: "x", startedAt: NOW_ISO, status: "passed", resultText: FOLLOWUP }] });
+    const openPanel = vi.fn();
+    const user = userEvent.setup();
+    render(withRun({ openPanel }));
+    await choose(user);
+    await user.click(await screen.findByRole("button", { name: "Send to the orchestrator" }));
+    await user.click(await screen.findByRole("button", { name: "Open Cursor" }));
+    expect(openPanel).toHaveBeenCalledWith("cursor");
+  });
+
+  it("turns the switch to the orchestrator off and disables it while a task is chosen, and gives it back after", async () => {
+    const user = userEvent.setup();
+    render(withRun());
+    await screen.findByText("<b>Here is the plan</b>");
+    const toggle = screen.getByRole("switch", { name: "Send to the orchestrator" }) as HTMLButtonElement;
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    await choose(user);
+    const off = screen.getByRole("switch", { name: "Send to the orchestrator" }) as HTMLButtonElement;
+    expect(off.disabled).toBe(true);
+    expect(off.getAttribute("aria-checked")).toBe("false");
+    expect(off.getAttribute("title")).toMatch(new RegExp(`correction for ${target.taskId}`, "i"));
+    await user.click(screen.getByRole("button", { name: "Stop iterating" }));
+    expect((screen.getByRole("switch", { name: "Send to the orchestrator" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("closes the list once a task is chosen, says it goes to the orchestrator, and marks the chosen row when it opens again", async () => {
+    const user = userEvent.setup();
+    render(withRun());
+    await choose(user);
+    expect(screen.queryByRole("list", { name: "Tasks to iterate on" })).toBeNull();
+    expect(within(screen.getByRole("region", { name: "Task iteration" })).getByText(/to the orchestrator/i)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /Iterate on a task/ }));
+    const row = within(screen.getByRole("list", { name: "Tasks to iterate on" })).getByRole("button", { name: new RegExp(target.taskId) });
+    expect(row.getAttribute("aria-pressed")).toBe("true");
+  });
+});
+

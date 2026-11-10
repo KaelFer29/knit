@@ -2,6 +2,7 @@ import { contextShare, contextWindowOf, windowIsStated } from "../context/index.
 import { parsePlan } from "../plan/parse-plan.js";
 import type { StoredRun } from "../ports/run-reader.js";
 import type { AttemptRecord, EventRecord, TaskRecord } from "../ports/run-store.js";
+import { openFollowups } from "./followups.js";
 import { liveLineOf, type TimelineEntry } from "./live-line.js";
 import { traceEvents, type TaskTrace } from "./track-attempts.js";
 import type {
@@ -48,7 +49,8 @@ const RUNNING_STATES: ReadonlySet<TaskState> = new Set(["running", "retrying", "
  */
 export function buildBoard(input: BoardInput): BoardModel {
   const { run } = input;
-  const live = run.status === "running";
+  // A follow-up keeps working on a run that is already finished, so a run is live also while one is open.
+  const live = run.status === "running" || openFollowups(input.events).size > 0;
   const traces = traceEvents(input.events);
   const order = input.tasks
     .map((record, index) => ({ record, position: record.position ?? index + 1, index }))
@@ -90,9 +92,9 @@ export function buildBoard(input: BoardInput): BoardModel {
     ...(run.finishedAt ? { finishedAt: run.finishedAt } : {}),
     nodes: {
       claude: { status: "done", planName: run.planName, taskCount: tasks.length, hasPlanText: run.planText !== undefined },
-      knit: { status: nodeStatus(run, "working"), ...(active ? { activeTaskId: active.taskId } : {}) },
+      knit: { status: nodeStatus(run, live, "working"), ...(active ? { activeTaskId: active.taskId } : {}) },
       cursor: {
-        status: nodeStatus(run, open?.status === "running" ? "working" : "idle"),
+        status: nodeStatus(run, live, open?.status === "running" ? "working" : "idle"),
         ...(active ? { activeTaskId: active.taskId } : {}),
         ...(open?.status === "running" ? { attempt: open.attempt } : {}),
       },
@@ -109,7 +111,8 @@ export function buildBoard(input: BoardInput): BoardModel {
 }
 
 /** Knit and the builder follow the run's status; while it runs, `whileRunning` says what they are doing. */
-function nodeStatus(run: StoredRun, whileRunning: NodeStatus): NodeStatus {
+function nodeStatus(run: StoredRun, live: boolean, whileRunning: NodeStatus): NodeStatus {
+  if (live) return whileRunning;
   if (run.status === "passed") return "done";
   if (run.status === "failed") return "failed";
   return whileRunning;

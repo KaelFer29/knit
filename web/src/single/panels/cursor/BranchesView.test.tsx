@@ -15,6 +15,7 @@ const branch = (over: Record<string, unknown> = {}) => ({
   startSha: "aaaaaaa",
   state: { exists: true, head: "bbbbbbb", historyIntact: true, pushed: false, hasWorktree: true, dirty: false, ahead: [{ sha: "b1", subject: "docs: add prueba.md" }] },
   undo: { revert: ok, reset: { ok: true, effects: ["Moves docs/one back to the commit the task started from. 1 commit leaves the branch."] }, delete: { ok: true, effects: ["Deletes the branch docs/one and its worktree.", "1 commit of the task is lost from this repository."] } },
+  checkout: { ok: true as const, effects: ["Removes the worktree of T1. The branch docs/one and its 1 commit stay.", "Switches your repository to docs/one, so you can test it there. Your repository must have no uncommitted changes.", "To iterate on T1 again, switch back first (git checkout main): a branch can only be checked out in one place."] },
   pr: { ok: true, base: "main", head: "docs/one", options: ["main", "docs/two"], effects: ["Pushes docs/one to origin, without forcing.", "Opens a pull request from docs/one into main."] },
   ...over,
 });
@@ -25,7 +26,7 @@ interface Call {
   body?: unknown;
 }
 let calls: Call[];
-let listing: { branches: unknown[] };
+let listing: { branches: unknown[]; returnTo?: { taskId: string; branch: string } };
 let replies: Record<string, { status: number; body: unknown }>;
 let remote: string[];
 
@@ -54,7 +55,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-const show = () => render(<BranchesView runId="run-1" pollMs={60_000} />);
+const show = (flashMs?: number) => render(<BranchesView runId="run-1" pollMs={60_000} {...(flashMs === undefined ? {} : { flashMs })} />);
 const posts = (): Call[] => calls.filter((c) => c.method === "POST");
 
 describe("BranchesView", () => {
@@ -70,6 +71,86 @@ describe("BranchesView", () => {
     expect((within(card).getByRole("button", { name: "Open pull request" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  describe("test this branch", () => {
+    const open = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(await screen.findByRole("button", { name: "Test this branch" }));
+      return screen.getByRole("alertdialog", { name: /Test docs\/one in your repository/i });
+    };
+
+    it("asks first, says exactly what it will do, and does nothing until it is confirmed", async () => {
+      const user = userEvent.setup();
+      show();
+      const dialog = await open(user);
+      expect(within(dialog).getByText(/Removes the worktree of T1/)).toBeTruthy();
+      expect(within(dialog).getByText(/git checkout main/)).toBeTruthy();
+      expect(posts()).toEqual([]);
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(posts()).toEqual([]);
+    });
+
+    it("sends the confirmation and reads the branches again", async () => {
+      const user = userEvent.setup();
+      replies["POST checkout"] = { status: 200, body: { ok: true, dryRun: false, branch: "docs/one", effects: [], freedWorktree: true } };
+      show();
+      const dialog = await open(user);
+      await user.click(within(dialog).getByRole("button", { name: "Switch my repository" }));
+      await waitFor(() => expect(posts()).toEqual([{ method: "POST", url: "/api/runs/run-1/tasks/T1/checkout", body: { confirm: true } }]));
+      await waitFor(() => expect(calls.filter((c) => c.url.endsWith("/branches")).length).toBeGreaterThan(1));
+    });
+
+    it("says it was done with a notice at the right end of the state tags, not a banner, and the notice goes away by itself", async () => {
+      const user = userEvent.setup();
+      replies["POST checkout"] = { status: 200, body: { ok: true, dryRun: false, branch: "docs/one", effects: [], freedWorktree: true } };
+      show(400);
+      const dialog = await open(user);
+      await user.click(within(dialog).getByRole("button", { name: "Switch my repository" }));
+      const tags = within(screen.getByRole("list", { name: "State of the branch" }));
+      const notice = await tags.findByRole("status");
+      expect(notice.textContent).toMatch(/Repository switched/);
+      // The last tag, so it sits at the far right of the row.
+      const items = tags.getAllByRole("listitem");
+      expect(items.at(-1)!.contains(notice)).toBe(true);
+      // No banner of its own.
+      expect(screen.queryByText(/Your repository is now on/)).toBeNull();
+      await waitFor(() => expect(tags.queryByRole("status")).toBeNull(), { timeout: 2000 });
+    });
+
+    it("shows why it was refused and keeps the confirmation open", async () => {
+      const user = userEvent.setup();
+      replies["POST checkout"] = { status: 409, body: { error: "Your repository has uncommitted changes. Commit or stash them first, so switching branches cannot touch them" } };
+      show();
+      const dialog = await open(user);
+      await user.click(within(dialog).getByRole("button", { name: "Switch my repository" }));
+      expect((await screen.findByRole("alert")).textContent).toContain("uncommitted changes");
+      expect(screen.getByRole("alertdialog")).toBeTruthy();
+    });
+
+    it("offers to give the repository back its branch only on the task that was tested, and sends the confirmation", async () => {
+      const user = userEvent.setup();
+      listing = { branches: [branch({ taskId: "T1", branch: "docs/one" }), branch({ taskId: "T2", title: "Other", branch: "docs/two" })], returnTo: { taskId: "T1", branch: "main" } };
+      replies["POST return"] = { status: 200, body: { ok: true, branch: "main" } };
+      show();
+      await user.click(await screen.findByRole("button", { name: /docs\/one/ }));
+      const button = await screen.findByRole("button", { name: "Return repository to main" });
+      expect(screen.queryByRole("region", { name: "Branch docs/two" })).toBeTruthy();
+      await user.click(button);
+      const dialog = screen.getByRole("alertdialog", { name: "Return your repository to main" });
+      expect(within(dialog).getByText(/Switches your repository back to main/)).toBeTruthy();
+      expect(posts()).toEqual([]);
+      await user.click(within(dialog).getByRole("button", { name: "Switch back to main" }));
+      await waitFor(() => expect(posts()).toEqual([{ method: "POST", url: "/api/runs/run-1/tasks/T1/return", body: { confirm: true } }]));
+    });
+
+    it("is disabled, with the reason, when the branch cannot be tested", async () => {
+      listing = { branches: [branch({ checkout: refuse("Your repository is already on docs/one."), state: { ...branch().state, checkedOut: true, hasWorktree: false } })] };
+      show();
+      const button = (await screen.findByRole("button", { name: "Test this branch" })) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      expect(screen.getByText("Your repository is already on docs/one.")).toBeTruthy();
+    });
+  });
+
   describe("pull request state", () => {
     const PR = "https://github.com/acme/demo/pull/7";
 
@@ -80,6 +161,29 @@ describe("BranchesView", () => {
       const pill = within(card).getByText("Merged into release/1.2");
       expect(pill.getAttribute("data-state")).toBe("merged");
       expect(within(card).getByRole("link", { name: "Merged ↗" }).getAttribute("href")).toBe(PR);
+    });
+
+    it("says how many commits came after a merged pull request, and offers to open another", async () => {
+      listing = { branches: [branch({ prUrl: PR, prState: { state: "merged", base: "main", newCommits: 2 }, state: { ...branch().state, pushed: true } })] };
+      show();
+      const card = await screen.findByRole("region", { name: "Branch docs/one" });
+      expect(within(card).getByText("Merged into main")).toBeTruthy();
+      expect(within(card).getByText("2 new commits").getAttribute("data-state")).toBe("new");
+      const button = within(card).getByRole("button", { name: "Open pull request" }) as HTMLButtonElement;
+      expect(button.disabled).toBe(false);
+      expect(within(card).getByRole("link", { name: "Merged ↗" }).getAttribute("href")).toBe(PR);
+    });
+
+    it("speaks of one new commit in the singular, and says nothing when there are none", async () => {
+      listing = { branches: [branch({ prUrl: PR, prState: { state: "merged", base: "main", newCommits: 1 }, state: { ...branch().state, pushed: true } })] };
+      const first = show();
+      expect(await screen.findByText("1 new commit")).toBeTruthy();
+      first.unmount();
+      listing = { branches: [branch({ prUrl: PR, prState: { state: "merged", base: "main", newCommits: 0 }, pr: refuse(`T1 already has a pull request: ${PR}`), state: { ...branch().state, pushed: true } })] };
+      show();
+      await screen.findByText("Merged into main");
+      expect(screen.queryByText(/new commit/)).toBeNull();
+      expect(screen.queryByRole("button", { name: "Open pull request" })).toBeNull();
     });
 
     it("says when a pull request was closed without merging, and when it is still open", async () => {
@@ -307,9 +411,8 @@ describe("BranchesView", () => {
       await user.type(title, "Create prueba.md");
       await user.click(within(form).getByRole("button", { name: "Push and open pull request" }));
       await waitFor(() => expect(posts().at(-1)).toEqual({ method: "POST", url: "/api/runs/run-1/tasks/T1/pr", body: { title: "Create prueba.md", body: "## Summary\n- adds it" } }));
-      const done = await screen.findByRole("link", { name: "Pull request ↗" });
-      expect(done.getAttribute("href")).toBe("https://example.test/pull/7");
-      expect(screen.getByRole("status").textContent).not.toMatch(/opened/i);
+      // A short notice at the end of the tags, like the checkout one; the link is the row's "Pull request" tag.
+      expect(await screen.findByText("Pull request opened")).toBeTruthy();
     });
 
     it("builds the description from the task when the form opens, without asking a model", async () => {

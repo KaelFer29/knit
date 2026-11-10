@@ -15,6 +15,10 @@ export const USAGE = `Usage:
   ${PROGRAM_NAME} clean <run-id> [options]    Remove the worktrees of a run (branches are kept)
   ${PROGRAM_NAME} branch <run-id> <task-id> undo --mode <revert|reset|delete> [options]
                                               Take back what a task did on its branch (says what it would do until --yes)
+  ${PROGRAM_NAME} branch <run-id> <task-id> checkout [options]
+                                              Switch your repository to the task branch to test it (says what it would do until --yes)
+  ${PROGRAM_NAME} branch <run-id> <task-id> return [options]
+                                              Switch your repository back to the branch it was on before the test (says what it would do until --yes)
   ${PROGRAM_NAME} branch <run-id> <task-id> pr-draft [--template] [options]
                                               Write the title and body of a pull request for the task (--template: from the task itself, no model)
   ${PROGRAM_NAME} branch <run-id> <task-id> pr --title <t> --body <b> [--base <branch>] [options]
@@ -64,8 +68,9 @@ Options for followup:
   The agent resumes the task's chat (agent --resume) inside the task's own worktree, with your prompt as typed. Knit then
   verifies the result like an attempt of the run: scope, git hygiene and the task's checks, against the plan snapshot stored
   with the run. The outcome is recorded as the task's next attempt and the turn as part of a session. Refused (exit 1) while
-  the run is still running, when the worktree is gone, when no attempt recorded a chat id, or for a run from before plan
-  snapshots. Exit code 0 when the verification passed, 1 otherwise, 2 for usage mistakes. When the chat has passed 70% of its
+  the run is still running, when no attempt recorded a chat id, when the worktree is gone and cannot be recreated, or for a
+  run from before plan snapshots. A worktree that is gone (cleaned, or freed to test the branch) is recreated from the
+  branch, which holds everything the agent made; if your repository is on that branch, switch it away first. Exit code 0 when the verification passed, 1 otherwise, 2 for usage mistakes. When the chat has passed 70% of its
   window (200k unless the task's model says another), a note says so: another follow-up keeps adding to the same chat.
 
 Options for branch undo:
@@ -75,13 +80,18 @@ Options for branch undo:
   --yes                      Do it; without it the command only prints what it would do and changes nothing
   --json                     Print one JSON line (used by the web interface)
   --data-dir <dir>
+  checkout: frees the task's worktree (never forced) and runs git checkout of its branch in your repository, so you can test
+  it in your own editor and app; the branch and its commits stay. Refused (exit 1) while the run is running, when your
+  repository or the worktree has uncommitted changes, or when your repository is already on the branch. A branch lives in
+  one place at a time: to iterate on the task again, switch your repository back first (the follow-up recreates the worktree).
+  return: switches your repository back to the branch it was on before the last checkout (refused while the run is running, when Knit did not switch it, or when your repository has uncommitted changes). Exit code 0 when done.
   pr-draft: --template builds the text from the task's goal and specs, with no model and no tokens (the commits and files are on the pull request)
   (the same sections every time; it cannot be combined with --model). Without it, --model <id> picks the model (default composer-2.5-fast, see 'agent models'). It writes text only, in an empty
   scratch directory, from the task, its commits and a cut of its diff.
   pr: pushes the branch to origin (never forced) and opens the pull request into the run's base branch, or into the parent
   task's branch when the task depends on another (that branch must be on origin first). --base <branch> opens it into
   another branch instead (a plain branch name; GitHub refuses one that is not on origin). Only for a task that passed, with
-  commits and no pull request yet; the address is kept with the task. Checks the GitHub CLI and that the base branch is on origin before pushing anything.
+  commits and no pull request yet (or whose pull request ended, merged or closed, and the branch has commits made after it: then it opens another for those); the address of the latest is kept with the task. Checks the GitHub CLI and that the base branch is on origin before pushing anything.
   A title or body that starts with a dash has to be written --title="-fix typo" and --body="- adds it", or it reads as an option.
   undo: refused (exit 1) while the run is still running, for a branch that is gone, with uncommitted changes (revert), after
   a rewritten history (reset), or when another task is stacked on the branch (reset, delete). A remote is never touched.

@@ -543,3 +543,43 @@ describe("which chat each attempt ran in", () => {
   });
 });
 
+describe("a follow-up on a delivered task of a finished run", () => {
+  const done = run({ status: "passed", finishedAt: at(300) });
+  const base = [ev("attempt.started", "T1", 1), ev("attempt.finished", "T1", 1, { payload: { passed: true } }, 5), ev("task.passed", "T1", 1, {}, 6)];
+  const followup = [ev("followup.started", "T1", 2, {}, 100), ev("attempt.started", "T1", 2, { payload: { chat: "resumed" } }, 101)];
+
+  it("is live while it runs: the task is running, its attempt open, and the knit and Cursor nodes are working", () => {
+    const b = board({ run: done, tasks: [task("T1", { status: "running" })], attempts: [attempt("T1", 1)], events: [...base, ...followup] });
+    expect(b.tasks[0]!.state).toBe("running");
+    expect(b.tasks[0]!.attempts.map((a) => [a.attempt, a.status])).toEqual([[1, "passed"], [2, "running"]]);
+    expect(b.nodes.knit.status).toBe("working");
+    expect(b.nodes.cursor.status).toBe("working");
+    expect(b.active).toMatchObject({ taskId: "T1" });
+    expect(b.runStatus).toBe("passed");
+  });
+
+  it("shows its checks as verifying, like any attempt", () => {
+    const b = board({ run: done, tasks: [task("T1", { status: "running" })], attempts: [attempt("T1", 1)], events: [...base, ...followup, ev("check.started", "T1", 2, { payload: { command: "npm test" } }, 110)] });
+    expect(b.tasks[0]!.state).toBe("verifying");
+  });
+
+  it("is over once it finished: the task is delivered again and the nodes are done", () => {
+    const b = board({
+      run: done,
+      tasks: [task("T1", { status: "passed" })],
+      attempts: [attempt("T1", 1), attempt("T1", 2)],
+      events: [...base, ...followup, ev("attempt.finished", "T1", 2, { payload: { passed: true } }, 120), ev("task.passed", "T1", 2, {}, 121), ev("followup.finished", "T1", 2, {}, 122)],
+    });
+    expect(b.tasks[0]!.state).toBe("delivered");
+    expect(b.nodes.knit.status).toBe("done");
+    expect(b.nodes.cursor.status).toBe("done");
+    expect(b.active).toBeUndefined();
+  });
+
+  it("does not make a finished run live when there was no follow-up", () => {
+    const b = board({ run: done, tasks: [task("T1", { status: "passed" })], attempts: [attempt("T1", 1)], events: base });
+    expect(b.nodes.knit.status).toBe("done");
+    expect(b.nodes.cursor.status).toBe("done");
+  });
+});
+

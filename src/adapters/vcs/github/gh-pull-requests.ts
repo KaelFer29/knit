@@ -67,11 +67,11 @@ export class GhPullRequests implements PullRequests {
   }
 
   status(repo: string, url: string): PullRequestStatus {
-    const r = this.gh(["pr", "view", url, "--json", "state,baseRefName"], repo);
+    const r = this.gh(["pr", "view", url, "--json", "state,baseRefName,headRefOid"], repo);
     if (r.status !== 0) throw new Error(`gh pr view failed: ${r.stderr.trim() || r.stdout.trim() || "no answer"}`);
-    const parsed = JSON.parse(r.stdout) as { state?: string; baseRefName?: string };
+    const parsed = JSON.parse(r.stdout) as { state?: string; baseRefName?: string; headRefOid?: string };
     const state = parsed.state === "MERGED" ? "merged" : parsed.state === "CLOSED" ? "closed" : "open";
-    return { state, base: parsed.baseRefName ?? "" };
+    return { state, base: parsed.baseRefName ?? "", ...(parsed.headRefOid ? { headSha: parsed.headRefOid } : {}) };
   }
 }
 

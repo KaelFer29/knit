@@ -112,4 +112,28 @@ describe("decidePr", () => {
       expect(decidePr(ctx({ requestedBase: "docs/one" }))).toMatchObject({ ok: false, reason: expect.stringContaining("its own branch") });
     });
   });
+
+  describe("a task that already has a pull request", () => {
+    const withPr = (prior?: PrContext["prior"]) =>
+      ctx({ task: { taskId: "T1", branch: "docs/one", status: "passed", prUrl: "https://example.test/pull/7" }, ...(prior ? { prior } : {}) });
+
+    it("opens another one when the earlier was merged and the branch has new commits since, and says how many", () => {
+      const d = decidePr(withPr({ state: "merged", newCommits: 2 }));
+      expect(d).toMatchObject({ ok: true, base: "main", head: "docs/one" });
+      if (d.ok) expect(d.effects.join(" ")).toMatch(/2 new commits since the previous pull request, which was merged/);
+    });
+
+    it("does the same for a closed one, and speaks of a single commit in the singular", () => {
+      const d = decidePr(withPr({ state: "closed", newCommits: 1 }));
+      expect(d.ok).toBe(true);
+      if (d.ok) expect(d.effects.join(" ")).toMatch(/1 new commit since the previous pull request, which was closed/);
+    });
+
+    it("still refuses while the earlier one is open, and when nothing is new or it is not known", () => {
+      for (const prior of [{ state: "open" as const, newCommits: 3 }, { state: "merged" as const, newCommits: 0 }, { state: "merged" as const }, undefined]) {
+        expect(decidePr(withPr(prior)), JSON.stringify(prior)).toMatchObject({ ok: false, reason: expect.stringContaining("already has a pull request") });
+      }
+    });
+  });
 });
+

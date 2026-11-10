@@ -15,7 +15,7 @@ export type TaskCardData = Pick<TaskView, "taskId" | "title" | "position" | "sta
 interface Props {
   task: TaskCardData;
   /** The state of the task's pull request, when it has one and GitHub could be asked. */
-  pr?: { state: "open" | "merged" | "closed"; base: string } | undefined;
+  pr?: { state: "open" | "merged" | "closed"; base: string; newCommits?: number } | undefined;
   renderDetail?: RenderDetail | undefined;
 }
 
@@ -35,6 +35,7 @@ export function TaskCard({ task, pr, renderDetail }: Props) {
             {pr === undefined ? null : (
               <span className="task-card__pr" data-state={pr.state} title={pr.state === "merged" ? `The pull request of this task was merged into ${pr.base}.` : `The pull request of this task is ${pr.state}; it targets ${pr.base}.`}>
                 {PR_LABEL[pr.state](pr.base)}
+                {pr.state !== "open" && (pr.newCommits ?? 0) > 0 ? ` · ${pr.newCommits} new ${pr.newCommits === 1 ? "commit" : "commits"}` : ""}
               </span>
             )}
             {task.attempts > 0 ? (

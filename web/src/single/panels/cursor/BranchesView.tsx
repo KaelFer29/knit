@@ -3,7 +3,7 @@ import type { BranchView } from "../../../branches/types";
 import { useList } from "../../../lists/useList";
 import { ListToolbar } from "../../../molecules/ListToolbar";
 import { Pager } from "../../../molecules/Pager";
-import { draftPullRequest, fetchRemoteBranches, openPullRequest, undoBranch } from "../../../branches/api";
+import { checkoutBranch, draftPullRequest, fetchRemoteBranches, openPullRequest, returnRepository, undoBranch } from "../../../branches/api";
 import { useBranches } from "../../../branches/useBranches";
 import { BranchCard, type BranchActions } from "../../../organisms/BranchCard";
 import "./BranchesView.css";
@@ -15,11 +15,13 @@ const searchable = (b: BranchView): string[] => [b.taskId, b.title, b.branch];
  * The branches Cursor created for a run: what each holds and what can be done with it (undo it, or open its pull
  * request). Container: it reads the branches, runs the actions and reads again after each one.
  */
-export function BranchesView({ runId, pollMs }: { runId: string; pollMs?: number }) {
+export function BranchesView({ runId, pollMs, flashMs }: { runId: string; pollMs?: number; flashMs?: number }) {
   const { listing, error, reload } = useBranches(runId, pollMs);
   const actions = useMemo<BranchActions>(
     () => ({
       remote: () => fetchRemoteBranches(runId),
+      checkout: (taskId) => checkoutBranch(runId, taskId),
+      returnRepo: (taskId) => returnRepository(runId, taskId),
       undo: (taskId, mode) => undoBranch(runId, taskId, mode),
       draft: (taskId, how) => draftPullRequest(runId, taskId, how),
       open: (taskId, title, body, into) => openPullRequest(runId, taskId, title, body, into),
@@ -49,7 +51,7 @@ export function BranchesView({ runId, pollMs }: { runId: string; pollMs?: number
       {listing.branches.length > 1 ? <ListToolbar label="Search branches" query={list.query} onQuery={list.setQuery} summary={list.narrowed ? `${list.matching} of ${listing.branches.length} branches` : undefined} /> : null}
       {list.view.total === 0 ? <p className="detail-note">No branch matches this search.</p> : null}
       {list.view.items.map((b) => (
-        <BranchCard key={b.taskId} runId={runId} branch={b} actions={actions} onChanged={reload} defaultOpen={listing.branches.length === 1} />
+        <BranchCard key={b.taskId} runId={runId} branch={b} actions={actions} onChanged={reload} defaultOpen={listing.branches.length === 1} {...(flashMs === undefined ? {} : { flashMs })} {...(listing.returnTo?.taskId === b.taskId ? { returnTo: listing.returnTo.branch } : {})} />
       ))}
       <Pager page={list.view} onPage={list.setPage} noun="branches" />
     </div>

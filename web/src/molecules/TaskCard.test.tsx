@@ -84,6 +84,11 @@ describe("TaskCard", () => {
     expect(pill.getAttribute("title")).toMatch(/pull request/i);
   });
 
+  it("says how many commits came after the merge, so the work that is not in the base is not forgotten", () => {
+    render(<TaskCard task={{ ...task, state: "delivered" }} pr={{ state: "merged", base: "main", newCommits: 2 }} />);
+    expect(screen.getByText("Merged into main · 2 new commits").getAttribute("data-state")).toBe("merged");
+  });
+
   it("labels a closed pull request, and an open one, and shows nothing when its state is not known", () => {
     const { rerender } = render(<TaskCard task={task} pr={{ state: "closed", base: "main" }} />);
     expect(screen.getByText("PR closed").getAttribute("data-state")).toBe("closed");

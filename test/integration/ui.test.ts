@@ -637,6 +637,28 @@ describe("live stream (SSE)", () => {
     expect(sse.frames.at(-1)!.data).toEqual({ status: "failed" });
   });
 
+  it("keeps a finished run's stream open while a follow-up on one of its tasks is working, and ends it when the follow-up finishes", async () => {
+    seedRun();
+    store.finishRun("run-1", "passed", ts);
+    store.recordEvent({ runId: "run-1", taskId: "T1", attempt: 2, ts, type: "followup.started" });
+    const server = await launch();
+    const sse = openSse(server, "/api/runs/run-1/stream");
+    await sse.ready;
+    await until(() => sse.frames.some((f) => f.data.type === "followup.started"), "the existing rows");
+    // Well past the status checks: a finished run with nothing open would have ended by now.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(sse.ended).toBe(false);
+
+    store.recordEvent({ runId: "run-1", taskId: "T1", attempt: 2, ts, type: "attempt.started" });
+    await until(() => sse.frames.some((f) => f.data.type === "attempt.started" && f.data.attempt === 2), "a row written during the follow-up");
+    expect(sse.ended).toBe(false);
+
+    store.recordEvent({ runId: "run-1", taskId: "T1", attempt: 2, ts, type: "followup.finished", payload: { passed: true } });
+    await until(() => sse.ended, "the stream to end");
+    expect(sse.frames.at(-1)!.event).toBe("done");
+    expect(sse.frames.some((f) => f.data.type === "followup.finished")).toBe(true);
+  });
+
   it("stops polling when the client disconnects", async () => {
     seedRun();
     let polls = 0;

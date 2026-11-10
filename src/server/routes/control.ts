@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { readFileSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { parsePlan, PlanParseError } from "../../core/plan/parse-plan.js";
+import { isModelId, parsePlan, PlanParseError } from "../../core/plan/parse-plan.js";
 import type { StoredRun } from "../../core/ports/run-reader.js";
 import { HttpError, sendJson } from "../http.js";
 import type { ControlDeps, RouteModule, SpawnedProcess } from "../types.js";
@@ -96,6 +96,18 @@ class IssuesError extends HttpError {
   }
 }
 
+/** The longest prompt a follow-up takes from the page. */
+const MAX_FOLLOWUP_PROMPT = 20_000;
+
+/** The last lines of a command's log, to say why it refused; empty when there is nothing to read. */
+function logTail(logPath: string): string {
+  try {
+    return readFileSync(logPath, "utf8").trim().split(/\r?\n/).slice(-4).join("\n").slice(-600);
+  } catch {
+    return "";
+  }
+}
+
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 type Registration = { kind: "found"; run: StoredRun } | { kind: "exited"; code: number | null } | { kind: "timeout" };
@@ -174,6 +186,9 @@ export const controlRoutes: RouteModule = ({ reader, pollIntervalMs, control: co
   const resuming = new Set<string>();
 
   /** Spawns `knit resume <id>` for a run that is not running and waits for it to take the run over. */
+  /** `<run>/<task>` pairs whose follow-up is starting: a second click must not start a second turn of the same chat. */
+  const followingUp = new Set<string>();
+
   async function resume(control: ControlDeps, runId: string, res: Parameters<typeof sendJson>[0]): Promise<void> {
     if (resuming.has(runId)) throw new HttpError(409, `Run ${runId} is already being resumed`);
     resuming.add(runId);
@@ -267,6 +282,56 @@ export const controlRoutes: RouteModule = ({ reader, pollIntervalMs, control: co
         if (task.status !== "failed") throw new HttpError(409, `Task ${task.taskId} is ${task.status}, only a failed task can be retried`);
         // Resume already re-runs failed tasks first and the ones that were skipped after them.
         await resume(control, params.id!, res);
+      },
+    },
+    {
+      method: "POST",
+      pattern: "/api/runs/:id/tasks/:task/followup",
+      handler: async ({ req, res, params }) => {
+        const control = requireControl(controlDeps);
+        const body = await readJsonBody(req);
+        const unknown = Object.keys(body).filter((k) => k !== "prompt" && k !== "model");
+        if (unknown.length > 0) throw new HttpError(400, `Unknown field: ${unknown.join(", ")}`);
+        const { prompt, model } = body;
+        if (typeof prompt !== "string" || prompt.trim() === "") throw new HttpError(400, "prompt must be a non-empty string");
+        if (prompt.length > MAX_FOLLOWUP_PROMPT) throw new HttpError(400, `prompt is longer than ${MAX_FOLLOWUP_PROMPT} characters`);
+        if (model !== undefined && (typeof model !== "string" || !isModelId(model))) throw new HttpError(400, "model must be an id from 'agent models': no spaces, and it cannot start with a dash");
+        const runId = params.id!;
+        const taskId = params.task!;
+        const before = requireSnapshot(reader, runId);
+        if (!before.tasks.some((t) => t.taskId === taskId)) throw new HttpError(404, `Task not found: ${taskId}`);
+        // Whether the run is still running, whether the task has a chat and whether its worktree can be recreated are decided by
+        // `knit followup` itself, which knows how to tell a live process from a crashed one; its reason comes back below.
+        const key = `${runId}/${taskId}`;
+        if (followingUp.has(key)) throw new HttpError(409, `A follow-up on ${taskId} is already starting`);
+        followingUp.add(key);
+        try {
+          const logPath = logFileFor(control, "followup");
+          let child: SpawnedProcess;
+          try {
+            // `--` before the prompt: one that starts with a dash is a prompt, never an option.
+            child = control.spawn({ args: ["followup", runId, taskId, ...(model === undefined ? [] : ["--model", model]), "--data-dir", control.dataDir, "--", prompt], logFile: logPath });
+          } catch (err) {
+            throw new HttpError(502, `Could not start knit followup: ${err instanceof Error ? err.message : String(err)}`);
+          }
+          if (child.pid === undefined) throw new HttpError(502, `Could not start knit followup. Log: ${logPath}`);
+          const outcome = await awaitRegistration(
+            child,
+            () => {
+              const snap = reader.getRunSnapshot(runId);
+              if (!snap) return undefined;
+              return reader.getEventsAfter(runId, before.lastEventId).some((e) => e.type === "followup.started" && e.taskId === taskId) ? snap.run : undefined;
+            },
+            pollMs,
+            control.registerTimeoutMs ?? DEFAULT_REGISTER_TIMEOUT_MS,
+          );
+          if (outcome.kind === "found") return sendJson(res, 202, { runId, taskId, pid: child.pid, logPath });
+          const reason = outcome.kind === "exited" ? logTail(logPath) : "";
+          if (reason !== "") return sendJson(res, 409, { error: reason, logPath });
+          return failRegistration(res, "followup", logPath, outcome);
+        } finally {
+          followingUp.delete(key);
+        }
       },
     },
   ];

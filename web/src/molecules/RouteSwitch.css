@@ -64,3 +64,17 @@
     transition: none;
   }
 }
+
+.route[data-disabled] .route__switch {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.route[data-disabled] .route__switch:hover {
+  background: none;
+}
+
+.route[data-disabled] .route__track {
+  opacity: 0.6;
+}
+

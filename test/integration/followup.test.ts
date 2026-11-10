@@ -156,6 +156,50 @@ beforeEach(() => {
 afterEach(() => rmSync(scratch, { recursive: true, force: true }));
 
 describe("knit followup that passes", () => {
+  describe("when the worktree of the task is gone", () => {
+    const head = (): string => git(repo, "rev-parse", "--abbrev-ref", "HEAD");
+
+    it("recreates it from the branch, says so, and carries on with the same chat", async () => {
+      const runId = await runPlanFirst();
+      const worktree = readRun(runId).detail.tasks[0]!.worktree!;
+      git(repo, "worktree", "remove", "--force", worktree);
+      expect(existsSync(worktree)).toBe(false);
+      const seen = newSeen();
+      const c = capture();
+      expect(await main(["followup", runId, "T1", "please EDIT the file"], c.io, depsFor(seen)), c.err()).toBe(0);
+      expect(c.out()).toMatch(/Recreated the worktree of T1/);
+      expect(existsSync(join(worktree, ".git"))).toBe(true);
+      expect(seen.requests[0]).toMatchObject({ cwd: worktree, resumeSessionId: "chat-1" });
+    });
+
+    it("after the branch was tested in the user's repository: asks to switch back first, and works once it is", async () => {
+      const runId = await runPlanFirst();
+      const worktree = readRun(runId).detail.tasks[0]!.worktree!;
+      expect(await main(["branch", runId, "T1", "checkout", "--yes"], capture().io, depsFor(newSeen()))).toBe(0);
+      expect(head()).toBe("feat/create-a");
+
+      const blocked = capture();
+      expect(await main(["followup", runId, "T1", "please EDIT the file"], blocked.io, depsFor(newSeen()))).toBe(1);
+      expect(blocked.err()).toMatch(/feat\/create-a is checked out at .*Return button/s);
+      expect(existsSync(worktree)).toBe(false);
+
+      git(repo, "checkout", "main");
+      const ok = capture();
+      expect(await main(["followup", runId, "T1", "please EDIT the file"], ok.io, depsFor(newSeen())), ok.err()).toBe(0);
+      expect(existsSync(join(worktree, ".git"))).toBe(true);
+    });
+
+    it("refuses with the reason when the branch is gone too", async () => {
+      const runId = await runPlanFirst();
+      const worktree = readRun(runId).detail.tasks[0]!.worktree!;
+      git(repo, "worktree", "remove", "--force", worktree);
+      git(repo, "branch", "-D", "feat/create-a");
+      const c = capture();
+      expect(await main(["followup", runId, "T1", "please EDIT the file"], c.io, depsFor(newSeen()))).toBe(1);
+      expect(c.err()).toMatch(/no longer exists/);
+    });
+  });
+
   it("warns when the chat it resumed has passed 70% of its window, and records the context and that the chat was resumed", async () => {
     const runId = await runPlanFirst();
     const c = capture();
@@ -165,6 +209,8 @@ describe("knit followup that passes", () => {
     expect(c.out()).toMatch(/new task/i);
     const events = readRun(runId).events.filter((e) => e.attempt === 2);
     expect(events.find((e) => e.type === "attempt.started")!.payload).toMatchObject({ chat: "resumed" });
+    // What was asked is kept with the event, so a pull request description can say what the follow-up fixed.
+    expect(readRun(runId).events.find((e) => e.type === "followup.started")!.payload).toMatchObject({ prompt: "please EDIT the file FULL" });
     expect(events.find((e) => e.type === "attempt.finished")!.payload).toMatchObject({ contextTokens: 160_000 });
   });
 
@@ -185,9 +231,11 @@ describe("knit followup that passes", () => {
     const code = await main(["followup", runId, "T1", "please EDIT the file"], c.io, depsFor(seen));
 
     expect(code, c.err()).toBe(0);
-    // The agent was asked to continue chat-1 inside the worktree, with the prompt exactly as typed.
+    // The agent was asked to continue chat-1 inside the worktree, with the instruction as typed plus the git rules.
     expect(seen.requests).toHaveLength(1);
-    expect(seen.requests[0]).toMatchObject({ cwd: worktree, prompt: "please EDIT the file", resumeSessionId: "chat-1" });
+    expect(seen.requests[0]).toMatchObject({ cwd: worktree, resumeSessionId: "chat-1" });
+    expect(seen.requests[0]!.prompt.startsWith("please EDIT the file\n")).toBe(true);
+    expect(seen.requests[0]!.prompt).toMatch(/commit your work yourself/i);
     expect(seen.options).toEqual([{ agent: "cursor" }]);
 
     // Knit verified again: the second check ran against the new content, and the outcome is attempt 2.
@@ -219,7 +267,7 @@ describe("knit followup that passes", () => {
     expect(only!.session.title).toContain(runId);
     expect(only!.session.title).toContain("T1");
     expect(only!.turns).toHaveLength(1);
-    expect(only!.turns[0]).toMatchObject({ prompt: "please EDIT the file", status: "passed", inputTokens: 10, outputTokens: 3, exitCode: 0 });
+    expect(only!.turns[0]).toMatchObject({ status: "passed", inputTokens: 10, outputTokens: 3, exitCode: 0 });
     expect(only!.events.map((e) => e.kind)).toEqual(["message"]);
 
     // What the user sees: the stream, the answer, the verdict and how to keep going.
@@ -248,7 +296,7 @@ describe("knit followup that passes", () => {
     expect(readRun(runId).detail.attempts.map((a) => a.attempt)).toEqual([1, 2, 3]);
     const sessions = readSessions();
     expect(sessions).toHaveLength(1);
-    expect(sessions[0]!.turns.map((t) => [t.seq, t.prompt])).toEqual([[1, "EDIT once"], [2, "EDIT twice"]]);
+    expect(sessions[0]!.turns.map((t) => [t.seq, t.prompt.split("\n")[0]])).toEqual([[1, "EDIT once"], [2, "EDIT twice"]]);
   });
 
   it("uses the chat of the latest attempt that has one", async () => {
@@ -359,9 +407,11 @@ describe("knit followup that is refused", () => {
     untouched(runId);
   });
 
-  it("refuses when the task's worktree is gone", async () => {
+  it("refuses when the task's worktree is gone and cannot be recreated because its branch is gone too", async () => {
     const runId = await runPlanFirst();
     rmSync(readRun(runId).detail.tasks[0]!.worktree!, { recursive: true, force: true });
+    git(repo, "worktree", "prune");
+    git(repo, "branch", "-D", "feat/create-a");
     const { seen } = await refused([runId, "T1", "EDIT it"], /worktree/);
     expect(seen.requests).toEqual([]);
     untouched(runId);

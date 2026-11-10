@@ -57,6 +57,19 @@ describe("useBoard", () => {
     expect(result.current.pulses).toEqual([]);
   });
 
+  it("reopens on request: fetches the board again and a new stream from its cursors, closing the old one", async () => {
+    const fetchDetail = vi.fn().mockResolvedValue(detail("first"));
+    const { result } = renderHook(() => useBoard("run-1", { fetchDetail, eventSource, refreshMs: 5 }));
+    await waitFor(() => expect(result.current.board?.planName).toBe("first"));
+    // The run finished and its stream ended; then a follow-up starts: the page must listen again.
+    fetchDetail.mockResolvedValue({ ...detail("second"), lastEventId: 30, lastAgentEventId: 44 });
+    act(() => result.current.reopen());
+    await waitFor(() => expect(result.current.board?.planName).toBe("second"));
+    expect(FakeSource.all).toHaveLength(2);
+    expect(FakeSource.all[0]!.closed).toBe(true);
+    expect(FakeSource.all[1]!.url).toBe("/api/runs/run-1/stream?after=30.44");
+  });
+
   it("refetches once for a burst of rows", async () => {
     const fetchDetail = vi.fn().mockResolvedValue(detail("x"));
     renderHook(() => useBoard("run-1", { fetchDetail, eventSource, refreshMs: 20 }));

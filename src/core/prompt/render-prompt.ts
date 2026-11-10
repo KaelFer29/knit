@@ -78,3 +78,19 @@ export function renderContinuationPrompt(retry: RetryContext): string {
   ].join("\n\n") + "\n";
 }
 
+
+/**
+ * What a resumed chat is sent for a follow-up: the instruction as typed, then the git rules a follow-up would otherwise
+ * not repeat. Without them the agent edits the file and leaves it uncommitted, which verification rejects.
+ */
+export function renderFollowupPrompt(instruction: string, branch: string): string {
+  return [
+    instruction.trim(),
+    [
+      "Git rules, unchanged:",
+      `- Stay on branch ${branch}. Do not switch branches, push, amend, rebase or reset.`,
+      "- Commit your work yourself, with a single-line message in the form type(scope): description (type is one of feat, fix, refactor, docs, chore, test; no body, no trailers).",
+      "- Leave the working tree clean when you finish: everything committed.",
+    ].join("\n"),
+  ].join("\n\n") + "\n";
+}

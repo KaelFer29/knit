@@ -1,0 +1,122 @@
+/* The instruction for Cursor, as a card in Claude's colors right under the iteration bar. */
+.followup-draft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--claude-line);
+  border-radius: var(--radius-lg);
+  background: var(--claude-paper);
+  animation: followup-in var(--duration-base) var(--ease-out);
+}
+
+@keyframes followup-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.followup-draft__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.followup-draft__heading {
+  margin: 0;
+  color: var(--claude-ink);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.followup-draft__note,
+.followup-draft__sent {
+  margin: 0;
+  color: var(--claude-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.followup-draft__text {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--claude-line);
+  border-radius: var(--radius-md);
+  background: var(--claude-ivory);
+  color: var(--claude-ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  resize: vertical;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.followup-draft__text:focus {
+  border-color: var(--claude-orange);
+  outline: none;
+}
+
+.followup-draft__text:focus-visible,
+.followup-draft__send:focus-visible,
+.followup-draft__link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.followup-draft__error {
+  margin: 0;
+  color: var(--status-failed);
+  font-size: var(--text-xs);
+}
+
+.followup-draft__foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.followup-draft__send {
+  padding: 0.3rem var(--space-4);
+  border: 1px solid var(--claude-ink);
+  border-radius: 999px;
+  background: var(--claude-ink);
+  color: var(--claude-paper);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.followup-draft__send:hover:not(:disabled) {
+  border-color: var(--claude-orange);
+  background: var(--claude-orange);
+}
+
+.followup-draft__send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.followup-draft__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--claude-orange-ink);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .followup-draft,
+  .followup-draft__text,
+  .followup-draft__send {
+    animation: none;
+    transition: none;
+  }
+}

@@ -373,3 +373,46 @@
   background: var(--status-failed-soft);
   color: var(--status-failed);
 }
+
+/* Work added after the pull request ended: amber, so it reads as pending next to the purple of what was merged. */
+.branch__pr[data-state="new"] {
+  background: var(--status-retrying-soft);
+  color: var(--status-retrying);
+}
+
+/* The notice of a finished checkout: at the far right of the tags, it fades in, holds and fades out by itself. */
+.branch__chips > li.branch__flash {
+  margin-left: auto;
+  animation: branch-flash var(--flash-ms, 3s) var(--ease-out) both;
+}
+
+.branch__flash span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+@keyframes branch-flash {
+  0% {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+  8% {
+    opacity: 1;
+    transform: none;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .branch__chips > li.branch__flash {
+    animation: none;
+  }
+}
+

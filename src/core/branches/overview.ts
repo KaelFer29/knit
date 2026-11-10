@@ -1,5 +1,6 @@
 import type { BranchState } from "../ports/branch-tools.js";
-import { decidePr, type PrDecision } from "./pr-rules.js";
+import { decideCheckout, type CheckoutDecision } from "./checkout-rules.js";
+import { decidePr, type PriorPr, type PrDecision } from "./pr-rules.js";
 import { decideUndo, type UndoDecision } from "./undo-rules.js";
 
 export interface BranchTask {
@@ -24,6 +25,8 @@ export interface BranchOverview {
   undo: { revert: UndoDecision; reset: UndoDecision; delete: UndoDecision };
   /** Whether a pull request can be opened and where it would go. */
   pr: PrDecision;
+  /** Whether the user's repository can be switched to this branch to test it, and what that does. */
+  checkout: CheckoutDecision;
 }
 
 /**
@@ -36,6 +39,8 @@ export function describeBranches(
   stateOf: (task: BranchTask) => BranchState,
   /** A branch the person chose for one task's pull request, in place of the recommended one. */
   requested?: { taskId: string; base: string },
+  /** What the pull request a task already has says (its state, and the commits added after it); asked only for tasks that have one. */
+  priorPr?: (taskId: string) => PriorPr | undefined,
 ): BranchOverview[] {
   const states = new Map<string, BranchState>();
   const read = (task: BranchTask): BranchState => {
@@ -47,6 +52,11 @@ export function describeBranches(
     return s;
   };
   const refs = tasks.map((t) => ({ taskId: t.taskId, ...(t.branch ? { branch: t.branch } : {}), ...(t.dependsOn ? { dependsOn: t.dependsOn } : {}) }));
+
+  // The branch the run started from (`<branch>@<sha>`), to say where to go back to before iterating on a task again.
+  const at = run.base.lastIndexOf("@");
+  const baseName = (at === -1 ? "" : run.base.slice(0, at)).trim();
+  const baseBranch = baseName === "" || baseName === "HEAD" ? undefined : baseName;
 
   return tasks.flatMap((task): BranchOverview[] => {
     if (task.branch === undefined || task.startSha === undefined) return [];
@@ -67,6 +77,7 @@ export function describeBranches(
         ...(task.prUrl ? { prUrl: task.prUrl } : {}),
         state,
         undo: { revert: undoFor("revert"), reset: undoFor("reset"), delete: undoFor("delete") },
+        checkout: decideCheckout({ runStatus: run.status, task: { taskId: task.taskId, branch: task.branch, startSha: task.startSha }, state, baseBranch }),
         pr: decidePr({
           runStatus: run.status,
           runBase: run.base,
@@ -75,6 +86,7 @@ export function describeBranches(
           state,
           parentState: parent && parent.branch !== undefined && parent.startSha !== undefined ? read(parent) : undefined,
           ...(requested?.taskId === task.taskId ? { requestedBase: requested.base } : {}),
+          ...(task.prUrl && priorPr?.(task.taskId) ? { prior: priorPr(task.taskId)! } : {}),
         }),
       },
     ];

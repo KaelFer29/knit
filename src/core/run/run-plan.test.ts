@@ -122,6 +122,7 @@ function harness(options: Options = {}) {
       state.outside = [];
       return wsFor(`/w/${input.runId}/${input.taskId}/repo`, input.branch, `start-${input.taskId}`);
     },
+    restore: () => { throw new Error("the run loop never restores a worktree"); },
     attach: (input) => {
       attached.push(input.path);
       return options.attachResult === "gone" ? undefined : wsFor(input.path, input.branch, input.startSha);
@@ -387,6 +388,7 @@ describe("runPlan: core loop", () => {
         workspace: {
           resolveBase: () => ({ sha: "b" }),
           prepare: (i) => ({ path: `/w/${i.taskId}`, branch: i.branch, startSha: "s" }),
+          restore: () => { throw new Error("the run loop never restores a worktree"); },
           attach: () => undefined,
           changedPaths: () => ["src/a.ts"],
           outsideChanges: () => [],
@@ -464,7 +466,7 @@ describe("runPlan: agent transcript", () => {
     const summary = await runPlan(plan(), {
       agent: { run: async () => ({ exitCode: 0, isError: false, resultText: "", durationMs: 1, timedOut: false }) },
       checks: { run: async (command) => ({ command, exitCode: 0, output: "", timedOut: false, durationMs: 1 }) },
-      workspace: { resolveBase: () => ({ sha: "s", branch: "main" }), prepare: (i) => ({ path: `/w/${i.taskId}`, branch: i.branch, startSha: "s" }), attach: () => undefined, changedPaths: () => ["src/a.ts"], outsideChanges: () => [], inspect: (ws) => ({ branch: ws.branch, historyIntact: true, commits: [{ sha: "x", subject: "feat: w", body: "" }], uncommitted: [] }), push: () => {} },
+      workspace: { resolveBase: () => ({ sha: "s", branch: "main" }), prepare: (i) => ({ path: `/w/${i.taskId}`, branch: i.branch, startSha: "s" }), restore: () => { throw new Error("not used"); }, attach: () => undefined, changedPaths: () => ["src/a.ts"], outsideChanges: () => [], inspect: (ws) => ({ branch: ws.branch, historyIntact: true, commits: [{ sha: "x", subject: "feat: w", body: "" }], uncommitted: [] }), push: () => {} },
       store: { createRun() {}, finishRun() {}, reopenRun() {}, getTasks: () => [], nextAttempt: () => 1, upsertTask() {}, recordAttempt() {}, recordEvent() {}, recordAgentEvent() {} },
     }, { runId: "r", planPath: "p", maxAttempts: 1 });
     expect(summary.tasks[0]).toMatchObject({ status: "passed" });

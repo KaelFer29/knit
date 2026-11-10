@@ -13,6 +13,8 @@ export interface BranchState {
   pushed: boolean;
   hasWorktree: boolean;
   dirty: boolean;
+  /** The branch is the one the user's own repository is on. */
+  checkedOut?: boolean;
 }
 
 export interface BranchView {
@@ -23,9 +25,11 @@ export interface BranchView {
   startSha: string;
   prUrl?: string;
   /** Read from GitHub when the list is built: absent when GitHub cannot be asked right now. */
-  prState?: { state: "open" | "merged" | "closed"; base: string };
+  prState?: { state: "open" | "merged" | "closed"; base: string; /** Commits the branch got after that pull request ended; they are not in the base. */ newCommits?: number };
   state: BranchState;
   undo: Record<UndoMode, Decision>;
+  /** Whether the user's repository can be switched to this branch to test it. */
+  checkout: Decision;
   pr: PrDecision;
 }
 
@@ -34,6 +38,13 @@ export interface BranchListing {
   runStatus: string;
   base: string;
   branches: BranchView[];
+  /** The task whose branch Knit switched the user's repository to, and the branch it was on before. */
+  returnTo?: { taskId: string; branch: string };
+}
+
+export interface ReturnResult {
+  ok: true;
+  branch: string;
 }
 
 export interface UndoResult {
@@ -56,3 +67,10 @@ export interface PrResult {
   base: string;
   head: string;
 }
+
+export interface CheckoutResult {
+  ok: true;
+  branch: string;
+  freedWorktree: boolean;
+}
+

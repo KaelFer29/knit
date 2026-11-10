@@ -1,0 +1,100 @@
+.iterate-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+}
+
+.iterate-tasks__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--claude-ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.iterate-tasks__item:hover {
+  background: var(--claude-ivory);
+}
+
+/* The chosen task: Claude's orange, so it reads as the one the next prompt is about. */
+.iterate-tasks__item[aria-pressed="true"] {
+  background: var(--claude-orange-tint);
+  box-shadow: inset 3px 0 0 var(--claude-orange);
+}
+
+.iterate-tasks__item:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.iterate-tasks__id {
+  flex: none;
+  padding: 0.05rem var(--space-2);
+  border-radius: 999px;
+  background: var(--claude-ink);
+  color: var(--claude-paper);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.iterate-tasks__item[aria-pressed="true"] .iterate-tasks__id {
+  background: var(--claude-orange);
+}
+
+.iterate-tasks__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iterate-tasks__branch {
+  flex: none;
+  color: var(--claude-ink-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.iterate-tasks__mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  color: var(--claude-orange-ink);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  animation: iterate-mark-in var(--duration-base) var(--ease-out);
+}
+
+@keyframes iterate-mark-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iterate-tasks__item {
+    transition: none;
+  }
+
+  .iterate-tasks__mark {
+    animation: none;
+  }
+}

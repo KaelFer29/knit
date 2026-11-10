@@ -1,8 +1,8 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { ApiError } from "../api/client";
 import { Chevron } from "../atoms/Chevron";
 import { StatusBadge } from "../atoms/StatusBadge";
-import type { BranchView, PrDraft, PrResult, UndoMode, UndoResult } from "../branches/types";
+import type { BranchView, CheckoutResult, PrDraft, PrResult, ReturnResult, UndoMode, UndoResult } from "../branches/types";
 import { draftKey, draftOnce, forgetDraft, loadDraft, saveDraft } from "../branches/draftCache";
 import { Popover } from "../molecules/Popover";
 import "./BranchCard.css";
@@ -10,6 +10,10 @@ import "./BranchCard.css";
 export interface BranchActions {
   /** The branches origin has now, asked each time the pull request form opens. */
   remote: () => Promise<string[]>;
+  /** Switches the user's repository to the branch to test it. */
+  checkout: (taskId: string) => Promise<CheckoutResult>;
+  /** Gives the user's repository back its own branch. */
+  returnRepo: (taskId: string) => Promise<ReturnResult>;
   undo: (taskId: string, mode: UndoMode) => Promise<UndoResult>;
   draft: (taskId: string, how: "template" | "model") => Promise<PrDraft>;
   open: (taskId: string, title: string, body: string, into?: string) => Promise<PrResult>;
@@ -45,15 +49,25 @@ const DRAFT_MODEL = "composer-2.5-fast";
 /** What the server calls a description built from the task, with no model. */
 const TEMPLATE = "template";
 
-type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | undefined;
+type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | { kind: "checkout" } | { kind: "return" } | undefined;
 
 /**
  * One branch Cursor created: its commits and where it is, and what can be done with it. Undoing asks first and says
  * exactly what it will do; a pull request is drafted by a cheap model and edited before anything is pushed. The card
  * only renders and holds the state of its own forms; the actions come from the container.
  */
-export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen = false }: { runId: string; branch: BranchView; actions: BranchActions; onChanged: () => void; defaultOpen?: boolean }) {
+/** How long the notice of a finished checkout stays in the tag row. */
+export const FLASH_MS = 3000;
+
+export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen = false, flashMs = FLASH_MS, returnTo }: { runId: string; branch: BranchView; actions: BranchActions; onChanged: () => void; defaultOpen?: boolean; flashMs?: number; /** The branch the user's repository was on before Knit tested this task; set only on the task that was tested. */ returnTo?: string }) {
   const [open, setOpen] = useState(defaultOpen);
+  /** A short notice at the end of the state tags; it goes away by itself. */
+  const [flash, setFlash] = useState<{ text: string; key: number }>();
+  useEffect(() => {
+    if (flash === undefined) return;
+    const timer = window.setTimeout(() => setFlash(undefined), flashMs);
+    return () => window.clearTimeout(timer);
+  }, [flash, flashMs]);
   const sectionId = useId();
   const [panel, setPanel] = useState<Panel>();
   /** The branch typed in the form; undefined until the person edits it, so the recommended one stays the default. */
@@ -61,7 +75,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
   const [remote, setRemote] = useState<{ state: "loading" } | { state: "ready"; names: string[] } | { state: "failed"; message: string }>({ state: "loading" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const [result, setResult] = useState<{ text: string; url?: string }>();
+  const [result, setResult] = useState<{ text: string }>();
   const [draft, setDraft] = useState<{ state: "writing" | "ready" | "failed"; title: string; body: string; model: string; saved: boolean }>({ state: "writing", title: b.title, body: "", model: TEMPLATE, saved: false });
   const key = draftKey(runId, b.taskId, b.state.head);
   const titleId = useId();
@@ -79,6 +93,36 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
       await actions.undo(b.taskId, mode);
       setPanel(undefined);
       setResult({ text: UNDO[mode].done(b.branch, b.taskId) });
+      onChanged();
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmReturn = async (): Promise<void> => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      const done = await actions.returnRepo(b.taskId);
+      setPanel(undefined);
+      setFlash({ text: `Repository back on ${done.branch}`, key: Date.now() });
+      onChanged();
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmCheckout = async (): Promise<void> => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await actions.checkout(b.taskId);
+      setPanel(undefined);
+      setFlash({ text: "Repository switched", key: Date.now() });
       onChanged();
     } catch (err) {
       setError(messageOf(err));
@@ -133,7 +177,8 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
       const done = await actions.open(b.taskId, draft.title.trim(), draft.body, target === recommended ? undefined : target);
       setPanel(undefined);
       forgetDraft(key);
-      setResult({ text: "", url: done.url });
+      // The link is the "Pull request" tag of the row once the branch is read again; here only a short notice.
+      setFlash({ text: "Pull request opened", key: Date.now() });
       onChanged();
     } catch (err) {
       setError(messageOf(err));
@@ -169,12 +214,17 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
             Closed without merging
           </span>
         ) : null}
+        {b.prState !== undefined && b.prState.state !== "open" && (b.prState.newCommits ?? 0) > 0 ? (
+          <span className="branch__pr" data-state="new" title="Commits made after the pull request ended: they are not in the base branch">
+            {b.prState.newCommits} new {b.prState.newCommits === 1 ? "commit" : "commits"}
+          </span>
+        ) : null}
         <StatusBadge state={b.status === "passed" ? "delivered" : b.status === "failed" ? "failed" : "running"} />
         <Chevron />
       </button>
       {open ? (
         <div className="branch__body-wrap" id={sectionId}>
-      <ul className="branch__chips" aria-label="State of the branch">
+      <ul className="branch__chips" aria-label="State of the branch" style={{ "--flash-ms": `${flashMs}ms` } as React.CSSProperties}>
         <li>{plural(state.ahead.length, "commit")}</li>
         <li data-tone={state.pushed ? "ok" : undefined}>{state.pushed ? "On origin" : "Local only"}</li>
         <li>{state.hasWorktree ? "Has a worktree" : "No worktree"}</li>
@@ -187,6 +237,16 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
             </a>
           </li>
         ) : null}
+              {flash === undefined ? null : (
+          <li key={flash.key} className="branch__flash" data-tone="ok">
+            <span role="status">
+              <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <path d="m3.5 8.5 3 3 6-7" />
+              </svg>{" "}
+              {flash.text}
+            </span>
+          </li>
+        )}
       </ul>
       {state.ahead.length > 0 ? (
         <ol className="branch__commits" aria-label="Commits of the task">
@@ -200,9 +260,36 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
       ) : null}
 
       <div className="branch__actions">
-        {b.prUrl ? null : (
+        {b.prUrl && !b.pr.ok ? null : (
           <button type="button" className="branch__primary" disabled={!b.pr.ok || busy || panel?.kind === "pr"} onClick={startPr}>
             Open pull request
+          </button>
+        )}
+        <button
+          type="button"
+          className="branch__ghost"
+          disabled={!b.checkout.ok || busy || panel?.kind === "checkout"}
+          title={b.checkout.ok ? "Switch your repository to this branch to test it" : b.checkout.reason}
+          onClick={() => {
+            setResult(undefined);
+            setError(undefined);
+            setPanel({ kind: "checkout" });
+          }}
+        >
+          Test this branch
+        </button>
+        {returnTo === undefined ? null : (
+          <button
+            type="button"
+            className="branch__primary"
+            disabled={busy || panel?.kind === "return"}
+            onClick={() => {
+              setResult(undefined);
+              setError(undefined);
+              setPanel({ kind: "return" });
+            }}
+          >
+            Return repository to {returnTo}
           </button>
         )}
         <Popover
@@ -245,6 +332,54 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
         </Popover>
       </div>
       {prReason !== undefined && !b.prUrl ? <p className="branch__why">{prReason}</p> : null}
+      {!b.checkout.ok && b.checkout.reason !== prReason ? <p className="branch__why">{b.checkout.reason}</p> : null}
+
+      {panel?.kind === "return" && returnTo !== undefined ? (
+        <div className="branch__panel" role="alertdialog" aria-label={`Return your repository to ${returnTo}`}>
+          <p className="branch__panel-title">Return your repository to {returnTo}</p>
+          <ul className="branch__effects">
+            <li>Switches your repository back to {returnTo}. It must have no uncommitted changes.</li>
+            <li>{b.branch} and its commits stay; iterating on {b.taskId} again recreates its worktree.</li>
+          </ul>
+          {error ? (
+            <p className="branch__error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="branch__row">
+            <button type="button" className="branch__primary" disabled={busy} onClick={() => void confirmReturn()}>
+              {busy ? "Working…" : `Switch back to ${returnTo}`}
+            </button>
+            <button type="button" className="branch__ghost" disabled={busy} onClick={close}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {panel?.kind === "checkout" && b.checkout.ok ? (
+        <div className="branch__panel" role="alertdialog" aria-label={`Test ${b.branch} in your repository`}>
+          <p className="branch__panel-title">Test {b.branch} in your repository</p>
+          <ul className="branch__effects">
+            {b.checkout.effects.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+          {error ? (
+            <p className="branch__error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="branch__row">
+            <button type="button" className="branch__primary" disabled={busy} onClick={() => void confirmCheckout()}>
+              {busy ? "Working…" : "Switch my repository"}
+            </button>
+            <button type="button" className="branch__ghost" disabled={busy} onClick={close}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {panel?.kind === "undo" ? (
         <div className="branch__panel branch__panel--danger" role="alertdialog" aria-label={UNDO[panel.mode].title(b.branch)}>
@@ -362,13 +497,7 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
 
       {result ? (
         <p className="branch__result" role="status">
-          {result.url ? (
-            <a href={result.url} target="_blank" rel="noopener noreferrer">
-              Pull request ↗
-            </a>
-          ) : (
-            result.text
-          )}
+          {result.text}
         </p>
       ) : null}
         </div>

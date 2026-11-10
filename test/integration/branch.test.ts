@@ -182,6 +182,58 @@ function draftAgent(answer: string, fail = false) {
   return { seen, deps: (): CliDeps => ({ ...deps(), agent: (o) => (seen.options.push(o), agent) }) };
 }
 
+describe("knit branch checkout", () => {
+  const head = (): string => git(repo, "rev-parse", "--abbrev-ref", "HEAD");
+
+  it("without --yes only says what it would do, and changes nothing", async () => {
+    const { runId, worktree } = await runPlan();
+    const before = head();
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "checkout", "--json"], c.io, deps())).toBe(0);
+    const out = JSON.parse(c.out().trim());
+    expect(out).toMatchObject({ ok: true, dryRun: true, branch: "feat/create-a" });
+    expect(out.effects.join(" ")).toMatch(/Removes the worktree of T1/);
+    expect(existsSync(worktree)).toBe(true);
+    expect(head()).toBe(before);
+    expect(events(runId)).not.toContain("branch.checked_out");
+  });
+
+  it("with --yes frees the worktree and switches the repository to the branch, which keeps its commits, and records it", async () => {
+    const { runId, worktree } = await runPlan();
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "checkout", "--yes", "--json"], c.io, deps())).toBe(0);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: true, dryRun: false, branch: "feat/create-a", freedWorktree: true });
+    expect(existsSync(worktree)).toBe(false);
+    expect(head()).toBe("feat/create-a");
+    expect(existsSync(join(repo, "src/a.txt"))).toBe(true);
+    expect(events(runId)).toContain("branch.checked_out");
+  });
+
+  it("refuses, and changes nothing, when the user's repository has uncommitted changes", async () => {
+    const { runId, worktree } = await runPlan();
+    writeFileSync(join(repo, "wip.txt"), "wip\n");
+    const before = head();
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "checkout", "--yes", "--json"], c.io, deps())).toBe(1);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("uncommitted changes") });
+    expect(existsSync(worktree)).toBe(true);
+    expect(head()).toBe(before);
+  });
+
+  it("refuses a second time, saying the repository is already on the branch", async () => {
+    const { runId } = await runPlan();
+    await main(["branch", runId, "T1", "checkout", "--yes"], capture().io, deps());
+    const c = capture();
+    expect(await main(["branch", runId, "T1", "checkout", "--yes", "--json"], c.io, deps())).toBe(1);
+    expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("already on feat/create-a") });
+  });
+
+  it("refuses a task that has no branch", async () => {
+    const { runId } = await runPlan();
+    expect(await main(["branch", runId, "T9", "checkout", "--yes"], capture().io, deps())).toBe(1);
+  });
+});
+
 describe("knit branch pr-draft", () => {
   it("asks the cheap model for a title and a body from the task and its diff, in a scratch directory, and prints them", async () => {
     const { runId, worktree } = await runPlan();
@@ -218,6 +270,43 @@ describe("knit branch pr-draft", () => {
     const { runId } = await runPlan();
     expect(await main(["branch", runId, "T1", "pr-draft", "--template", "--model", "grok-4.7-high"], capture().io, draftAgent("x").deps())).toBe(2);
     expect(await main(["branch", runId, "T1", "pr", "--template", "--title", "t", "--body", "b"], capture().io, deps())).toBe(2);
+  });
+
+  describe("a description for a second pull request", () => {
+    const record = (runId: string, type: string, payload?: object): void => {
+      const store = new SqliteRunStore(join(dataDir, "knit.db"));
+      store.recordEvent({ runId, taskId: "T1", ts: "2026-11-09T12:00:00.000Z", type, ...(payload ? { payload } : {}) });
+      store.close();
+    };
+    const body = async (runId: string): Promise<string> => {
+      const c = capture();
+      expect(await main(["branch", runId, "T1", "pr-draft", "--template", "--json"], c.io, draftAgent("x").deps())).toBe(0);
+      return (JSON.parse(c.out().trim()) as { body: string }).body;
+    };
+
+    it("says what the follow-ups after the previous pull request asked for, and not what was asked before it", async () => {
+      const { runId } = await runPlan();
+      record(runId, "followup.started", { prompt: "an old correction, already in the first pull request" });
+      record(runId, "branch.pr_opened", { url: "https://example.test/pull/7", base: "main", head: "feat/create-a" });
+      record(runId, "followup.started", { prompt: "Make the heading a level 2 heading." });
+      record(runId, "followup.started", { prompt: "Keep the rest of the file." });
+      const text = await body(runId);
+      expect(text).toContain("## Correction\n- Make the heading a level 2 heading.\n- Keep the rest of the file.");
+      expect(text).not.toContain("an old correction");
+    });
+
+    it("says everything the follow-ups asked when no pull request was opened before, and nothing without follow-ups", async () => {
+      const { runId } = await runPlan();
+      expect(await body(runId)).not.toContain("## Correction");
+      record(runId, "followup.started", { prompt: "Tweak it." });
+      expect(await body(runId)).toContain("## Correction\n- Tweak it.");
+    });
+
+    it("skips a follow-up that recorded no prompt (older runs)", async () => {
+      const { runId } = await runPlan();
+      record(runId, "followup.started", { sessionId: "s", chatId: "c" });
+      expect(await body(runId)).not.toContain("## Correction");
+    });
   });
 
   it("uses the model it is given instead of the default", async () => {
@@ -324,6 +413,56 @@ describe("knit branch pr", () => {
     expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("its own branch") });
     expect(calls).toEqual([]);
     expect(git(bare, "branch", "--list", "feat/create-a")).toBe("");
+  });
+
+  describe("a second pull request for a branch that got new commits after the first one was merged", () => {
+    const urls = ["https://example.test/pull/7", "https://example.test/pull/8"];
+    /** GitHub as it is after the merge: the first pull request ended at the commit it had when it was opened. */
+    const afterMerge = (endedAt: () => string): { deps: () => CliDeps; created: number } => {
+      const state = { deps: (): CliDeps => ({ ...deps() }), created: 0 };
+      const prs: PullRequests = {
+        preflight: () => {},
+        status: () => ({ state: "merged", base: "main", headSha: endedAt() }),
+        create: (input) => {
+          calls.push(input);
+          return { url: urls[state.created++]! };
+        },
+      };
+      state.deps = () => ({ ...deps(), pullRequests: prs });
+      return state;
+    };
+    const pr = (runId: string, d: CliDeps, c = capture()) => main(["branch", runId, "T1", "pr", "--title", "t", "--body", "b", "--json"], c.io, d);
+    const addCommit = (worktree: string): void => {
+      writeFileSync(join(worktree, "second.txt"), "second\n");
+      git(worktree, "add", "-A");
+      git(worktree, "commit", "-qm", "feat(demo): a correction");
+    };
+
+    it("opens another one for the new commits, and keeps the address of the latest", async () => {
+      const { runId, worktree } = await runPlan();
+      const first = afterMerge(() => git(worktree, "rev-parse", "HEAD"));
+      expect(await pr(runId, first.deps())).toBe(0);
+      const merged = git(worktree, "rev-parse", "HEAD");
+      addCommit(worktree);
+      const later = afterMerge(() => merged);
+      later.created = 1;
+      const c = capture();
+      expect(await pr(runId, later.deps(), c)).toBe(0);
+      expect(JSON.parse(c.out().trim())).toMatchObject({ ok: true, url: urls[1] });
+      const store = new SqliteRunStore(join(dataDir, "knit.db"));
+      expect(store.getRun(runId)!.tasks[0]!.prUrl).toBe(urls[1]);
+      expect(store.getEvents(runId).filter((e) => e.type === "branch.pr_opened").map((e) => (e.payload as { url: string }).url)).toEqual(urls);
+      store.close();
+    });
+
+    it("refuses when the merged pull request carried everything", async () => {
+      const { runId, worktree } = await runPlan();
+      const first = afterMerge(() => git(worktree, "rev-parse", "HEAD"));
+      expect(await pr(runId, first.deps())).toBe(0);
+      const c = capture();
+      expect(await pr(runId, first.deps(), c)).toBe(1);
+      expect(JSON.parse(c.out().trim())).toMatchObject({ ok: false, reason: expect.stringContaining("already has a pull request") });
+    });
   });
 
   it("takes a title or a body that starts with a dash when it is given as --title=... and --body=...", async () => {

@@ -23,7 +23,7 @@ interface Props {
   error?: string;
   placeholder?: string;
   /** The "send to the orchestrator" switch; absent when the container offers no routing. */
-  routing?: { on: boolean; onChange: (on: boolean) => void };
+  routing?: { on: boolean; onChange: (on: boolean) => void; disabled?: boolean | undefined; reason?: string | undefined };
 }
 
 /** Prompt field with the command palette and the per-turn profile. Presentational: the container sends and tracks. */
@@ -138,7 +138,7 @@ export function Composer({ agent, models, profile, onProfileChange, commands, on
           >
             /
           </button>
-          {routing ? <RouteSwitch on={routing.on} onChange={routing.onChange} /> : null}
+          {routing ? <RouteSwitch on={routing.on} onChange={routing.onChange} disabled={routing.disabled} reason={routing.reason} /> : null}
           <ProfileBar agent={agent} models={models} profile={profile} onChange={onProfileChange} modelRef={modelField} />
           <div className="composer__send">
             {busy ? <span className="composer__busy">{busyLabel ?? "Working…"}</span> : null}

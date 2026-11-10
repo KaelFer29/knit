@@ -226,6 +226,21 @@ describe("POST /api/runs/:id/tasks/:task/pr-draft and /pr", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("starts the checkout of a branch only when it is confirmed, and says what it did", async () => {
+    seed();
+    answer = { json: { ok: true, dryRun: false, branch: "docs/one", effects: ["Switches your repository to docs/one."], freedWorktree: true } };
+    const server = await launch();
+    const url = `/api/runs/${RUN}/tasks/T1/checkout`;
+    expect((await request(server, "POST", url, {})).status).toBe(400);
+    expect((await request(server, "POST", url, { confirm: false })).status).toBe(400);
+    expect((await request(server, "POST", url, { confirm: true, extra: 1 })).status).toBe(400);
+    expect(calls).toHaveLength(0);
+    const reply = await request(server, "POST", url, { confirm: true });
+    expect(reply.status).toBe(200);
+    expect(reply.json()).toMatchObject({ ok: true, branch: "docs/one", freedWorktree: true });
+    expect(calls[0]!.args).toEqual(["branch", RUN, "T1", "checkout", "--yes", "--json", "--data-dir", dataDir]);
+  });
+
   it("lists the branches origin has, for choosing where a pull request goes", async () => {
     seed();
     const bare = join(scratch, "origin.git");
@@ -322,6 +337,45 @@ describe("GET /api/runs/:id/branches with a pull request", () => {
     const reply = await request(await launch({ pulls: pulls("merged", "release/1.2") }), "GET", `/api/runs/${RUN}/branches`);
     expect(reply.status).toBe(200);
     expect(reply.json().branches[0]).toMatchObject({ prUrl: PR, prState: { state: "merged", base: "release/1.2" } });
+  });
+
+  describe("a branch that got new commits after its pull request", () => {
+    const seedWithPr = (): string => {
+      seed();
+      const store = new SqliteRunStore(dbPath());
+      store.upsertTask({ runId: RUN, taskId: "T1", title: "Create prueba.md", status: "passed", branch: "docs/one", worktree, startSha, position: 1, prUrl: PR });
+      store.close();
+      return git(repo, "rev-parse", "docs/one");
+    };
+    const endedAt = (headSha: string, state: "open" | "merged" | "closed" = "merged"): PullRequests => ({ preflight: () => {}, create: () => ({ url: PR }), status: () => ({ state, base: "main", headSha }) });
+    const addCommit = (): void => {
+      writeFileSync(join(worktree, "second.md"), "second\n");
+      git(worktree, "add", "-A");
+      git(worktree, "commit", "-qm", "docs: correct prueba.md");
+    };
+
+    it("says how many commits the merged pull request did not carry, and lets another be opened", async () => {
+      const merged = seedWithPr();
+      addCommit();
+      const b = (await request(await launch({ pulls: endedAt(merged) }), "GET", `/api/runs/${RUN}/branches`)).json().branches[0];
+      expect(b.prState).toMatchObject({ state: "merged", base: "main", newCommits: 1 });
+      expect(b.pr).toMatchObject({ ok: true, head: "docs/one" });
+    });
+
+    it("keeps refusing a second pull request when the merged one carried everything", async () => {
+      const merged = seedWithPr();
+      const b = (await request(await launch({ pulls: endedAt(merged) }), "GET", `/api/runs/${RUN}/branches`)).json().branches[0];
+      expect(b.prState).toMatchObject({ state: "merged", newCommits: 0 });
+      expect(b.pr).toMatchObject({ ok: false, reason: expect.stringContaining("already has a pull request") });
+    });
+
+    it("does not count while the pull request is still open", async () => {
+      const head = seedWithPr();
+      addCommit();
+      const b = (await request(await launch({ pulls: endedAt(head, "open") }), "GET", `/api/runs/${RUN}/branches`)).json().branches[0];
+      expect(b.prState.newCommits).toBeUndefined();
+      expect(b.pr.ok).toBe(false);
+    });
   });
 
   it("still lists the branch when GitHub cannot be asked: no state, the address kept", async () => {
