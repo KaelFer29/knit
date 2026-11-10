@@ -32,8 +32,8 @@
 
 /* The chosen task: Claude's orange, so it reads as the one the next prompt is about. */
 .iterate-tasks__item[aria-pressed="true"] {
-  background: var(--agent-claude-soft);
-  box-shadow: inset 3px 0 0 var(--agent-claude);
+  background: var(--claude-orange-tint);
+  box-shadow: inset 3px 0 0 var(--claude-orange);
 }
 
 .iterate-tasks__item:focus-visible {
@@ -53,7 +53,7 @@
 }
 
 .iterate-tasks__item[aria-pressed="true"] .iterate-tasks__id {
-  background: var(--agent-claude);
+  background: var(--claude-orange);
 }
 
 .iterate-tasks__title {
@@ -76,7 +76,7 @@
   flex: none;
   align-items: center;
   gap: 4px;
-  color: var(--claude-text);
+  color: var(--claude-orange-ink);
   font-size: var(--text-xs);
   font-weight: 600;
   animation: iterate-mark-in var(--duration-base) var(--ease-out);

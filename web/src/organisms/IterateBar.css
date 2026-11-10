@@ -11,12 +11,12 @@
 
 .iterate-bar:hover,
 .iterate-bar[data-open] {
-  border-color: color-mix(in srgb, var(--agent-claude) 45%, var(--claude-line));
+  border-color: var(--claude-orange-line);
 }
 
 .iterate-bar[data-selected] {
-  border-color: var(--agent-claude);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--agent-claude) 14%, transparent);
+  border-color: var(--claude-orange);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--claude-orange) 14%, transparent);
 }
 
 .iterate-bar__row {
@@ -53,8 +53,8 @@
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: var(--agent-claude-soft);
-  color: var(--claude-text);
+  background: var(--claude-orange-tint);
+  color: var(--claude-orange-ink);
   transition: transform var(--duration-base) var(--ease-out);
 }
 
@@ -63,7 +63,7 @@
 }
 
 .iterate-bar[data-selected] .iterate-bar__icon {
-  background: var(--agent-claude);
+  background: var(--claude-orange);
 }
 
 /* A soft beat while a task is chosen: the next prompts are about it. */
@@ -128,7 +128,7 @@
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  color: var(--claude-text);
+  color: var(--claude-orange-ink);
   font-size: var(--text-xs);
   font-weight: 600;
   text-overflow: ellipsis;
@@ -157,8 +157,8 @@
 }
 
 .iterate-bar__stop:hover {
-  background: var(--agent-claude-soft);
-  color: var(--claude-text);
+  background: var(--claude-orange-tint);
+  color: var(--claude-orange-ink);
 }
 
 .iterate-bar__panel {

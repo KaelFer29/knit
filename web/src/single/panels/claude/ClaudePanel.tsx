@@ -13,13 +13,14 @@ import { useSessionTitles } from "../../../sessions/useSessionTitles";
 import { fetchAgentList, fetchModels, fetchSessions, sendTurn, startSession } from "../../../sessions/api";
 import { identityOf } from "../../../identity/agents";
 import { sendFollowup } from "../../../runs/api";
-import { extractFollowup, iterationPrompt } from "../../../sessions/iterate";
+import { extractFollowup, iterationPrompt, iterationTargets } from "../../../sessions/iterate";
 import { launchPlan, type PlanDraftView } from "../../../sessions/plans";
 import { paletteCommands, usageAction } from "../../../sessions/commands";
 import { routedPrompt } from "../../../sessions/route";
 import { buildTimeline } from "../../../sessions/timeline";
 import type { AgentView, Profile, SessionListEntry } from "../../../sessions/types";
 import { usePlanDrafts } from "../../../sessions/usePlanDrafts";
+import { usePrStates } from "../../../branches/usePrStates";
 import { useSessionLive } from "../../../sessions/useSessionLive";
 import { ClaudePanelHeader } from "./ClaudePanelHeader";
 import { EmptyConversation } from "./EmptyConversation";
@@ -184,13 +185,15 @@ export function ClaudePanel({ agentId: panelAgent, board, runId, live: runIsLive
     }
   };
 
-  // The delivered and the failed tasks of a real run can be iterated on (a failed one is how it gets fixed): the same branch, the same Cursor chat, a new attempt.
+  // The delivered and failed tasks of a real run that are not merged yet can be iterated on: the same branch, the same
+  // Cursor chat, a new attempt. The pull request states come from GitHub, read only when a task has one.
+  const prStates = usePrStates(runId, runIsLive && board !== undefined && board.tasks.some((t) => t.prUrl !== undefined));
   const targets = useMemo(
     () =>
       runIsLive && runId !== undefined && board !== undefined
-        ? board.tasks.filter((t) => (t.state === "delivered" || t.state === "failed") && t.branch !== undefined).map((t) => ({ taskId: t.taskId, title: t.title, branch: t.branch, goal: t.goal, specs: t.specs }))
+        ? iterationTargets(board.tasks, prStates).map((t) => ({ taskId: t.taskId, title: t.title, branch: t.branch, goal: t.goal, specs: t.specs }))
         : [],
-    [board, runId, runIsLive],
+    [board, runId, runIsLive, prStates],
   );
   const target = targets.find((t) => t.taskId === iterating);
   const latestTurn = live.detail?.turns[live.detail.turns.length - 1];

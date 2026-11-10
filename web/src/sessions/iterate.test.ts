@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractFollowup, iterationPrompt } from "./iterate";
+import { extractFollowup, iterationPrompt, iterationTargets } from "./iterate";
 
 const task = {
   taskId: "T1",
@@ -69,5 +69,21 @@ describe("extractFollowup", () => {
 
   it("does not read a followup block quoted inside another fence", () => {
     expect(extractFollowup("````md\n```followup\ninner\n```\n````")).toBeUndefined();
+  });
+});
+
+describe("iterationTargets", () => {
+  const t = (taskId: string, state: string) => ({ taskId, state, branch: `docs/${taskId}` as string | undefined });
+  const noBranch = (taskId: string, state: string) => ({ taskId, state, branch: undefined });
+
+  it("offers the delivered and the failed tasks that have a branch", () => {
+    const tasks = [t("T1", "delivered"), t("T2", "failed"), t("T3", "running"), noBranch("T4", "delivered")];
+    expect(iterationTargets(tasks, {}).map((x) => x.taskId)).toEqual(["T1", "T2"]);
+  });
+
+  it("leaves out a task whose pull request is merged: it was reviewed and accepted, so it is not iterated on", () => {
+    const tasks = [t("T1", "delivered"), t("T2", "delivered"), t("T3", "delivered")];
+    const prStates = { T1: { state: "merged" }, T2: { state: "open" } };
+    expect(iterationTargets(tasks, prStates).map((x) => x.taskId)).toEqual(["T2", "T3"]);
   });
 });

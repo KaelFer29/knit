@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { IterateTasks } from "./IterateTasks";
+import { IterateTasks, ITERATE_PAGE_SIZE } from "./IterateTasks";
 
 const tasks = [
   { taskId: "T1", title: "Create prueba.md", branch: "docs/one" },
@@ -28,6 +28,23 @@ describe("IterateTasks", () => {
     rerender(<IterateTasks tasks={tasks} selected="T1" onSelect={onSelect} />);
     await user.click(screen.getByRole("button", { name: /T1/ }));
     expect(onSelect).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("pages the tasks, a few at a time, so the list never covers the conversation", async () => {
+    const many = Array.from({ length: ITERATE_PAGE_SIZE + 2 }, (_, i) => ({ taskId: `T${i + 1}`, title: `Task ${i + 1}`, branch: `docs/${i + 1}` }));
+    const user = userEvent.setup();
+    render(<IterateTasks tasks={many} selected={undefined} onSelect={() => {}} />);
+    const list = within(screen.getByRole("list", { name: "Tasks to iterate on" }));
+    expect(list.getAllByRole("button")).toHaveLength(ITERATE_PAGE_SIZE);
+    expect(screen.getByText(`1–${ITERATE_PAGE_SIZE} of ${many.length} tasks`)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    expect(list.getAllByRole("button")).toHaveLength(2);
+    expect(list.getByRole("button", { name: /T6/ })).toBeTruthy();
+  });
+
+  it("shows no pager when everything fits in one page", () => {
+    render(<IterateTasks tasks={tasks} selected={undefined} onSelect={() => {}} />);
+    expect(screen.queryByRole("navigation", { name: /Pages of tasks/ })).toBeNull();
   });
 
   it("renders nothing when there are no tasks", () => {

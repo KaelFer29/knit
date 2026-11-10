@@ -13,6 +13,17 @@ export interface IterationTarget {
  * it to the orchestrator, which continues the same Cursor chat on the same branch. The request goes last and
  * untouched, so Claude reads the rules first.
  */
+/**
+ * The tasks worth iterating on: delivered or failed ones with a branch, whose pull request is not merged. A merged task
+ * was already reviewed and accepted, so a correction to it is not offered.
+ */
+export function iterationTargets<T extends { taskId: string; state: string; branch?: string | undefined }>(
+  tasks: readonly T[],
+  prStates: Readonly<Record<string, { state: string } | undefined>>,
+): T[] {
+  return tasks.filter((t) => (t.state === "delivered" || t.state === "failed") && t.branch !== undefined && prStates[t.taskId]?.state !== "merged");
+}
+
 export function iterationPrompt(task: IterationTarget, request: string): string {
   const specs = task.specs ?? [];
   return [
