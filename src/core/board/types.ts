@@ -31,6 +31,10 @@ export interface AttemptView {
   durationMs?: number;
   inputTokens?: number;
   outputTokens?: number;
+  /** Which chat the attempt ran in: a new one, the previous attempt's resumed, or a fresh one because the previous was full. Absent when not recorded. */
+  chat?: "new" | "resumed" | "switched";
+  /** How much context the agent's chat carried after this attempt (fresh input plus cache); absent when it was not recorded. */
+  contextTokens?: number;
   /** The check command that failed, or the setup command. */
   failedCheck?: string;
   /** Scope verdict: false when the agent changed files outside the task's allowed files. Absent while open. */
@@ -147,6 +151,20 @@ export interface BoardTotals {
   tasks: Record<TaskState, number> & { total: number };
 }
 
+/** How full the chat of the builder agent is, from the latest attempt that recorded its context. */
+export interface ContextView {
+  /** The task whose chat was measured, and its attempt. */
+  taskId: string;
+  attempt: number;
+  tokens: number;
+  /** The window of the model the plan chose for that task, or the default one. */
+  window: number;
+  /** `tokens / window`, from 0 to 1. */
+  share: number;
+  /** The window is the default, not read from the model id. */
+  assumedWindow: boolean;
+}
+
 export interface BoardModel {
   runId: string;
   planName: string;
@@ -165,4 +183,6 @@ export interface BoardModel {
   tasks: TaskView[];
   totals: BoardTotals;
   liveLine?: LiveLine;
+  /** Absent when no attempt recorded the context of its chat (older runs, or an agent that does not report it). */
+  context?: ContextView;
 }

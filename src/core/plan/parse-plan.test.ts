@@ -168,6 +168,19 @@ describe("parsePlan: the model of a task", () => {
     }
   });
 
+  it("accepts the parameterized ids the CLI takes: one bracket group of key=value pairs at the end", () => {
+    for (const id of ["claude-opus-4-8[context=1m]", "claude-opus-4-8[context=1m,effort=high,fast=false]", "gpt-5[effort=high]", "m[]"]) {
+      expect(parsePlan(withModel(`Model: ${id}`)).tasks[0]!.model, id).toBe(id);
+    }
+    expect(parsePlan(withModel("Model: `claude-opus-4-8[context=1m]`")).tasks[0]!.model).toBe("claude-opus-4-8[context=1m]");
+  });
+
+  it("rejects a bracket group that is open, nested, repeated, leading, followed by text or carries anything but key=value characters", () => {
+    for (const bad of ["a[b", "a]b", "a[b]c", "[x]", "a[b][c]", "a[[b]]", "a[b c]", "a[b;c]", "a[$(x)]", "a[b`c]", "a[b\\c]", `a[${"x".repeat(81)}]`, "-a[b=c]"]) {
+      expect(() => parsePlan(withModel(`Model: ${bad}`)), bad).toThrow(/T1: invalid model/);
+    }
+  });
+
   it("rejects a model that is empty, has spaces or could be read as a flag, and says which task", () => {
     for (const bad of ["Model:", "Model: Grok 4.7", "Model: --force", "Model: a;b", "Model: -x"]) {
       expect(() => parsePlan(withModel(bad)), bad).toThrow(/T1: invalid model/);

@@ -20,9 +20,29 @@ function familyOf(id: string): string | undefined {
   return match?.[1];
 }
 
+/**
+ * An id as the interface shows it: the parameters of `name[context=1m,effort=high,fast=false]` go after dashes
+ * (`name-1m-high`), never in long brackets. A flag that is on is shown by its name, one that is off is left out.
+ */
+export function shortModelId(id: string): string {
+  const match = /^([^[\]]*)\[([^[\]]*)\]$/.exec(id);
+  if (match === null) return id.replace(/[[\]]/g, "");
+  const params = match[2]!
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p !== "")
+    .flatMap((p) => {
+      const [key = "", ...rest] = p.split("=");
+      const value = rest.join("=");
+      if (value === "" || value === "true") return [key];
+      return value === "false" ? [] : [value];
+    });
+  return [match[1]!, ...params].filter((part) => part !== "").join("-");
+}
+
 export function modelInfo(id: string): ModelInfo {
   const family = familyOf(id);
-  return family === undefined ? { name: id } : FAMILIES[family]!;
+  return family === undefined ? { name: shortModelId(id) } : FAMILIES[family]!;
 }
 
 export interface ModelChoice extends ModelInfo {

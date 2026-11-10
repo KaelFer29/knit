@@ -91,7 +91,7 @@ function followupAgent(seen: Seen, capabilities: AgentCapabilities | null): Agen
       } else if (req.prompt.includes("CRASH")) {
         return { exitCode: 3, isError: true, resultText: "bad crash", durationMs: 1, timedOut: false, sessionId: "chat-1" };
       }
-      return { ...OK, resultText: "followed up", sessionId: req.resumeSessionId ?? "chat-1" };
+      return { ...OK, resultText: "followed up", sessionId: req.resumeSessionId ?? "chat-1", ...(req.prompt.includes("FULL") ? { contextTokens: 160_000 } : {}) };
     },
   };
 }
@@ -156,6 +156,25 @@ beforeEach(() => {
 afterEach(() => rmSync(scratch, { recursive: true, force: true }));
 
 describe("knit followup that passes", () => {
+  it("warns when the chat it resumed has passed 70% of its window, and records the context and that the chat was resumed", async () => {
+    const runId = await runPlanFirst();
+    const c = capture();
+    const code = await main(["followup", runId, "T1", "please EDIT the file FULL"], c.io, depsFor(newSeen()));
+    expect(code, c.err()).toBe(0);
+    expect(c.out()).toMatch(/Context: .*T1.*160k of 200k tokens \(80%\)/);
+    expect(c.out()).toMatch(/new task/i);
+    const events = readRun(runId).events.filter((e) => e.attempt === 2);
+    expect(events.find((e) => e.type === "attempt.started")!.payload).toMatchObject({ chat: "resumed" });
+    expect(events.find((e) => e.type === "attempt.finished")!.payload).toMatchObject({ contextTokens: 160_000 });
+  });
+
+  it("says nothing about the context when the chat has room, or when the agent does not report it", async () => {
+    const runId = await runPlanFirst();
+    const c = capture();
+    expect(await main(["followup", runId, "T1", "please EDIT the file"], c.io, depsFor(newSeen())), c.err()).toBe(0);
+    expect(c.out()).not.toMatch(/Context:/);
+  });
+
   it("resumes the task's chat in its worktree, verifies the result again and records it as the next attempt", async () => {
     const runId = await runPlanFirst();
     const before = readRun(runId).detail;

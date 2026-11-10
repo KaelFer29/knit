@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parsePlan, type ResolvedPlan } from "../plan/parse-plan.js";
 import { runPlan, type RunOptions } from "./run-plan.js";
-import type { AgentEvent, AgentRunRequest, AgentRunResult, AgentRunner } from "../ports/agent-runner.js";
+import type { AgentCapabilities, AgentEvent, AgentRunRequest, AgentRunResult, AgentRunner } from "../ports/agent-runner.js";
 import type { Transcript, TranscriptStore } from "../ports/transcript.js";
 import type { CheckResult, CheckRunner } from "../ports/check-runner.js";
 import type { CreatePullRequestInput, PullRequests } from "../ports/pull-requests.js";
@@ -55,6 +55,8 @@ interface State {
 }
 
 interface Options {
+  /** What the fake agent declares it can do; none by default, like a simple runner. */
+  capabilities?: Partial<AgentCapabilities>;
   agent?: (call: number, req: AgentRunRequest, state: State) => Partial<AgentRunResult> | void;
   check?: (command: string, call: number) => Partial<CheckResult>;
   base?: BaseRef;
@@ -91,6 +93,7 @@ function harness(options: Options = {}) {
 
   const agent: AgentRunner = {
     name: "fake-agent",
+    ...(options.capabilities ? { capabilities: options.capabilities as AgentCapabilities } : {}),
     run: async (req, onEvent) => {
       order.push("agent");
       prompts.push(req.prompt);
@@ -204,6 +207,14 @@ describe("runPlan: core loop", () => {
     expect(h.checkCalls[0]!.cwd).toBe("/w/run-1/T1/repo");
     expect(h.runs.status).toBe("passed");
     expect(h.tasks.get("T2")).toMatchObject({ status: "passed", commitSha: "sha-feat/second", branch: "feat/second", startSha: "start-T2" });
+  });
+
+  it("records how much context the agent's chat carries in the attempt.finished event, and nothing when it reports none", async () => {
+    const h = harness({ agent: (call, _r, s) => { s.changed = [call === 0 ? "src/a.ts" : "src/b.ts"]; return call === 0 ? { contextTokens: 12_381 } : {}; } });
+    await h.run();
+    const finished = h.events.filter((e) => e.type === "attempt.finished");
+    expect(finished[0]!.payload).toMatchObject({ passed: true, contextTokens: 12_381 });
+    expect(finished[1]!.payload).not.toHaveProperty("contextTokens");
   });
 
   it("starts independent tasks from the plan base, not from the previous task", async () => {
@@ -640,3 +651,90 @@ describe("runPlan: resume", () => {
     expect(summary.tasks[0]!.prUrl).toBe("https://example.test/pull/99");
   });
 });
+
+describe("runPlan: the chat of the agent across attempts", () => {
+  const RESUME = { resume: true };
+  /** T1 fails its check once, then passes; T2 passes at once. Each call answers with its own chat id and the context it reports. */
+  const retrying = (contextOf: (call: number) => number | undefined, over: Partial<Options> = {}) =>
+    harness({
+      capabilities: RESUME,
+      agent: (call, _req, s) => {
+        s.changed = [call === 2 ? "src/b.ts" : "src/a.ts"];
+        const contextTokens = contextOf(call);
+        return { sessionId: `chat-${call}`, ...(contextTokens === undefined ? {} : { contextTokens }) };
+      },
+      check: (command, call) => (command === "npm test" && call === 1 ? { exitCode: 1, output: "FAIL: expected 1 got 2" } : {}),
+      ...over,
+    });
+  const chats = (h: ReturnType<typeof harness>) => h.events.filter((e) => e.type === "attempt.started").map((e) => (e.payload as { chat?: string }).chat);
+
+  it("resumes the chat of the previous attempt on a retry, with only what went wrong, while the chat is under the threshold", async () => {
+    const h = retrying(() => 10_000);
+    await h.run();
+    expect(h.requests.map((r) => r.resumeSessionId)).toEqual([undefined, "chat-0", undefined]);
+    expect(h.prompts[1]).toContain("Failed check: npm test");
+    expect(h.prompts[1]).toContain("FAIL: expected 1 got 2");
+    expect(h.prompts[1]).not.toContain("Allowed files");
+    expect(h.prompts[0]).toContain("Allowed files");
+    expect(chats(h)).toEqual(["new", "resumed", "new"]);
+  });
+
+  it("opens a fresh chat with the whole task and the feedback once the chat reaches 70% of its window, and says why", async () => {
+    const h = retrying(() => 140_000);
+    await h.run();
+    expect(h.requests[1]!.resumeSessionId).toBeUndefined();
+    expect(h.prompts[1]).toContain("Allowed files");
+    expect(h.prompts[1]).toContain("FAIL: expected 1 got 2");
+    expect(chats(h)).toEqual(["new", "switched", "new"]);
+    expect(h.events.filter((e) => e.type === "attempt.started")[1]!.payload).toMatchObject({ chat: "switched", contextTokens: 140_000 });
+  });
+
+  it("still resumes just under the threshold", async () => {
+    const h = retrying(() => 139_999);
+    await h.run();
+    expect(chats(h)).toEqual(["new", "resumed", "new"]);
+  });
+
+  it("starts every task in a fresh chat, never in the one of the task before", async () => {
+    const h = retrying(() => 10_000);
+    await h.run();
+    expect(h.requests[2]!.resumeSessionId).toBeUndefined();
+    expect(h.prompts[2]).toContain("Allowed files");
+  });
+
+  it("opens a fresh chat when the agent did not report its context, since it cannot tell how full the chat is", async () => {
+    const h = retrying(() => undefined);
+    await h.run();
+    expect(h.requests.map((r) => r.resumeSessionId)).toEqual([undefined, undefined, undefined]);
+    expect(chats(h)).toEqual(["new", "new", "new"]);
+  });
+
+  it("opens a fresh chat after an attempt whose process failed or timed out: that chat cannot be trusted", async () => {
+    for (const failure of [{ exitCode: 1, isError: true, resultText: "model exploded" }, { exitCode: null, isError: true, timedOut: true, resultText: "Agent timed out" }]) {
+      const h = harness({
+        capabilities: RESUME,
+        agent: (call, _r, s) => {
+          s.changed = [call === 2 ? "src/b.ts" : "src/a.ts"];
+          return call === 0 ? { sessionId: "chat-0", contextTokens: 10_000, ...failure } : { sessionId: `chat-${call}`, contextTokens: 10_000 };
+        },
+      });
+      await h.run();
+      expect(h.requests[1]!.resumeSessionId).toBeUndefined();
+      expect(h.prompts[1]).toContain("Allowed files");
+    }
+  });
+
+  it("never asks for a resume from an agent that cannot resume", async () => {
+    const h = retrying(() => 10_000, { capabilities: {} });
+    await h.run();
+    expect(h.requests.every((r) => r.resumeSessionId === undefined)).toBe(true);
+    expect(chats(h)).toEqual(["new", "new", "new"]);
+  });
+
+  it("keeps recording the chat of each attempt, so a follow-up continues the last one", async () => {
+    const h = retrying(() => 10_000);
+    await h.run();
+    expect(h.attempts.filter((a) => a.taskId === "T1").map((a) => a.sessionId)).toEqual(["chat-0", "chat-1"]);
+  });
+});
+

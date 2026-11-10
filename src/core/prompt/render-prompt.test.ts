@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderPrompt } from "./render-prompt.js";
+import { renderContinuationPrompt, renderPrompt } from "./render-prompt.js";
 import type { Task } from "../plan/parse-plan.js";
 
 const TASK: Task = {
@@ -81,3 +81,28 @@ describe("renderPrompt", () => {
     expect(p).toContain("- README.md\n- ../x.txt");
   });
 });
+
+describe("renderContinuationPrompt", () => {
+  it("says what went wrong and nothing else about the task: the chat already holds the task, its specs and its rules", () => {
+    const text = renderContinuationPrompt({ failedCheck: "npm test", output: "FAIL: expected 1 got 2" });
+    expect(text).toContain("Failed check: npm test");
+    expect(text).toContain("FAIL: expected 1 got 2");
+    expect(text).toContain("unchanged");
+    expect(text).not.toContain("You are the implementer");
+    expect(text).not.toContain("Allowed files");
+    expect(text).not.toContain("Git rules");
+  });
+
+  it("keeps the instruction to commit the work, and to reply the same way", () => {
+    const text = renderContinuationPrompt({ processFailure: "The agent process failed" });
+    expect(text).toMatch(/commit/i);
+    expect(text).toMatch(/files changed/i);
+    expect(text).toContain("Problem: The agent process failed");
+  });
+
+  it("is much shorter than the full prompt, which is the point", () => {
+    const retry = { failedCheck: "npm test", output: "FAIL" };
+    expect(renderContinuationPrompt(retry).length).toBeLessThan(renderPrompt(TASK, retry).length / 2);
+  });
+});
+

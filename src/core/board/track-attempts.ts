@@ -3,8 +3,12 @@ import type { EventRecord } from "../ports/run-store.js";
 /** What the lifecycle events say about one attempt. Attempt rows are only written when an attempt ends. */
 export interface TrackedAttempt {
   startedAt: string;
+  /** From `attempt.started`: which chat the attempt ran in. Absent in runs that did not record it. */
+  chat?: "new" | "resumed" | "switched";
   /** Set by `attempt.finished`. */
   finished: boolean;
+  /** How much context the agent's chat carried after the attempt, from `attempt.finished`; absent in runs that did not record it. */
+  contextTokens?: number;
   /** Latest `check.started` command: the agent finished and Knit is checking its work. */
   checking?: string;
   checkStartedAt?: string;
@@ -37,7 +41,10 @@ export function traceEvents(events: readonly EventRecord[]): Map<string, TaskTra
     const tracked = e.attempt === undefined ? undefined : trace.attempts.get(e.attempt);
     switch (e.type) {
       case "attempt.started":
-        if (e.attempt !== undefined) trace.attempts.set(e.attempt, { startedAt: e.ts, finished: false });
+        if (e.attempt !== undefined) {
+          const chat = payload.chat;
+          trace.attempts.set(e.attempt, { startedAt: e.ts, finished: false, ...(chat === "new" || chat === "resumed" || chat === "switched" ? { chat } : {}) });
+        }
         break;
       case "check.started":
         if (tracked && typeof payload.command === "string") {
@@ -46,7 +53,10 @@ export function traceEvents(events: readonly EventRecord[]): Map<string, TaskTra
         }
         break;
       case "attempt.finished":
-        if (tracked) tracked.finished = true;
+        if (tracked) {
+          tracked.finished = true;
+          if (typeof payload.contextTokens === "number" && Number.isFinite(payload.contextTokens) && payload.contextTokens >= 0) tracked.contextTokens = payload.contextTokens;
+        }
         break;
       case "task.failed":
         if (typeof payload.reason === "string") trace.failureReason = payload.reason;

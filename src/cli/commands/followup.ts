@@ -1,3 +1,4 @@
+import { CONTEXT_SWITCH_SHARE } from "../../core/context/index.js";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { CursorAgentRunner } from "../../adapters/agents/cursor/cursor-runner.js";
@@ -216,6 +217,10 @@ export async function followupCommand(args: string[], io: CliIo, deps: CliDeps, 
     if (summary.passed) {
       io.out(`\n${summary.resultText}\n`);
       io.out(`\nKnit verification: passed (attempt ${summary.attempt}, commit ${summary.commitSha?.slice(0, 8)})\n`);
+      if (summary.context?.full) {
+        const { tokens, window, share } = summary.context;
+        io.out(`Context: the chat of ${taskId} carries ${Math.round(tokens / 1000)}k of ${Math.round(window / 1000)}k tokens (${Math.round(share * 100)}%). Each follow-up adds to it; past ${Math.round(CONTEXT_SWITCH_SHARE * 100)}% it is better to ask for the rest as a new task.\n`);
+      }
       if (detail.run.status === "failed") {
         io.out(`The run is still marked failed; ${PROGRAM_NAME} resume ${runId} keeps ${taskId} as passed and continues with the next task.\n`);
       }

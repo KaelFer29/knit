@@ -1,3 +1,4 @@
+import { contextShare, contextWindowOf, shouldSwitchChat } from "../context/index.js";
 import { runTurn } from "../chat/run-turn.js";
 import type { Task } from "../plan/parse-plan.js";
 import { capabilitiesOf, type AgentProfile, type AgentRunner } from "../ports/agent-runner.js";
@@ -52,6 +53,8 @@ export interface FollowupSummary {
   /** Last commit of the task branch, when it passed. */
   commitSha?: string;
   resultText: string;
+  /** How full the chat is after the turn, when the agent reported it. `full`: it has passed the share at which a chat is replaced. */
+  context?: { tokens: number; window: number; share: number; full: boolean };
 }
 
 /** A follow-up continues the agent's chat, so an agent that cannot resume one cannot take it. */
@@ -102,7 +105,8 @@ export async function runFollowup(deps: FollowupDeps, input: FollowupInput): Pro
 
   runs.upsertTask({ runId, taskId: task.taskId, title: task.title, status: "running" });
   emit("followup.started", { sessionId: session.id, chatId: session.agentSessionId });
-  emit("attempt.started");
+  // A follow-up always continues the chat of the task, so it always resumes.
+  emit("attempt.started", { chat: "resumed" });
 
   const finish = (summary: FollowupSummary): FollowupSummary => {
     emit("followup.finished", {
@@ -148,6 +152,7 @@ export async function runFollowup(deps: FollowupDeps, input: FollowupInput): Pro
     });
     emit("attempt.finished", {
       passed, scopeOk: violations.length === 0, failedCheck,
+      ...(result.contextTokens !== undefined ? { contextTokens: result.contextTokens } : {}),
       ...(gitProblems.length > 0 ? { gitProblems } : {}),
     });
 
@@ -155,12 +160,12 @@ export async function runFollowup(deps: FollowupDeps, input: FollowupInput): Pro
       const commitSha = verdict.inspection.commits.at(-1)?.sha ?? ws.startSha;
       runs.upsertTask({ runId, taskId: task.taskId, title: task.title, status: "passed", commitSha });
       emit("task.passed", { commitSha, attempts: attempt });
-      return finish({ attempt, passed: true, commitSha, resultText: result.resultText });
+      return finish({ attempt, passed: true, commitSha, resultText: result.resultText, ...contextSummary(result.contextTokens, planTask.model) });
     }
     const reason = describeFailure(verdict.problems);
     runs.upsertTask({ runId, taskId: task.taskId, title: task.title, status: "failed" });
     emit("task.failed", { reason, attempts: attempt });
-    return finish({ attempt, passed: false, reason, resultText: result.resultText });
+    return finish({ attempt, passed: false, reason, resultText: result.resultText, ...contextSummary(result.contextTokens, planTask.model) });
   } catch (err) {
     // The turn is already closed by `runTurn`; close the attempt too so nothing stays open on the board.
     const reason = `Unexpected error: ${errorMessage(err)}`;
@@ -175,3 +180,11 @@ export async function runFollowup(deps: FollowupDeps, input: FollowupInput): Pro
     return finish({ attempt, passed: false, reason, resultText: reason });
   }
 }
+
+/** How full the chat is after a turn, from what the agent reported and the window of the task's model. */
+function contextSummary(tokens: number | undefined, model: string | undefined): { context?: NonNullable<FollowupSummary["context"]> } {
+  if (tokens === undefined) return {};
+  const window = contextWindowOf(model);
+  return { context: { tokens, window, share: contextShare(tokens, window), full: shouldSwitchChat(tokens, window) } };
+}
+

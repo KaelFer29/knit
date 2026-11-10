@@ -25,6 +25,8 @@ Rendered once per attempt and passed as the single prompt argument to `agent`. I
 
 On a retry the prompt adds what went wrong: the process failure, the scope violations, the git problems, or the failed check with the last 40 lines of its output.
 
+**The chat across attempts.** A task always starts in a fresh chat. A retry of the same task resumes the chat of the previous attempt (`resumeSessionId`) when the agent declares `resume`, that attempt ended cleanly (no process failure, no timeout) and reported its context (`contextTokens`) below 70% of the window (200k unless the task's model id says another, `name[context=1m]`). The resumed chat is sent only what went wrong (`renderContinuationPrompt`): it already holds the task, its specs, the allowed files and the rules. Otherwise the retry opens a fresh chat with the whole self-contained prompt plus the feedback, which is the handoff: this is what happens when the chat is full (`switched`), when the agent did not report its context, after a failed process and for an agent that cannot resume (`new`). Each `attempt.started` records which one it was (`chat`: `new`, `resumed` or `switched`, and the `contextTokens` that decided it). Verification does not depend on the chat. Reusing the chat across tasks is not done: each task has its own worktree and branch.
+
 ## Invocation
 
 ```bash

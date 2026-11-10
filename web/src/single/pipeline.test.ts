@@ -213,3 +213,28 @@ describe("live plan usage", () => {
     expect(deriveDetails(runningRun, stored).claude.meters).toEqual([expect.objectContaining({ ratio: 0.42 })]);
   });
 });
+
+describe("Cursor's context in the block details", () => {
+  const context = { taskId: "T3", attempt: 1, tokens: 100_000, window: 200_000, share: 0.5, assumedWindow: true };
+
+  it("adds a Context fact and a meter when the chat was measured", () => {
+    const { cursor } = deriveDetails({ ...runningRun, context }, undefined);
+    expect(cursor.facts).toContainEqual({ label: "Context", value: "100k of 200k" });
+    expect(cursor.meters).toEqual([{ label: "Context", ratio: 0.5 }]);
+  });
+
+  it("adds nothing when it was not", () => {
+    const { cursor } = deriveDetails(runningRun, undefined);
+    expect(cursor.facts.some((f) => f.label === "Context")).toBe(false);
+    expect(cursor.meters).toEqual([]);
+  });
+});
+
+describe("long model ids on the blocks", () => {
+  it("show a parameterized model with dashes, never in brackets", () => {
+    const board = { ...runningRun, tasks: runningRun.tasks.map((t) => (t.taskId === "T3" ? { ...t, model: "claude-opus-4-8[context=1m,effort=high,fast=false]" } : t)) };
+    expect(deriveBlocks(board, claudeBusy).cursor.model).toBe("claude-opus-4-8-1m-high");
+    expect(deriveBlocks(runningRun, { ...claudeBusy, model: "composer-2[context=1m]" }).claude.model).toBe("composer-2-1m");
+  });
+});
+

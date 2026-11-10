@@ -65,7 +65,8 @@ Options for followup:
   verifies the result like an attempt of the run: scope, git hygiene and the task's checks, against the plan snapshot stored
   with the run. The outcome is recorded as the task's next attempt and the turn as part of a session. Refused (exit 1) while
   the run is still running, when the worktree is gone, when no attempt recorded a chat id, or for a run from before plan
-  snapshots. Exit code 0 when the verification passed, 1 otherwise, 2 for usage mistakes.
+  snapshots. Exit code 0 when the verification passed, 1 otherwise, 2 for usage mistakes. When the chat has passed 70% of its
+  window (200k unless the task's model says another), a note says so: another follow-up keeps adding to the same chat.
 
 Options for branch undo:
   --mode revert              Add one commit that restores the code to how it was before the task (history is kept)

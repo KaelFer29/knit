@@ -30,6 +30,16 @@ describe("CursorAgentRunner", () => {
     expect(r.durationMs).toBeGreaterThan(0);
   });
 
+  it("reports the context the chat carries: fresh input plus what it read from and wrote to the cache", async () => {
+    expect((await run("ok")).contextTokens).toBe(1050);
+  });
+
+  it("reports no context when the result carries no usage", async () => {
+    const r = await run("garbage");
+    expect(r.contextTokens).toBeUndefined();
+    expect(r.inputTokens).toBeUndefined();
+  });
+
   it("passes the headless flags, the prompt as last arg, and runs in the given cwd", async () => {
     const events: AgentEvent[] = [];
     await run("ok", 10_000, (e) => events.push(e));

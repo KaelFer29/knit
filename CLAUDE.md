@@ -12,6 +12,7 @@ Knit joins Claude and Cursor into one workflow: plan with Claude, orchestrate wi
 - Commits: `type(scope): description`, one line, no body, no co-author or AI trailers. Scope is lowercase letters and hyphens only. Group by work unit, with tests and docs alongside the code.
 - Every commit typechecks and passes its own tests: `pnpm typecheck && pnpm test`.
 - When you add or change a command, option or message, update `src/cli/usage.ts` and the docs in the same commit.
+- Interface: never show long bracketed ids (`claude-opus-4-8[context=1m,effort=high,fast=false]`) in the web interface. Show the short form with dashes (`claude-opus-4-8-1m-high`) through `shortModelId` in `web/src/sessions/models.ts`; the full id stays in plans, commands and data.
 
 ## Where to look
 

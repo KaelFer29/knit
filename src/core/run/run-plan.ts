@@ -1,12 +1,13 @@
 import { AgentEventNormalizer, type AgentLogEntry } from "../timeline/normalize-agent-events.js";
 import type { ResolvedPlan, Task } from "../plan/parse-plan.js";
-import type { AgentRunResult, AgentRunner } from "../ports/agent-runner.js";
+import { contextWindowOf, shouldSwitchChat } from "../context/index.js";
+import { capabilitiesOf, type AgentRunResult, type AgentRunner } from "../ports/agent-runner.js";
 import type { CheckRunner } from "../ports/check-runner.js";
 import type { PullRequests } from "../ports/pull-requests.js";
 import type { EventRecord, RunStore, TaskRecord } from "../ports/run-store.js";
 import type { TranscriptStore } from "../ports/transcript.js";
 import type { TaskWorkspace, Workspace } from "../ports/workspace.js";
-import { renderPrompt, type RetryContext } from "../prompt/render-prompt.js";
+import { renderContinuationPrompt, renderPrompt, type RetryContext } from "../prompt/render-prompt.js";
 import { prBody, prTitle } from "./pull-request-text.js";
 import { RESULT_TEXT_LIMIT, describeFailure, truncate, verifyAttempt } from "./verify-attempt.js";
 
@@ -272,11 +273,19 @@ export async function runPlan(plan: ResolvedPlan, deps: RunDeps, options: RunOpt
       let retry: RetryContext | undefined = resumed ? { processFailure: RESUME_NOTE } : undefined;
       let lastReason = "";
       const firstAttempt = store.nextAttempt(runId, task.id);
+      // The chat of the last attempt of this task, when it ended cleanly and the agent can resume it. A task always starts in a fresh chat.
+      let chat: { id: string; contextTokens: number | undefined } | undefined;
+      const canResume = capabilitiesOf(agent).resume;
+      const window = contextWindowOf(task.model);
       for (let i = 0; i < maxAttempts; i++) {
         const attempt = firstAttempt + i;
         const actx = { taskId: task.id, attempt };
         const startedAt = now().toISOString();
-        emit("attempt.started", actx);
+        // A retry continues the chat while it has room; once it reaches the threshold (or its size is unknown) a fresh chat gets the whole task again.
+        const previous = canResume && retry !== undefined ? chat : undefined;
+        const mode: "new" | "resumed" | "switched" =
+          previous === undefined || previous.contextTokens === undefined ? "new" : shouldSwitchChat(previous.contextTokens, window) ? "switched" : "resumed";
+        emit("attempt.started", actx, { chat: mode, ...(previous?.contextTokens !== undefined ? { contextTokens: previous.contextTokens } : {}) });
 
         const transcript = deps.transcripts?.open({ runId, taskId: task.id, attempt });
         const normalizer = new AgentEventNormalizer();
@@ -291,7 +300,13 @@ export async function runPlan(plan: ResolvedPlan, deps: RunDeps, options: RunOpt
         let result: AgentRunResult;
         try {
           result = await agent.run(
-            { cwd: ws.path, prompt: renderPrompt(task, retry), timeoutMs: agentTimeoutMs, ...(task.model ? { profile: { model: task.model } } : {}) },
+            {
+              cwd: ws.path,
+              prompt: mode === "resumed" ? renderContinuationPrompt(retry!) : renderPrompt(task, retry),
+              timeoutMs: agentTimeoutMs,
+              ...(task.model ? { profile: { model: task.model } } : {}),
+              ...(mode === "resumed" ? { resumeSessionId: previous!.id } : {}),
+            },
             (e) => {
               transcript?.append(e);
               record(normalizer.push(e.raw));
@@ -308,6 +323,8 @@ export async function runPlan(plan: ResolvedPlan, deps: RunDeps, options: RunOpt
           record(normalizer.flush());
           transcript?.close();
         }
+
+        chat = result.sessionId !== undefined && !result.isError && !result.timedOut ? { id: result.sessionId, contextTokens: result.contextTokens } : undefined;
 
         const verdict = await verifyAttempt(
           { checks, workspace },
@@ -332,6 +349,7 @@ export async function runPlan(plan: ResolvedPlan, deps: RunDeps, options: RunOpt
         });
         emit("attempt.finished", actx, {
           passed, scopeOk: violations.length === 0, failedCheck,
+          ...(result.contextTokens !== undefined ? { contextTokens: result.contextTokens } : {}),
           ...(gitProblems.length > 0 ? { gitProblems } : {}),
         });
 

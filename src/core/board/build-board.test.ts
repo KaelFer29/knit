@@ -408,3 +408,138 @@ Checks:
     expect(b.tasks[0]!.model).toBeUndefined();
   });
 });
+
+describe("the context of each attempt's chat", () => {
+  it("carries what attempt.finished recorded, and nothing for an attempt that recorded none (older runs)", () => {
+    const b = board({
+      tasks: [task("T1", { status: "passed" })],
+      attempts: [attempt("T1", 1), attempt("T1", 2)],
+      events: [
+        ev("attempt.started", "T1", 1),
+        ev("attempt.finished", "T1", 1, { payload: { passed: false, contextTokens: 12_381 } }, 5),
+        ev("attempt.started", "T1", 2, {}, 6),
+        ev("attempt.finished", "T1", 2, { payload: { passed: true } }, 9),
+      ],
+    });
+    const [first, second] = b.tasks[0]!.attempts;
+    expect(first!.contextTokens).toBe(12_381);
+    expect(second!.contextTokens).toBeUndefined();
+  });
+
+  it("ignores a context that is not a number", () => {
+    const b = board({
+      tasks: [task("T1", { status: "passed" })],
+      attempts: [attempt("T1", 1)],
+      events: [ev("attempt.started", "T1", 1), ev("attempt.finished", "T1", 1, { payload: { contextTokens: "lots" } }, 5)],
+    });
+    expect(b.tasks[0]!.attempts[0]!.contextTokens).toBeUndefined();
+  });
+});
+
+describe("the context view of the board", () => {
+  const PLAN = `# Plan: demo
+
+## T1: First
+
+Branch: feat/one
+Goal: first.
+Specs:
+- S1: first spec.
+Allowed files:
+- src/a.ts
+Checks:
+- true
+
+## T2: Second
+
+Branch: feat/two
+Model: composer-2.5-fast
+Goal: second.
+Specs:
+- S1: second spec.
+Allowed files:
+- src/b.ts
+Checks:
+- true
+`;
+  const finished = (taskId: string, n: number, contextTokens: number | undefined) => [
+    ev("attempt.started", taskId, n),
+    ev("attempt.finished", taskId, n, { payload: contextTokens === undefined ? { passed: true } : { passed: true, contextTokens } }, 5),
+  ];
+
+  it("shows the latest chat measured: its tokens, the window assumed for its model and how full it is", () => {
+    const b = board({
+      run: run({ planText: PLAN }),
+      tasks: [task("T1", { status: "passed" }), task("T2", { status: "passed" })],
+      attempts: [attempt("T1", 1), attempt("T2", 1), attempt("T2", 2)],
+      events: [...finished("T1", 1, 50_000), ...finished("T2", 1, 60_000), ...finished("T2", 2, 100_000)],
+    });
+    // A plan can only name plain model ids, which carry no window, so the default one is assumed and flagged as such.
+    expect(b.context).toEqual({ taskId: "T2", attempt: 2, tokens: 100_000, window: 200_000, share: 0.5, assumedWindow: true });
+  });
+
+  it("assumes the default window when the plan names no model, and says so", () => {
+    const b = board({ run: run({ planText: PLAN }), tasks: [task("T1", { status: "passed" })], attempts: [attempt("T1", 1)], events: finished("T1", 1, 50_000) });
+    expect(b.context).toEqual({ taskId: "T1", attempt: 1, tokens: 50_000, window: 200_000, share: 0.25, assumedWindow: true });
+  });
+
+  it("is absent when no attempt recorded a context, and skips attempts that did not", () => {
+    expect(board({ tasks: [task("T1", { status: "passed" })], attempts: [attempt("T1", 1)], events: finished("T1", 1, undefined) }).context).toBeUndefined();
+    const b = board({
+      run: run({ planText: PLAN }),
+      tasks: [task("T1", { status: "passed" }), task("T2", { status: "passed" })],
+      attempts: [attempt("T1", 1), attempt("T2", 1)],
+      events: [...finished("T1", 1, 50_000), ...finished("T2", 1, undefined)],
+    });
+    expect(b.context).toMatchObject({ taskId: "T1", tokens: 50_000 });
+  });
+});
+
+describe("the window of a parameterized plan model", () => {
+  const PLAN = `# Plan: demo
+
+## T1: First
+
+Branch: feat/one
+Model: claude-opus-4-8[context=1m,effort=high]
+Goal: first.
+Specs:
+- S1: first spec.
+Allowed files:
+- src/a.ts
+Checks:
+- true
+`;
+
+  it("takes the window the model id carries, and does not call it assumed", () => {
+    const b = board({
+      run: run({ planText: PLAN }),
+      tasks: [task("T1", { status: "passed" })],
+      attempts: [attempt("T1", 1)],
+      events: [ev("attempt.started", "T1", 1), ev("attempt.finished", "T1", 1, { payload: { passed: true, contextTokens: 250_000 } }, 5)],
+    });
+    expect(b.context).toEqual({ taskId: "T1", attempt: 1, tokens: 250_000, window: 1_000_000, share: 0.25, assumedWindow: false });
+  });
+});
+
+describe("which chat each attempt ran in", () => {
+  it("carries what attempt.started recorded: a new chat, the one before resumed, or a fresh one because the last was full", () => {
+    const b = board({
+      tasks: [task("T1", { status: "passed" })],
+      attempts: [attempt("T1", 1), attempt("T1", 2), attempt("T1", 3), attempt("T1", 4)],
+      events: [
+        ev("attempt.started", "T1", 1, { payload: { chat: "new" } }),
+        ev("attempt.started", "T1", 2, { payload: { chat: "resumed", contextTokens: 10_000 } }, 1),
+        ev("attempt.started", "T1", 3, { payload: { chat: "switched", contextTokens: 150_000 } }, 2),
+        ev("attempt.started", "T1", 4, {}, 3),
+      ],
+    });
+    expect(b.tasks[0]!.attempts.map((a) => a.chat)).toEqual(["new", "resumed", "switched", undefined]);
+  });
+
+  it("ignores a chat mode it does not know", () => {
+    const b = board({ tasks: [task("T1", { status: "passed" })], attempts: [attempt("T1", 1)], events: [ev("attempt.started", "T1", 1, { payload: { chat: "bogus" } })] });
+    expect(b.tasks[0]!.attempts[0]!.chat).toBeUndefined();
+  });
+});
+

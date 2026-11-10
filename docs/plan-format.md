@@ -13,7 +13,7 @@ Setup:
 ## T1: <short title>
 
 Branch: <type>/<slug>
-Model: <optional; the builder agent's model for this task, an id from `agent models`>
+Model: <optional; the builder agent's model for this task, an id from `agent models`; a parameterized id such as `claude-opus-4-8[context=1m,effort=high]` is accepted as written>
 Depends: <optional; one earlier task ID>
 Goal: <one sentence>
 Specs:
@@ -29,7 +29,7 @@ Checks:
 - `T<n>` IDs are unique. Order in the file is execution order.
 - `Repo` is optional. When omitted, the repository of the directory the command runs from is used. When present, a relative path resolves against the plan file.
 - `Branch` is required: `type/slug` where type is one of `feat`, `fix`, `refactor`, `docs`, `chore`, `test` (the same set the commit hook accepts) and the slug uses lowercase letters, digits, dots and hyphens. Branches are unique within a plan and must not exist yet in the repository.
-- `Model` is optional: the model the builder agent uses for this task (its `--model`), chosen by the planner by the task's complexity. One token of letters, digits and `. _ : / -` (for example `auto`, `composer-2.5`, `grok-4.7-high`), at most 80 characters, never starting with a dash. It wins over a `--model` given to `knit run`, applies to every attempt of the task, and a task without it uses the agent's own default. Knit does not check that the id exists: the agent rejects an unknown one and the task fails, so take the ids from `agent models`. `knit run --dry-run` prints it in the task header.
+- `Model` is optional: the model the builder agent uses for this task (its `--model`), chosen by the planner by the task's complexity. One token of letters, digits and `. _ : / -` (for example `auto`, `composer-2.5`, `grok-4.7-high`), at most 80 characters, never starting with a dash, optionally followed by one bracket group of `key=value` pairs (`claude-opus-4-8[context=1m,effort=high]`; letters, digits and `. _ : / - = ,`, at most 80 characters, nothing after it). The id is passed to the CLI as one argument, never through a shell. When the group says `context=1m` (or `200k`, or a plain number) Knit takes it as the window of the chat; otherwise it assumes 200k. The web interface shows such an id in its short form, `claude-opus-4-8-1m-high`, never in brackets. It wins over a `--model` given to `knit run`, applies to every attempt of the task, and a task without it uses the agent's own default. Knit does not check that the id exists: the agent rejects an unknown one and the task fails, so take the ids from `agent models`. `knit run --dry-run` prints it in the task header.
 - `Depends` names one task declared earlier. Without it, the branch starts from the plan base (so it is independent and its PR targets the base branch). With it, the branch starts from the parent's branch (stacked: its PR targets the parent's branch).
 - `Specs` are quoted, never paraphrased. The agent must not add requirements.
 - `Allowed files` is mandatory and non-empty. No `.`, no repo root, no `..`, no absolute paths, no wildcard-only globs. `dir/` allows everything under `dir`; `*`, `**` and `?` are supported.
