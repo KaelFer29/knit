@@ -289,7 +289,7 @@ describe("GitBranchTools.checkout", () => {
   it("frees the worktree and switches the repository to the branch, which keeps its commits", () => {
     const { ref, path } = worktree();
     commit(path, "a.txt", "a\n", "feat: add a");
-    expect(tools.checkout(ref)).toEqual({ freedWorktree: true });
+    expect(tools.checkout(ref)).toEqual({ freedWorktree: true, from: "main" });
     expect(existsSync(path)).toBe(false);
     expect(head()).toBe("feat/one");
     expect(readFileSync(join(repo, "a.txt"), "utf8")).toBe("a\n");
@@ -307,7 +307,7 @@ describe("GitBranchTools.checkout", () => {
     const { ref, path } = worktree();
     commit(path, "a.txt", "a\n", "feat: add a");
     git(repo, "worktree", "remove", path);
-    expect(tools.checkout({ ...ref, worktree: undefined })).toEqual({ freedWorktree: false });
+    expect(tools.checkout({ ...ref, worktree: undefined })).toEqual({ freedWorktree: false, from: "main" });
     expect(head()).toBe("feat/one");
     expect(tools.checkout({ ...ref, worktree: undefined })).toEqual({ freedWorktree: false });
   });
@@ -369,3 +369,31 @@ describe("GitBranchTools.commitsSince", () => {
   });
 });
 
+
+describe("GitBranchTools.returnRepository", () => {
+  const head = (): string => git(repo, "rev-parse", "--abbrev-ref", "HEAD");
+
+  it("switches the repository back to the branch it was on before the test, and the branch's commits stay", () => {
+    const { ref, path } = worktree();
+    commit(path, "a.txt", "a\n", "feat: add a");
+    const { from } = tools.checkout(ref);
+    expect(from).toBe("main");
+    tools.returnRepository(repo, from!);
+    expect(head()).toBe("main");
+    expect(tools.state({ ...ref, worktree: undefined })).toMatchObject({ exists: true, checkedOut: false });
+  });
+
+  it("does nothing when the repository is already on that branch", () => {
+    expect(() => tools.returnRepository(repo, "main")).not.toThrow();
+    expect(head()).toBe("main");
+  });
+
+  it("refuses with uncommitted changes and touches nothing", () => {
+    const { ref, path } = worktree();
+    commit(path, "a.txt", "a\n", "feat: add a");
+    tools.checkout(ref);
+    writeFileSync(join(repo, "new.txt"), "x\n");
+    expect(() => tools.returnRepository(repo, "main")).toThrow(/uncommitted changes/);
+    expect(head()).toBe("feat/one");
+  });
+});

@@ -180,7 +180,7 @@ describe("knit followup that passes", () => {
 
       const blocked = capture();
       expect(await main(["followup", runId, "T1", "please EDIT the file"], blocked.io, depsFor(newSeen()))).toBe(1);
-      expect(blocked.err()).toMatch(/feat\/create-a is checked out at .*git checkout <other>/s);
+      expect(blocked.err()).toMatch(/feat\/create-a is checked out at .*Return button/s);
       expect(existsSync(worktree)).toBe(false);
 
       git(repo, "checkout", "main");

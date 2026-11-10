@@ -7,6 +7,7 @@ import { isModelId } from "../../core/plan/parse-plan.js";
 import { GitBranchTools } from "../../adapters/vcs/git/git-branch-tools.js";
 import { GhPullRequests } from "../../adapters/vcs/github/gh-pull-requests.js";
 import { correctionsSince } from "../../core/branches/corrections.js";
+import { decideReturn, returnTargetOf } from "../../core/branches/return-rules.js";
 import { priorPrOf } from "../../core/branches/pr-info.js";
 import { isBranchName, type PriorPr } from "../../core/branches/pr-rules.js";
 import { buildPrDraftPrompt, buildPrTemplate, parsePrDraft } from "../../core/branches/pr-draft.js";
@@ -20,7 +21,7 @@ import { dataDirOf, openStoreIfExists } from "../support/paths.js";
 import type { CliDeps, CliIo } from "../types.js";
 
 const MODES: readonly UndoMode[] = ["revert", "reset", "delete"];
-const ACTIONS = ["undo", "pr-draft", "pr", "checkout"] as const;
+const ACTIONS = ["undo", "pr-draft", "pr", "checkout", "return"] as const;
 /** The cheap, fast model that drafts a pull request's text. */
 export const PR_DRAFT_MODEL = "composer-2.5-fast";
 const PR_DRAFT_TIMEOUT_MS = 120_000;
@@ -128,6 +129,7 @@ export async function branchCommand(args: string[], io: CliIo, deps: CliDeps, en
 
     if (action === "undo") return undo({ io, json, store, runId, taskId, task, ref, mine, mode: mode!, yes: values.yes === true, now, tools });
     if (action === "checkout") return checkout({ io, json, store, runId, taskId, task, ref, mine, yes: values.yes === true, now, tools });
+    if (action === "return") return returnRepository({ io, json, store, runId, taskId, task, runStatus: detail.run.status, repo: detail.run.repo, yes: values.yes === true, now, tools });
     if (action === "pr-draft") return await prDraft({ io, json, task, ref, state: mine.state, tools, deps, model: values.model ?? PR_DRAFT_MODEL, template: values.template === true, corrections: correctionsSince(store.getEvents(runId), taskId) });
     const decision = mine.pr;
     if (!decision.ok) return fail(io, json, decision.reason);
@@ -212,14 +214,51 @@ function checkout(i: CheckoutInput): number {
     report(io, json, { ok: true, dryRun: true, branch: task.branch, effects: decision.effects }, [...decision.effects, "Nothing was changed. Repeat with --yes to do it."]);
     return 0;
   }
-  let freedWorktree: boolean;
+  let result: { freedWorktree: boolean; from?: string };
   try {
-    ({ freedWorktree } = i.tools.checkout(i.ref!));
+    result = i.tools.checkout(i.ref!);
   } catch (err) {
     return fail(io, json, err instanceof Error ? err.message : String(err));
   }
-  i.store.recordEvent({ runId: i.runId, taskId: i.taskId, ts: i.now(), type: "branch.checked_out", payload: { branch: task.branch, freedWorktree } });
+  const { freedWorktree, from } = result;
+  // `from` lets `return` put the repository back on the branch it was on.
+  i.store.recordEvent({ runId: i.runId, taskId: i.taskId, ts: i.now(), type: "branch.checked_out", payload: { branch: task.branch, freedWorktree, ...(from !== undefined ? { from } : {}) } });
   report(io, json, { ok: true, dryRun: false, branch: task.branch, effects: decision.effects, freedWorktree }, [...decision.effects, `Done. Your repository is now on ${task.branch}.`]);
+  return 0;
+}
+
+interface ReturnInput {
+  io: CliIo;
+  json: boolean;
+  store: SqliteRunStore;
+  runId: string;
+  taskId: string;
+  task: TaskRecord;
+  runStatus: string;
+  repo: string;
+  yes: boolean;
+  now: () => string;
+  tools: GitBranchTools;
+}
+
+/** Switches the user's repository back to the branch it was on before Knit tested a task. Says what it would do until `--yes`. */
+function returnRepository(i: ReturnInput): number {
+  const { io, json, taskId, task } = i;
+  const target = returnTargetOf(i.store.getEvents(i.runId));
+  const decision = decideReturn({ runStatus: i.runStatus, target, taskBranch: task.branch });
+  if (!decision.ok) return fail(io, json, decision.reason);
+  const branch = target!.branch;
+  if (!i.yes) {
+    report(io, json, { ok: true, dryRun: true, branch, effects: decision.effects }, [...decision.effects, "Nothing was changed. Repeat with --yes to do it."]);
+    return 0;
+  }
+  try {
+    i.tools.returnRepository(i.repo, branch);
+  } catch (err) {
+    return fail(io, json, err instanceof Error ? err.message : String(err));
+  }
+  i.store.recordEvent({ runId: i.runId, taskId, ts: i.now(), type: "branch.returned", payload: { branch } });
+  report(io, json, { ok: true, dryRun: false, branch, effects: decision.effects }, [...decision.effects, `Done. Your repository is back on ${branch}.`]);
   return 0;
 }
 

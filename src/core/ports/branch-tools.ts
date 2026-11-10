@@ -60,9 +60,12 @@ export interface BranchEditor {
   /**
    * Frees the task's worktree (never forced) and switches the user's repository to the branch, so it can be tested
    * there; the branch and its commits stay. Refuses when the repository or the worktree has uncommitted changes, or when
-   * the branch is checked out somewhere else. Does nothing when the repository is already on the branch.
+   * the branch is checked out somewhere else. Does nothing when the repository is already on the branch. `from` is the
+   * branch the repository was on before, undefined when it was detached.
    */
-  checkout(ref: BranchRef): { freedWorktree: boolean };
+  checkout(ref: BranchRef): { freedWorktree: boolean; from?: string };
+  /** Switches the user's repository to `branch` again (the reverse of `checkout`). Refuses with uncommitted changes; never forced. */
+  returnRepository(repo: string, branch: string): void;
   /** A branch with this name is on `origin` right now (asks the remote). Throws when the remote cannot be reached. */
   onOrigin(repo: string, branch: string): boolean;
   /** Pushes the branch to `origin` with its upstream. Never forced: a remote branch that moved on is an error. */

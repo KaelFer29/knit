@@ -130,7 +130,7 @@ export class GitWorkspace implements Workspace {
     this.gitOk(input.repo, ["worktree", "prune"]);
     const at = this.checkedOutAt(input.repo, input.branch);
     if (at !== undefined) {
-      throw new Error(`${input.branch} is checked out at ${at}. Switch that checkout to another branch (git checkout <other>) and try again: a branch can only be checked out in one place.`);
+      throw new Error(`${input.branch} is checked out at ${at}. Give your repository back its own branch first (the Return button of the task in the Cursor tab, or knit branch <run> <task> return --yes) and try again: a branch can only be checked out in one place.`);
     }
     const parent = dirname(input.path);
     mkdirSync(parent, { recursive: true });

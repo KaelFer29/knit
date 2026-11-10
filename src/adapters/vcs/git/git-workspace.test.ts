@@ -252,7 +252,7 @@ describe("GitWorkspace.restore", () => {
     const w = prepare();
     git(repo, "worktree", "remove", w.path);
     git(repo, "checkout", "feat/one");
-    expect(() => ws.restore(input(w))).toThrow(/feat\/one is checked out at .*git checkout <other>/s);
+    expect(() => ws.restore(input(w))).toThrow(/feat\/one is checked out at .*Return button/s);
     expect(existsSync(w.path)).toBe(false);
   });
 

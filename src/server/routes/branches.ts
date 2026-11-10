@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { isModelId } from "../../core/plan/parse-plan.js";
 import { describeBranches } from "../../core/branches/overview.js";
+import { returnTargetOf } from "../../core/branches/return-rules.js";
 import { priorPrOf } from "../../core/branches/pr-info.js";
 import { isBranchName, type PriorPr } from "../../core/branches/pr-rules.js";
 import type { PullRequestStatus, PullRequests } from "../../core/ports/pull-requests.js";
@@ -14,7 +15,7 @@ const MODES: readonly UndoMode[] = ["revert", "reset", "delete"];
 const MAX_TITLE = 200;
 const MAX_BODY = 60_000;
 /** How long each action may take: an undo is git, a draft waits for a model, a pull request waits for GitHub. */
-const DEFAULT_TIMEOUT_MS: Record<string, number> = { undo: 60_000, checkout: 60_000, "pr-draft": 150_000, pr: 120_000 };
+const DEFAULT_TIMEOUT_MS: Record<string, number> = { undo: 60_000, checkout: 60_000, return: 60_000, "pr-draft": 150_000, pr: 120_000 };
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -142,7 +143,9 @@ export const branchesRoutes: RouteModule = ({ reader, branches, pullRequests, co
           const newCommits = prior.get(b.taskId)?.newCommits;
           return { ...b, prState: { state: status.state, base: status.base, ...(newCommits === undefined ? {} : { newCommits }) } };
         });
-        sendJson(res, 200, { runId: run.id, runStatus: run.status, base: at === -1 ? run.base : run.base.slice(0, at), branches: withState });
+        // The task whose branch the user's repository was switched to, and the branch to give it back to (if any).
+        const returnTo = returnTargetOf(snapshot.events);
+        sendJson(res, 200, { runId: run.id, runStatus: run.status, base: at === -1 ? run.base : run.base.slice(0, at), branches: withState, ...(returnTo ? { returnTo } : {}) });
       },
     },
     {
@@ -181,6 +184,18 @@ export const branchesRoutes: RouteModule = ({ reader, branches, pullRequests, co
         if (body.confirm !== true) throw new HttpError(400, "confirm must be true: switching your repository to another branch is only done when asked for explicitly");
         requireTask(params.id!, params.task!);
         await act(control, res, params.id!, params.task!, "checkout", ["--yes"]);
+      },
+    },
+    {
+      method: "POST",
+      pattern: "/api/runs/:id/tasks/:task/return",
+      handler: async ({ req, res, params }) => {
+        const control = requireControl(controlDeps);
+        const body = await readJsonBody(req);
+        rejectUnknown(body, ["confirm"]);
+        if (body.confirm !== true) throw new HttpError(400, "confirm must be true: switching your repository back is only done when asked for explicitly");
+        requireTask(params.id!, params.task!);
+        await act(control, res, params.id!, params.task!, "return", ["--yes"]);
       },
     },
     {

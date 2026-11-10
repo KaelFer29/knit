@@ -70,7 +70,20 @@ export class GitBranchTools implements BranchInspector, BranchEditor {
     return real(a) === real(b);
   }
 
-  checkout(ref: BranchRef): { freedWorktree: boolean } {
+  /** The branch the repository is on, undefined when it is detached. */
+  private currentBranch(repo: string): string | undefined {
+    return this.git(repo, ["symbolic-ref", "--short", "-q", "HEAD"]) || undefined;
+  }
+
+  returnRepository(repo: string, branch: string): void {
+    if (this.currentBranch(repo) === branch) return;
+    if (this.git(repo, ["status", "--porcelain"]) !== "") {
+      throw new Error("Your repository has uncommitted changes. Commit or stash them first, so switching branches cannot touch them");
+    }
+    this.git(repo, ["checkout", branch]);
+  }
+
+  checkout(ref: BranchRef): { freedWorktree: boolean; from?: string } {
     if (!this.exists(ref.repo, ref.branch)) throw new Error(`The branch ${ref.branch} no longer exists`);
     const at = this.checkedOutAt(ref.repo, ref.branch);
     if (at !== undefined && this.samePath(at, ref.repo)) return { freedWorktree: false };
@@ -85,8 +98,9 @@ export class GitBranchTools implements BranchInspector, BranchEditor {
       this.git(ref.repo, ["worktree", "remove", at]);
       freedWorktree = true;
     }
+    const from = this.currentBranch(ref.repo);
     this.git(ref.repo, ["checkout", ref.branch]);
-    return { freedWorktree };
+    return { freedWorktree, ...(from !== undefined ? { from } : {}) };
   }
 
   state(ref: BranchRef): BranchState {

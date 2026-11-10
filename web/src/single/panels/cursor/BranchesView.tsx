@@ -3,7 +3,7 @@ import type { BranchView } from "../../../branches/types";
 import { useList } from "../../../lists/useList";
 import { ListToolbar } from "../../../molecules/ListToolbar";
 import { Pager } from "../../../molecules/Pager";
-import { checkoutBranch, draftPullRequest, fetchRemoteBranches, openPullRequest, undoBranch } from "../../../branches/api";
+import { checkoutBranch, draftPullRequest, fetchRemoteBranches, openPullRequest, returnRepository, undoBranch } from "../../../branches/api";
 import { useBranches } from "../../../branches/useBranches";
 import { BranchCard, type BranchActions } from "../../../organisms/BranchCard";
 import "./BranchesView.css";
@@ -21,6 +21,7 @@ export function BranchesView({ runId, pollMs, flashMs }: { runId: string; pollMs
     () => ({
       remote: () => fetchRemoteBranches(runId),
       checkout: (taskId) => checkoutBranch(runId, taskId),
+      returnRepo: (taskId) => returnRepository(runId, taskId),
       undo: (taskId, mode) => undoBranch(runId, taskId, mode),
       draft: (taskId, how) => draftPullRequest(runId, taskId, how),
       open: (taskId, title, body, into) => openPullRequest(runId, taskId, title, body, into),
@@ -50,7 +51,7 @@ export function BranchesView({ runId, pollMs, flashMs }: { runId: string; pollMs
       {listing.branches.length > 1 ? <ListToolbar label="Search branches" query={list.query} onQuery={list.setQuery} summary={list.narrowed ? `${list.matching} of ${listing.branches.length} branches` : undefined} /> : null}
       {list.view.total === 0 ? <p className="detail-note">No branch matches this search.</p> : null}
       {list.view.items.map((b) => (
-        <BranchCard key={b.taskId} runId={runId} branch={b} actions={actions} onChanged={reload} defaultOpen={listing.branches.length === 1} {...(flashMs === undefined ? {} : { flashMs })} />
+        <BranchCard key={b.taskId} runId={runId} branch={b} actions={actions} onChanged={reload} defaultOpen={listing.branches.length === 1} {...(flashMs === undefined ? {} : { flashMs })} {...(listing.returnTo?.taskId === b.taskId ? { returnTo: listing.returnTo.branch } : {})} />
       ))}
       <Pager page={list.view} onPage={list.setPage} noun="branches" />
     </div>

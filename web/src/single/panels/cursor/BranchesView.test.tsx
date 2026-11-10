@@ -26,7 +26,7 @@ interface Call {
   body?: unknown;
 }
 let calls: Call[];
-let listing: { branches: unknown[] };
+let listing: { branches: unknown[]; returnTo?: { taskId: string; branch: string } };
 let replies: Record<string, { status: number; body: unknown }>;
 let remote: string[];
 
@@ -124,6 +124,22 @@ describe("BranchesView", () => {
       await user.click(within(dialog).getByRole("button", { name: "Switch my repository" }));
       expect((await screen.findByRole("alert")).textContent).toContain("uncommitted changes");
       expect(screen.getByRole("alertdialog")).toBeTruthy();
+    });
+
+    it("offers to give the repository back its branch only on the task that was tested, and sends the confirmation", async () => {
+      const user = userEvent.setup();
+      listing = { branches: [branch({ taskId: "T1", branch: "docs/one" }), branch({ taskId: "T2", title: "Other", branch: "docs/two" })], returnTo: { taskId: "T1", branch: "main" } };
+      replies["POST return"] = { status: 200, body: { ok: true, branch: "main" } };
+      show();
+      await user.click(await screen.findByRole("button", { name: /docs\/one/ }));
+      const button = await screen.findByRole("button", { name: "Return repository to main" });
+      expect(screen.queryByRole("region", { name: "Branch docs/two" })).toBeTruthy();
+      await user.click(button);
+      const dialog = screen.getByRole("alertdialog", { name: "Return your repository to main" });
+      expect(within(dialog).getByText(/Switches your repository back to main/)).toBeTruthy();
+      expect(posts()).toEqual([]);
+      await user.click(within(dialog).getByRole("button", { name: "Switch back to main" }));
+      await waitFor(() => expect(posts()).toEqual([{ method: "POST", url: "/api/runs/run-1/tasks/T1/return", body: { confirm: true } }]));
     });
 
     it("is disabled, with the reason, when the branch cannot be tested", async () => {

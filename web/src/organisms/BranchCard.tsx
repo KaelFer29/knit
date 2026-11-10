@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from "react";
 import { ApiError } from "../api/client";
 import { Chevron } from "../atoms/Chevron";
 import { StatusBadge } from "../atoms/StatusBadge";
-import type { BranchView, CheckoutResult, PrDraft, PrResult, UndoMode, UndoResult } from "../branches/types";
+import type { BranchView, CheckoutResult, PrDraft, PrResult, ReturnResult, UndoMode, UndoResult } from "../branches/types";
 import { draftKey, draftOnce, forgetDraft, loadDraft, saveDraft } from "../branches/draftCache";
 import { Popover } from "../molecules/Popover";
 import "./BranchCard.css";
@@ -12,6 +12,8 @@ export interface BranchActions {
   remote: () => Promise<string[]>;
   /** Switches the user's repository to the branch to test it. */
   checkout: (taskId: string) => Promise<CheckoutResult>;
+  /** Gives the user's repository back its own branch. */
+  returnRepo: (taskId: string) => Promise<ReturnResult>;
   undo: (taskId: string, mode: UndoMode) => Promise<UndoResult>;
   draft: (taskId: string, how: "template" | "model") => Promise<PrDraft>;
   open: (taskId: string, title: string, body: string, into?: string) => Promise<PrResult>;
@@ -47,7 +49,7 @@ const DRAFT_MODEL = "composer-2.5-fast";
 /** What the server calls a description built from the task, with no model. */
 const TEMPLATE = "template";
 
-type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | { kind: "checkout" } | undefined;
+type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | { kind: "checkout" } | { kind: "return" } | undefined;
 
 /**
  * One branch Cursor created: its commits and where it is, and what can be done with it. Undoing asks first and says
@@ -57,7 +59,7 @@ type Panel = { kind: "undo"; mode: UndoMode } | { kind: "pr" } | { kind: "checko
 /** How long the notice of a finished checkout stays in the tag row. */
 export const FLASH_MS = 3000;
 
-export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen = false, flashMs = FLASH_MS }: { runId: string; branch: BranchView; actions: BranchActions; onChanged: () => void; defaultOpen?: boolean; flashMs?: number }) {
+export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen = false, flashMs = FLASH_MS, returnTo }: { runId: string; branch: BranchView; actions: BranchActions; onChanged: () => void; defaultOpen?: boolean; flashMs?: number; /** The branch the user's repository was on before Knit tested this task; set only on the task that was tested. */ returnTo?: string }) {
   const [open, setOpen] = useState(defaultOpen);
   /** A short notice at the end of the state tags; it goes away by itself. */
   const [flash, setFlash] = useState<{ text: string; key: number }>();
@@ -91,6 +93,21 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
       await actions.undo(b.taskId, mode);
       setPanel(undefined);
       setResult({ text: UNDO[mode].done(b.branch, b.taskId) });
+      onChanged();
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmReturn = async (): Promise<void> => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      const done = await actions.returnRepo(b.taskId);
+      setPanel(undefined);
+      setFlash({ text: `Repository back on ${done.branch}`, key: Date.now() });
       onChanged();
     } catch (err) {
       setError(messageOf(err));
@@ -261,6 +278,20 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
         >
           Test this branch
         </button>
+        {returnTo === undefined ? null : (
+          <button
+            type="button"
+            className="branch__primary"
+            disabled={busy || panel?.kind === "return"}
+            onClick={() => {
+              setResult(undefined);
+              setError(undefined);
+              setPanel({ kind: "return" });
+            }}
+          >
+            Return repository to {returnTo}
+          </button>
+        )}
         <Popover
           label="Undo"
           direction="down"
@@ -302,6 +333,29 @@ export function BranchCard({ runId, branch: b, actions, onChanged, defaultOpen =
       </div>
       {prReason !== undefined && !b.prUrl ? <p className="branch__why">{prReason}</p> : null}
       {!b.checkout.ok && b.checkout.reason !== prReason ? <p className="branch__why">{b.checkout.reason}</p> : null}
+
+      {panel?.kind === "return" && returnTo !== undefined ? (
+        <div className="branch__panel" role="alertdialog" aria-label={`Return your repository to ${returnTo}`}>
+          <p className="branch__panel-title">Return your repository to {returnTo}</p>
+          <ul className="branch__effects">
+            <li>Switches your repository back to {returnTo}. It must have no uncommitted changes.</li>
+            <li>{b.branch} and its commits stay; iterating on {b.taskId} again recreates its worktree.</li>
+          </ul>
+          {error ? (
+            <p className="branch__error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="branch__row">
+            <button type="button" className="branch__primary" disabled={busy} onClick={() => void confirmReturn()}>
+              {busy ? "Working…" : `Switch back to ${returnTo}`}
+            </button>
+            <button type="button" className="branch__ghost" disabled={busy} onClick={close}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {panel?.kind === "checkout" && b.checkout.ok ? (
         <div className="branch__panel" role="alertdialog" aria-label={`Test ${b.branch} in your repository`}>

@@ -38,6 +38,13 @@ export interface BranchListing {
   runStatus: string;
   base: string;
   branches: BranchView[];
+  /** The task whose branch Knit switched the user's repository to, and the branch it was on before. */
+  returnTo?: { taskId: string; branch: string };
+}
+
+export interface ReturnResult {
+  ok: true;
+  branch: string;
 }
 
 export interface UndoResult {
